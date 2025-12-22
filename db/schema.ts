@@ -25,6 +25,13 @@ export const procurementStatusEnum = pgEnum('procurement_status', [
   'COMPLETED',
 ])
 
+export const adjustmentTypeEnum = pgEnum('adjustment_type', [
+  'STOCK_OPNAME',
+  'DAMAGE',
+  'LOSS',
+  'CORRECTION',
+])
+
 export const roles = pgTable('roles', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -57,6 +64,9 @@ export const items = pgTable(
     name: text('name').notNull(),
     baseUnit: text('base_unit').notNull(),
     minStockAlert: integer('min_stock_alert').default(0),
+
+    isActive: boolean('is_active').default(true).notNull(),
+    hasExpiry: boolean('has_expiry').default(false).notNull(),
   },
   (table) => [index('items_category_id_idx').on(table.categoryId)],
 )
@@ -158,9 +168,18 @@ export const warehouseStocks = pgTable(
     itemId: text('item_id')
       .notNull()
       .references(() => items.id, { onDelete: 'restrict' }),
+
     quantity: decimal('quantity', { precision: 10, scale: 2 }).default('0'),
+
+    batchNumber: text('batch_number'),
+    expiryDate: timestamp('expiry_date'),
+
+    receivedAt: timestamp('received_at').defaultNow(),
   },
-  (table) => [index('ws_warehouse_item_idx').on(table.warehouseId, table.itemId)],
+  (table) => [
+    index('ws_warehouse_item_idx').on(table.warehouseId, table.itemId),
+    index('ws_expiry_sort_idx').on(table.itemId, table.expiryDate),
+  ],
 )
 
 export const unitStocks = pgTable(
@@ -174,8 +193,43 @@ export const unitStocks = pgTable(
       .notNull()
       .references(() => items.id, { onDelete: 'restrict' }),
     quantity: decimal('quantity', { precision: 10, scale: 2 }).default('0'),
+
+    batchNumber: text('batch_number'),
+    expiryDate: timestamp('expiry_date'),
   },
-  (table) => [index('us_unit_item_idx').on(table.unitId, table.itemId)],
+  (table) => [
+    index('us_unit_item_idx').on(table.unitId, table.itemId),
+    index('us_expiry_sort_idx').on(table.itemId, table.expiryDate),
+  ],
+)
+
+export const stockAdjustments = pgTable(
+  'stock_adjustments',
+  {
+    id: text('id').primaryKey(),
+    warehouseId: text('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id),
+
+    batchNumber: text('batch_number'),
+    expiryDate: timestamp('expiry_date'),
+
+    systemQty: decimal('system_qty', { precision: 10, scale: 2 }).notNull(),
+    realQty: decimal('real_qty', { precision: 10, scale: 2 }).notNull(),
+    qtyDifference: decimal('qty_difference', { precision: 10, scale: 2 }).notNull(),
+
+    type: adjustmentTypeEnum('type').notNull(),
+    reason: text('reason').notNull(),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [index('sa_warehouse_item_idx').on(table.warehouseId, table.itemId)],
 )
 
 export const requests = pgTable(
@@ -248,6 +302,9 @@ export const procurementDetails = pgTable(
       .references(() => items.id),
     quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
     packagingLabel: text('packaging_label'),
+
+    batchNumber: text('batch_number'),
+    expiryDate: timestamp('expiry_date'),
   },
   (table) => [index('pd_procurement_id_idx').on(table.procurementId)],
 )
@@ -277,6 +334,8 @@ export const usageDetails = pgTable(
       .notNull()
       .references(() => items.id),
     qtyUsed: decimal('qty_used', { precision: 10, scale: 2 }).notNull(),
+
+    batchNumber: text('batch_number'),
   },
   (table) => [index('ud_usage_report_id_idx').on(table.usageReportId)],
 )
@@ -334,6 +393,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),
   requests: many(requests, { relationName: 'requester' }),
   procurements: many(procurements, { relationName: 'admin' }),
+  adjustments: many(stockAdjustments),
 }))
 
 export const itemsRelations = relations(items, ({ one, many }) => ({
@@ -343,6 +403,44 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   }),
   warehouseStocks: many(warehouseStocks),
   unitStocks: many(unitStocks),
+  adjustments: many(stockAdjustments),
+}))
+
+export const warehouseStocksRelations = relations(warehouseStocks, ({ one }) => ({
+  warehouse: one(warehouses, {
+    fields: [warehouseStocks.warehouseId],
+    references: [warehouses.id],
+  }),
+  item: one(items, {
+    fields: [warehouseStocks.itemId],
+    references: [items.id],
+  }),
+}))
+
+export const unitStocksRelations = relations(unitStocks, ({ one }) => ({
+  unit: one(units, {
+    fields: [unitStocks.unitId],
+    references: [units.id],
+  }),
+  item: one(items, {
+    fields: [unitStocks.itemId],
+    references: [items.id],
+  }),
+}))
+
+export const stockAdjustmentsRelations = relations(stockAdjustments, ({ one }) => ({
+  warehouse: one(warehouses, {
+    fields: [stockAdjustments.warehouseId],
+    references: [warehouses.id],
+  }),
+  item: one(items, {
+    fields: [stockAdjustments.itemId],
+    references: [items.id],
+  }),
+  user: one(user, {
+    fields: [stockAdjustments.userId],
+    references: [user.id],
+  }),
 }))
 
 export const requestsRelations = relations(requests, ({ one, many }) => ({
