@@ -245,6 +245,7 @@ export const requests = pgTable(
     approverId: text('approver_id').references(() => user.id),
     requestCode: text('request_code').notNull().unique(),
     status: requestStatusEnum('status').default('PENDING'),
+    note: text('note'),
     qrToken: text('qr_token'),
     createdAt: timestamp('created_at').defaultNow(),
   },
@@ -281,6 +282,7 @@ export const procurements = pgTable(
     approverId: text('approver_id').references(() => user.id),
     procurementCode: text('procurement_code').notNull().unique(),
     status: procurementStatusEnum('status').default('PENDING'),
+    note: text('note'),
     proofDocument: text('proof_document'),
     createdAt: timestamp('created_at').defaultNow(),
   },
@@ -348,6 +350,8 @@ export const transactionHistories = pgTable(
     action: text('action').notNull(),
     tableName: text('table_name').notNull(),
     recordId: text('record_id').notNull(),
+    referenceId: text('reference_id'),
+    description: text('description'),
     oldValues: json('old_values'),
     newValues: json('new_values'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -355,6 +359,7 @@ export const transactionHistories = pgTable(
   (table) => [
     index('th_record_id_idx').on(table.recordId),
     index('th_table_name_idx').on(table.tableName),
+    index('th_reference_id_idx').on(table.referenceId),
   ],
 )
 
@@ -394,6 +399,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
   requests: many(requests, { relationName: 'requester' }),
   procurements: many(procurements, { relationName: 'admin' }),
   adjustments: many(stockAdjustments),
+  transactionHistories: many(transactionHistories),
 }))
 
 export const itemsRelations = relations(items, ({ one, many }) => ({
@@ -526,6 +532,13 @@ export const sessionRelations = relations(session, ({ one }) => ({
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
+    references: [user.id],
+  }),
+}))
+
+export const transactionHistoriesRelations = relations(transactionHistories, ({ one }) => ({
+  user: one(user, {
+    fields: [transactionHistories.userId],
     references: [user.id],
   }),
 }))
