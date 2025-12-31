@@ -14,8 +14,11 @@ import {
 export const requestStatusEnum = pgEnum('request_status', [
   'PENDING',
   'APPROVED',
-  'REJECTED',
+  'PROCESSING',
+  'READY_TO_PICKUP',
   'COMPLETED',
+  'REJECTED',
+  'CANCELED',
 ])
 
 export const procurementStatusEnum = pgEnum('procurement_status', [
@@ -62,6 +65,8 @@ export const items = pgTable(
       .notNull()
       .references(() => categories.id),
     name: text('name').notNull(),
+    sku: text('sku').unique(),
+    image: text('image'),
     baseUnit: text('base_unit').notNull(),
     minStockAlert: integer('min_stock_alert').default(0),
 
@@ -245,7 +250,7 @@ export const requests = pgTable(
     approverId: text('approver_id').references(() => user.id),
     requestCode: text('request_code').notNull().unique(),
     status: requestStatusEnum('status').default('PENDING'),
-    note: text('note'),
+    rejectionReason: text('rejection_reason'),
     qrToken: text('qr_token'),
     createdAt: timestamp('created_at').defaultNow(),
   },
