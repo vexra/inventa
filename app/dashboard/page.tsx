@@ -13,22 +13,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export default function Page() {
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-4">
-      {/* --- HEADER --- */}
-      <div className="flex items-center justify-between space-y-2">
-        <div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground">Ringkasan aktivitas sistem dan status inventaris.</p>
         </div>
+
         <div className="flex items-center space-x-2">
-          <button className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow transition-colors">
-            Download Laporan
+          <button className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 w-full items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow transition-colors md:w-auto">
+            Download <span className="ml-1 hidden sm:inline">Laporan</span>
           </button>
         </div>
       </div>
 
-      {/* --- KEY METRICS (4 CARDS) --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Total Pengguna */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Pengguna</CardTitle>
@@ -40,7 +38,6 @@ export default function Page() {
           </CardContent>
         </Card>
 
-        {/* Card 2: Request Pending (Perlu perhatian Admin/Approver) */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Permintaan Pending</CardTitle>
@@ -52,7 +49,6 @@ export default function Page() {
           </CardContent>
         </Card>
 
-        {/* Card 3: Stok Kritis (Perlu perhatian Warehouse) */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Stok Menipis</CardTitle>
@@ -64,7 +60,6 @@ export default function Page() {
           </CardContent>
         </Card>
 
-        {/* Card 4: Total Aset/Barang */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Jenis Barang</CardTitle>
@@ -77,9 +72,7 @@ export default function Page() {
         </Card>
       </div>
 
-      {/* --- MAIN CONTENT SPLIT --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* LEFT: Statistik Visual (Placeholder Grafik) */}
         <Card className="col-span-4 h-full">
           <CardHeader>
             <CardTitle>Tren Permintaan Barang</CardTitle>
@@ -88,9 +81,7 @@ export default function Page() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            {/* Visualisasi Placeholder Grafik Batang */}
             <div className="flex h-75 w-full items-end justify-between gap-2 px-4 pt-8">
-              {/* Batang-batang grafik simulasi */}
               {[40, 25, 60, 35, 80, 50, 90].map((height, i) => (
                 <div key={i} className="group relative flex w-1/12 flex-col justify-end gap-2">
                   <div
@@ -106,7 +97,6 @@ export default function Page() {
           </CardContent>
         </Card>
 
-        {/* RIGHT: Recent Activity Logs (Audit Trail Ringkas) */}
         <Card className="col-span-3 h-full">
           <CardHeader>
             <CardTitle>Aktivitas Terkini</CardTitle>
@@ -114,7 +104,6 @@ export default function Page() {
           </CardHeader>
           <CardContent>
             <div className="space-y-8">
-              {/* Simulasi Data Log */}
               {[
                 {
                   user: 'Budi Santoso',
