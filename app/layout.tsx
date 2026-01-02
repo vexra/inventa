@@ -3,6 +3,8 @@ import { Roboto } from 'next/font/google'
 
 import { Toaster } from 'sonner'
 
+import { ThemeProvider } from '@/components/theme-provider'
+
 import './globals.css'
 
 const roboto = Roboto({
@@ -26,7 +28,14 @@ export default function RootLayout({
     <html lang="id">
       <body className={`${roboto.variable} antialiased`}>
         <Toaster position="top-center" />
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   )
