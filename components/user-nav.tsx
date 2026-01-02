@@ -25,7 +25,7 @@ interface UserNavProps {
   className?: string
 }
 
-export function UserNav({ children, side = 'bottom', align = 'end', className }: UserNavProps) {
+export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavProps) {
   const { data: session, isPending } = authClient.useSession()
   const router = useRouter()
 

@@ -6,6 +6,7 @@ import {
   FileText,
   History,
   LayoutDashboard,
+  type LucideIcon,
   Package,
   Shield,
   ShoppingBag,
@@ -22,7 +23,7 @@ export type UserRole = (typeof userRoleEnum.enumValues)[number]
 type NavItem = {
   title: string
   url: string
-  icon: any
+  icon: LucideIcon
   items?: { title: string; url: string }[]
 }
 
