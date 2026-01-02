@@ -91,7 +91,7 @@ export default function LoginPage() {
             <div className="mb-6 flex flex-col items-center gap-2 text-center">
               <h1 className="text-2xl font-bold">Masuk Akun</h1>
               <p className="text-muted-foreground text-sm text-balance">
-                Masukkan email dan password untuk mengakses inventaris
+                Masukkan email dan password untuk mengakses Inventa
               </p>
             </div>
             <Form {...form}>

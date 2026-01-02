@@ -35,10 +35,12 @@ export const adjustmentTypeEnum = pgEnum('adjustment_type', [
   'CORRECTION',
 ])
 
-export const roles = pgTable('roles', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-})
+export const userRoleEnum = pgEnum('user_role', [
+  'Administrator',
+  'Warehouse Admin',
+  'Unit Staff',
+  'Executive',
+])
 
 export const units = pgTable('units', {
   id: text('id').primaryKey(),
@@ -85,7 +87,8 @@ export const user = pgTable(
     emailVerified: boolean('email_verified').default(false).notNull(),
     image: text('image'),
 
-    roleId: text('role_id').references(() => roles.id),
+    role: userRoleEnum('role').notNull(),
+
     unitId: text('unit_id').references(() => units.id),
     warehouseId: text('warehouse_id').references(() => warehouses.id),
 
@@ -387,10 +390,6 @@ export const systemActivityLogs = pgTable(
 )
 
 export const userRelations = relations(user, ({ one, many }) => ({
-  role: one(roles, {
-    fields: [user.roleId],
-    references: [roles.id],
-  }),
   unit: one(units, {
     fields: [user.unitId],
     references: [units.id],
