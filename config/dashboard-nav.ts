@@ -1,13 +1,18 @@
 import {
   BarChart,
   Box,
+  Building2,
+  FileClock,
   FileText,
+  History,
   LayoutDashboard,
-  Settings,
+  Package,
   Shield,
   ShoppingBag,
+  Tags,
   Truck,
   Users,
+  Warehouse,
 } from 'lucide-react'
 
 import { userRoleEnum } from '@/db/schema'
@@ -24,42 +29,58 @@ type NavItem = {
 export const roleNavItems: Record<UserRole, { title: string; items: NavItem[] }[]> = {
   Administrator: [
     {
-      title: 'General',
+      title: 'Umum',
+      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+    },
+    {
+      title: 'Data Master',
       items: [
-        { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-        { title: 'Users', url: '/dashboard/users', icon: Users },
-        { title: 'Apps', url: '/dashboard/apps', icon: Box },
+        { title: 'Data Gudang', url: '/dashboard/warehouses', icon: Warehouse },
+        { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
+        { title: 'Data Barang', url: '/dashboard/items', icon: Package },
+        { title: 'Kategori', url: '/dashboard/categories', icon: Tags },
       ],
     },
     {
-      title: 'Management',
+      title: 'Manajemen Pengguna',
       items: [
-        { title: 'Roles & Permissions', url: '/dashboard/roles', icon: Shield },
-        { title: 'Settings', url: '/dashboard/settings', icon: Settings },
+        { title: 'Daftar Pengguna', url: '/dashboard/users', icon: Users },
+        { title: 'Hak Akses & Role', url: '/dashboard/roles', icon: Shield },
+      ],
+    },
+    {
+      title: 'Sistem & Audit',
+      items: [
+        { title: 'Log Aktivitas', url: '/dashboard/logs/activity', icon: FileClock },
+        { title: 'Riwayat Audit', url: '/dashboard/logs/audit', icon: History },
+        // Menu Pengaturan dihapus sesuai permintaan
       ],
     },
   ],
+
   'Warehouse Admin': [
     {
-      title: 'Inventory',
+      title: 'Inventaris',
       items: [
-        { title: 'Stock Overview', url: '/warehouse', icon: Box },
-        { title: 'Inbound/Outbound', url: '/warehouse/logs', icon: Truck },
+        { title: 'Stok Gudang', url: '/warehouse', icon: Box },
+        { title: 'Riwayat Keluar/Masuk', url: '/warehouse/logs', icon: Truck },
       ],
     },
   ],
+
   'Unit Staff': [
     {
-      title: 'Unit Operations',
-      items: [{ title: 'My Requests', url: '/unit/requests', icon: FileText }],
+      title: 'Operasional Unit',
+      items: [{ title: 'Permintaan Saya', url: '/unit/requests', icon: FileText }],
     },
   ],
+
   Executive: [
     {
-      title: 'Reports',
+      title: 'Laporan',
       items: [
-        { title: 'Analytics', url: '/exec/analytics', icon: BarChart },
-        { title: 'Revenue', url: '/exec/revenue', icon: ShoppingBag },
+        { title: 'Analisis', url: '/exec/analytics', icon: BarChart },
+        { title: 'Ringkasan Keuangan', url: '/exec/revenue', icon: ShoppingBag },
       ],
     },
   ],
