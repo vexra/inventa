@@ -1,32 +1,33 @@
-import * as crypto from 'crypto'
 import 'dotenv/config'
 import { eq } from 'drizzle-orm'
 
-import { roles, user } from '@/db/schema'
+import { user, userRoleEnum } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
+
+type UserRole = (typeof userRoleEnum.enumValues)[number]
 
 async function main() {
   const password = 'password123'
 
-  const seedData = [
+  const seedData: { role: UserRole; email: string; userName: string }[] = [
     {
-      roleName: 'Administrator',
+      role: 'Administrator',
       email: 'admin@inventa.fmipa.unila.ac.id',
       userName: 'Administrator User',
     },
     {
-      roleName: 'Warehouse Admin',
+      role: 'Warehouse Admin',
       email: 'warehouse@inventa.fmipa.unila.ac.id',
       userName: 'Warehouse Admin User',
     },
     {
-      roleName: 'Unit Representative',
+      role: 'Unit Staff',
       email: 'unit@inventa.fmipa.unila.ac.id',
-      userName: 'Unit Rep User',
+      userName: 'Unit Staff User',
     },
     {
-      roleName: 'Executive',
+      role: 'Executive',
       email: 'executive@inventa.fmipa.unila.ac.id',
       userName: 'Executive User',
     },
@@ -35,58 +36,43 @@ async function main() {
   console.log('🚀 Starting seeding process...')
 
   for (const data of seedData) {
-    let roleId: string
-
-    const existingRole = await db.select().from(roles).where(eq(roles.name, data.roleName)).limit(1)
-
-    if (existingRole.length > 0) {
-      roleId = existingRole[0].id
-      console.log(`ℹ️  Role found: ${data.roleName}`)
-    } else {
-      const newRole = await db
-        .insert(roles)
-        .values({
-          id: crypto.randomUUID(),
-          name: data.roleName,
-        })
-        .returning({ id: roles.id })
-
-      roleId = newRole[0].id
-      console.log(`✅ Role created: ${data.roleName}`)
-    }
-
     const existingUsers = await db.select().from(user).where(eq(user.email, data.email)).limit(1)
+
     const existingUser = existingUsers[0]
 
     if (existingUser) {
-      if (existingUser.roleId !== roleId) {
-        await db.update(user).set({ roleId: roleId }).where(eq(user.id, existingUser.id))
-        console.log(`🔄 Updated role for existing user: ${data.email}`)
+      if (existingUser.role !== data.role) {
+        await db.update(user).set({ role: data.role }).where(eq(user.id, existingUser.id))
+        console.log(`🔄 Updated role for existing user: ${data.email} -> ${data.role}`)
       } else {
         console.log(`⏭️  User already exists and valid: ${data.email}`)
       }
       continue
     }
 
-    const response = await auth.api.signUpEmail({
-      body: {
-        email: data.email,
-        password: password,
-        name: data.userName,
-      },
-      asResponse: false,
-    })
+    try {
+      const response = await auth.api.signUpEmail({
+        body: {
+          email: data.email,
+          password: password,
+          name: data.userName,
+        },
+        asResponse: false,
+      })
 
-    if (response.user) {
-      await db
-        .update(user)
-        .set({
-          roleId: roleId,
-          emailVerified: true,
-        })
-        .where(eq(user.id, response.user.id))
+      if (response.user) {
+        await db
+          .update(user)
+          .set({
+            role: data.role,
+            emailVerified: true,
+          })
+          .where(eq(user.id, response.user.id))
 
-      console.log(`🌱 Created new user: ${data.email} (${data.roleName})`)
+        console.log(`🌱 Created new user: ${data.email} as [${data.role}]`)
+      }
+    } catch (error) {
+      console.error(`❌ Failed to create user ${data.email}:`, error)
     }
   }
 
