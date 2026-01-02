@@ -15,7 +15,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-// 1. Import Skeleton
 import { Skeleton } from '@/components/ui/skeleton'
 import { authClient } from '@/lib/auth-client'
 
@@ -27,7 +26,6 @@ interface UserNavProps {
 }
 
 export function UserNav({ children, side = 'bottom', align = 'end', className }: UserNavProps) {
-  // 2. Ambil state 'isPending'
   const { data: session, isPending } = authClient.useSession()
   const router = useRouter()
 
@@ -50,10 +48,7 @@ export function UserNav({ children, side = 'bottom', align = 'end', className }:
     })
   }
 
-  // 3. LOGIKA SKELETON (LOADING STATE)
   if (isPending) {
-    // KASUS A: Mode Sidebar (Ada children)
-    // Tampilkan skeleton persegi panjang lebar dengan avatar + teks
     if (children) {
       return (
         <div className="ring-sidebar-ring has-data-[state=open]:bg-sidebar-accent has-data-[state=open]:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm transition-[width,height,padding] outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50">
@@ -67,12 +62,9 @@ export function UserNav({ children, side = 'bottom', align = 'end', className }:
       )
     }
 
-    // KASUS B: Mode Navbar/Header (Default)
-    // Tampilkan skeleton bulat saja
     return <Skeleton className="h-8 w-8 rounded-full" />
   }
 
-  // 4. Jika tidak loading tapi tidak ada user (Auth failed / belum login), baru return null
   if (!session?.user) {
     return null
   }

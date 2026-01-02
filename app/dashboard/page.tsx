@@ -12,7 +12,6 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Tabs Placeholder */}
       <div className="flex space-x-2 pb-4">
         <div className="bg-muted text-primary rounded-md px-3 py-1 text-sm font-medium">
           Overview
@@ -21,7 +20,6 @@ export default function Page() {
         <div className="text-muted-foreground rounded-md px-3 py-1 text-sm">Reports</div>
       </div>
 
-      {/* --- 4 Summary Cards --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
@@ -37,15 +35,12 @@ export default function Page() {
         ))}
       </div>
 
-      {/* --- Big Chart & Recent Sales Area --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Placeholder Chart Area (Overview) */}
         <Card className="col-span-4 h-100">
           <CardHeader>
             <CardTitle>Overview</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            {/* Kotak kosong simulasi chart */}
             <div className="flex h-75 w-full items-end gap-2 px-4">
               <div className="bg-primary/80 h-[60%] w-1/6 rounded-t-md"></div>
               <div className="bg-primary/80 h-[30%] w-1/6 rounded-t-md"></div>
@@ -57,7 +52,6 @@ export default function Page() {
           </CardContent>
         </Card>
 
-        {/* Placeholder Recent Sales */}
         <Card className="col-span-3 h-100">
           <CardHeader>
             <CardTitle>Recent Sales</CardTitle>
@@ -65,7 +59,6 @@ export default function Page() {
           </CardHeader>
           <CardContent>
             <div className="space-y-8">
-              {/* List User Dummy */}
               {[1, 2, 3, 4, 5].map((item) => (
                 <div className="flex items-center" key={item}>
                   <div className="bg-muted mr-4 flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold">

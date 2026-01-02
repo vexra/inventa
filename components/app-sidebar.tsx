@@ -21,7 +21,6 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
-// Import Skeleton
 import { UserNav } from '@/components/user-nav'
 import { type UserRole, roleNavItems } from '@/config/dashboard-nav'
 import { authClient } from '@/lib/auth-client'
@@ -62,22 +61,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* LOGIKA SKELETON CONTENT */}
         {isPending
-          ? // Tampilkan 2 Grup dummy sebagai skeleton
-            Array.from({ length: 2 }).map((_, i) => (
+          ? Array.from({ length: 2 }).map((_, i) => (
               <SidebarGroup key={i}>
                 <SidebarGroupLabel>
                   <Skeleton className="h-4 w-24" />
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {/* Tampilkan 4 Item dummy per grup */}
                     {Array.from({ length: 4 }).map((_, j) => (
                       <SidebarMenuItem key={j}>
                         <SidebarMenuButton disabled>
                           <Skeleton className="size-4" />
-                          <Skeleton className="h-4 w-full max-w-[120px]" />
+                          <Skeleton className="h-4 w-full max-w-30" />
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))}
@@ -85,8 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </SidebarGroupContent>
               </SidebarGroup>
             ))
-          : // Tampilkan Data Asli
-            navGroups?.map((group) => (
+          : navGroups?.map((group) => (
               <SidebarGroup key={group.title}>
                 <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -110,7 +105,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            {/* LOGIKA SKELETON FOOTER */}
             {isPending ? (
               <div className="ring-sidebar-ring flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm transition-[width,height,padding] outline-none">
                 <Skeleton className="h-8 w-8 rounded-lg" />
@@ -140,7 +134,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </SidebarMenuButton>
               </UserNav>
             ) : (
-              // State jika sudah tidak loading tapi user tidak ada (misal null)
               <div className="text-muted-foreground flex h-12 items-center justify-center px-4 text-xs">
                 Belum masuk
               </div>

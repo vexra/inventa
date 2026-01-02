@@ -1,8 +1,5 @@
 'use client'
 
-import * as React from 'react'
-
-// Tambahkan Check
 import { useTheme } from 'next-themes'
 
 import { Check, Moon, Sun } from 'lucide-react'
@@ -16,7 +13,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 export function ModeToggle() {
-  // Ambil state 'theme' untuk pengecekan
   const { theme, setTheme } = useTheme()
 
   return (
@@ -29,19 +25,16 @@ export function ModeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {/* Opsi Terang */}
         <DropdownMenuItem onClick={() => setTheme('light')}>
           Terang
           {theme === 'light' && <Check className="ml-auto h-4 w-4" />}
         </DropdownMenuItem>
 
-        {/* Opsi Gelap */}
         <DropdownMenuItem onClick={() => setTheme('dark')}>
           Gelap
           {theme === 'dark' && <Check className="ml-auto h-4 w-4" />}
         </DropdownMenuItem>
 
-        {/* Opsi Sistem */}
         <DropdownMenuItem onClick={() => setTheme('system')}>
           Sistem
           {theme === 'system' && <Check className="ml-auto h-4 w-4" />}
