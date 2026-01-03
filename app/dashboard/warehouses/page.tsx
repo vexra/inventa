@@ -1,4 +1,4 @@
-import { desc, ilike, or, sql } from 'drizzle-orm'
+import { asc, ilike, or, sql } from 'drizzle-orm'
 
 import { warehouses } from '@/db/schema'
 import { db } from '@/lib/db'
@@ -33,7 +33,7 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
     .where(searchCondition)
     .limit(ITEMS_PER_PAGE)
     .offset(offset)
-    .orderBy(desc(warehouses.name))
+    .orderBy(asc(warehouses.name))
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
