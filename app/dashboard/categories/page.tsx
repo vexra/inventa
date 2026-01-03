@@ -1,12 +1,12 @@
-import { asc, ilike, or, sql } from 'drizzle-orm'
+import { asc, ilike, sql } from 'drizzle-orm'
 
-import { units } from '@/db/schema'
+import { categories } from '@/db/schema'
 import { db } from '@/lib/db'
 
-import { UnitDialog } from './_components/unit-dialog'
-import { UnitList } from './_components/unit-list'
-import { UnitPagination } from './_components/unit-pagination'
-import { UnitSearch } from './_components/unit-search'
+import { CategoryDialog } from './_components/category-dialog'
+import { CategoryList } from './_components/category-list'
+import { CategoryPagination } from './_components/category-pagination'
+import { CategorySearch } from './_components/category-search'
 
 const ITEMS_PER_PAGE = 10
 
@@ -17,27 +17,25 @@ interface PageProps {
   }>
 }
 
-export default async function UnitsPage({ searchParams }: PageProps) {
+export default async function CategoriesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
 
-  const searchCondition = query
-    ? or(ilike(units.name, `%${query}%`), ilike(units.description, `%${query}%`))
-    : undefined
+  const searchCondition = query ? ilike(categories.name, `%${query}%`) : undefined
 
   const dataPromise = db
     .select()
-    .from(units)
+    .from(categories)
     .where(searchCondition)
     .limit(ITEMS_PER_PAGE)
     .offset(offset)
-    .orderBy(asc(units.name))
+    .orderBy(asc(categories.name))
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
-    .from(units)
+    .from(categories)
     .where(searchCondition)
 
   const [data, countResult] = await Promise.all([dataPromise, countPromise])
@@ -49,24 +47,24 @@ export default async function UnitsPage({ searchParams }: PageProps) {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Data Unit</h1>
-          <p className="text-muted-foreground">Kelola daftar unit kerja dan departemen</p>
+          <h1 className="text-3xl font-bold tracking-tight">Kategori</h1>
+          <p className="text-muted-foreground">Kelola kategori untuk pengelompokan jenis barang</p>
         </div>
-        <UnitDialog mode="create" />
+        <CategoryDialog mode="create" />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <UnitSearch />
+        <CategorySearch />
       </div>
 
       <div className="flex flex-col gap-4">
-        <UnitList data={data} />
+        <CategoryList data={data} />
 
-        {totalPages > 1 && <UnitPagination totalPages={totalPages} />}
+        {totalPages > 1 && <CategoryPagination totalPages={totalPages} />}
 
         {data.length === 0 && query && (
           <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan unit dengan kata kunci <strong>&quot;{query}&quot;</strong>.
+            Tidak ditemukan kategori dengan kata kunci <strong>&quot;{query}&quot;</strong>.
           </div>
         )}
       </div>

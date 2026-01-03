@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { FileText, MoreHorizontal, Pencil, Trash2, Users } from 'lucide-react'
+import { MoreHorizontal, Pencil, Tags, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -32,28 +32,27 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-import { deleteUnit } from '../actions'
-import { UnitDialog } from './unit-dialog'
+import { deleteCategory } from '../actions'
+import { CategoryDialog } from './category-dialog'
 
-type Unit = {
+type Category = {
   id: string
   name: string
-  description: string | null
 }
 
-export function UnitList({ data }: { data: Unit[] }) {
+export function CategoryList({ data }: { data: Category[] }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const handleDelete = async () => {
     if (!deletingId) return
-    const res = await deleteUnit(deletingId)
+    const res = await deleteCategory(deletingId)
     if (res.error) toast.error(res.error)
     else toast.success(res.message)
     setDeletingId(null)
   }
 
-  const unitToEdit = data.find((u) => u.id === editingId)
+  const categoryToEdit = data.find((c) => c.id === editingId)
 
   return (
     <>
@@ -61,16 +60,15 @@ export function UnitList({ data }: { data: Unit[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nama Unit</TableHead>
-              <TableHead>Deskripsi</TableHead>
+              <TableHead>Nama Kategori</TableHead>
               <TableHead className="w-25 text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center">
-                  Tidak ada data unit.
+                <TableCell colSpan={2} className="h-24 text-center">
+                  Tidak ada data kategori.
                 </TableCell>
               </TableRow>
             ) : (
@@ -78,19 +76,9 @@ export function UnitList({ data }: { data: Unit[] }) {
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      <Users className="text-muted-foreground h-4 w-4" />
+                      <Tags className="text-muted-foreground h-4 w-4" />
                       {item.name}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {item.description ? (
-                      <div className="text-muted-foreground flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        {item.description}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground italic">-</span>
-                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -120,12 +108,12 @@ export function UnitList({ data }: { data: Unit[] }) {
         </Table>
       </div>
 
-      {editingId && unitToEdit && (
-        <UnitDialog
+      {editingId && categoryToEdit && (
+        <CategoryDialog
           mode="edit"
           open={!!editingId}
           onOpenChange={(open) => !open && setEditingId(null)}
-          initialData={unitToEdit}
+          initialData={categoryToEdit}
         />
       )}
 
@@ -134,7 +122,8 @@ export function UnitList({ data }: { data: Unit[] }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Apakah anda yakin?</AlertDialogTitle>
             <AlertDialogDescription>
-              Menghapus unit ini mungkin mempengaruhi data pengguna dan stok barang yang terkait.
+              Menghapus kategori ini mungkin menyebabkan barang yang terkait kehilangan label
+              kategorinya.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
