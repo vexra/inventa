@@ -1,12 +1,12 @@
 import { asc, ilike, or, sql } from 'drizzle-orm'
 
-import { warehouses } from '@/db/schema'
+import { units } from '@/db/schema'
 import { db } from '@/lib/db'
 
-import { WarehouseDialog } from './_components/warehouse-dialog'
-import { WarehouseList } from './_components/warehouse-list'
-import { WarehousePagination } from './_components/warehouse-pagination'
-import { WarehouseSearch } from './_components/warehouse-search'
+import { UnitDialog } from './_components/unit-dialog'
+import { UnitList } from './_components/unit-list'
+import { UnitPagination } from './_components/unit-pagination'
+import { UnitSearch } from './_components/unit-search'
 
 const ITEMS_PER_PAGE = 10
 
@@ -17,27 +17,27 @@ interface PageProps {
   }>
 }
 
-export default async function WarehousesPage({ searchParams }: PageProps) {
+export default async function UnitsPage({ searchParams }: PageProps) {
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
 
   const searchCondition = query
-    ? or(ilike(warehouses.name, `%${query}%`), ilike(warehouses.location, `%${query}%`))
+    ? or(ilike(units.name, `%${query}%`), ilike(units.description, `%${query}%`))
     : undefined
 
   const dataPromise = db
     .select()
-    .from(warehouses)
+    .from(units)
     .where(searchCondition)
     .limit(ITEMS_PER_PAGE)
     .offset(offset)
-    .orderBy(asc(warehouses.name))
+    .orderBy(asc(units.name))
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
-    .from(warehouses)
+    .from(units)
     .where(searchCondition)
 
   const [data, countResult] = await Promise.all([dataPromise, countPromise])
@@ -49,24 +49,24 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Data Gudang</h1>
-          <p className="text-muted-foreground">Kelola daftar gudang penyimpanan barang</p>
+          <h1 className="text-3xl font-bold tracking-tight">Data Unit</h1>
+          <p className="text-muted-foreground">Kelola daftar unit kerja dan departemen.</p>
         </div>
-        <WarehouseDialog mode="create" />
+        <UnitDialog mode="create" />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <WarehouseSearch />
+        <UnitSearch />
       </div>
 
       <div className="flex flex-col gap-4">
-        <WarehouseList data={data} />
+        <UnitList data={data} />
 
-        {totalPages > 1 && <WarehousePagination totalPages={totalPages} />}
+        {totalPages > 1 && <UnitPagination totalPages={totalPages} />}
 
         {data.length === 0 && query && (
           <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan gudang dengan kata kunci <strong>&quot;{query}&quot;</strong>.
+            Tidak ditemukan unit dengan kata kunci <strong>&quot;{query}&quot;</strong>.
           </div>
         )}
       </div>
