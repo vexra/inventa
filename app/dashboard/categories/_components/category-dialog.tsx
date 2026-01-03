@@ -73,7 +73,7 @@ export function CategoryDialog({
         setIsOpen?.(false)
         if (mode === 'create') form.reset()
       }
-    } catch (error) {
+    } catch {
       toast.error('Terjadi kesalahan sistem')
     }
   }

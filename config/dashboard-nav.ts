@@ -36,9 +36,9 @@ export const roleNavItems: Record<UserRole, { title: string; items: NavItem[] }[
     {
       title: 'Data Master',
       items: [
-        { title: 'Data Gudang', url: '/dashboard/warehouses', icon: Warehouse },
+        { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
         { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
-        { title: 'Data Barang', url: '/dashboard/items', icon: Package },
+        { title: 'Barang', url: '/dashboard/items', icon: Package },
         { title: 'Kategori', url: '/dashboard/categories', icon: Tags },
       ],
     },
