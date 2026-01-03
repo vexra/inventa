@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Turnstile } from '@marsidev/react-turnstile'
 import { Eye, EyeOff, GalleryVerticalEnd, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import * as z from 'zod'
@@ -37,6 +38,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  const [captchaToken, setCaptchaToken] = useState<string>('')
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -46,27 +49,38 @@ export default function LoginPage() {
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!captchaToken) {
+      toast.error('Validasi Gagal', {
+        description: 'Silakan selesaikan captcha terlebih dahulu.',
+      })
+      return
+    }
+
     setIsLoading(true)
+
     await authClient.signIn.email(
       {
         email: values.email,
         password: values.password,
       },
       {
+        fetchOptions: {
+          headers: {
+            'x-captcha-response': captchaToken,
+          },
+        },
         onSuccess: (ctx) => {
           const name = ctx.data?.user.name || 'User'
-
           setIsLoading(false)
-
           toast.success(`Selamat Datang, ${name}!`, {
             description: 'Anda berhasil masuk ke dalam sistem.',
           })
-
           router.push('/dashboard')
           router.refresh()
         },
         onError: (ctx) => {
           setIsLoading(false)
+
           toast.error('Gagal Masuk', {
             description: ctx.error.message || 'Periksa kembali email dan password Anda.',
           })
@@ -141,10 +155,27 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
+
+                <div className="flex min-h-16.25 w-full justify-center">
+                  <Turnstile
+                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
+                    onSuccess={(token) => {
+                      console.log('Captcha success:', token)
+                      setCaptchaToken(token)
+                    }}
+                    onExpire={() => setCaptchaToken('')}
+                    onError={() => toast.error('Gagal memuat Captcha')}
+                    options={{
+                      theme: 'auto',
+                      size: 'flexible',
+                    }}
+                  />
+                </div>
+
                 <Button
                   type="submit"
                   className="w-full bg-blue-600 text-white hover:bg-blue-700"
-                  disabled={isLoading}
+                  disabled={isLoading || !captchaToken}
                 >
                   {isLoading ? (
                     <>
