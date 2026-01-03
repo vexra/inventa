@@ -71,9 +71,17 @@ export const items = pgTable(
     image: text('image'),
     baseUnit: text('base_unit').notNull(),
     minStockAlert: integer('min_stock_alert').default(0),
+    description: text('description'),
 
     isActive: boolean('is_active').default(true).notNull(),
     hasExpiry: boolean('has_expiry').default(false).notNull(),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: timestamp('deleted_at'),
   },
   (table) => [index('items_category_id_idx').on(table.categoryId)],
 )
