@@ -21,7 +21,7 @@ export async function createWarehouse(data: unknown) {
     })
     revalidatePath('/dashboard/warehouses')
     return { success: true, message: 'Gudang berhasil ditambahkan' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menambahkan gudang' }
   }
 }
@@ -41,7 +41,7 @@ export async function updateWarehouse(id: string, data: unknown) {
 
     revalidatePath('/dashboard/warehouses')
     return { success: true, message: 'Data gudang diperbarui' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal memperbarui gudang' }
   }
 }
@@ -51,7 +51,7 @@ export async function deleteWarehouse(id: string) {
     await db.delete(warehouses).where(eq(warehouses.id, id))
     revalidatePath('/dashboard/warehouses')
     return { success: true, message: 'Gudang dihapus' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menghapus gudang (mungkin sedang digunakan)' }
   }
 }

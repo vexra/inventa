@@ -48,7 +48,7 @@ interface CategoryOption {
 interface ItemDialogProps {
   mode?: 'create' | 'edit'
   categories: CategoryOption[]
-  initialData?: any
+  initialData?: (Partial<ItemFormValues> & { id?: string }) | null
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
@@ -65,7 +65,6 @@ export function ItemDialog({
   const isOpen = isControlled ? open : internalOpen
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen
 
-  // FIX: Menghapus generic <ItemFormValues> agar TypeScript meng-infer dari resolver
   const form = useForm({
     resolver: zodResolver(itemSchema),
     defaultValues: {
@@ -98,7 +97,7 @@ export function ItemDialog({
         setIsOpen?.(false)
         if (mode === 'create') form.reset()
       }
-    } catch (error) {
+    } catch {
       toast.error('Terjadi kesalahan sistem')
     }
   }

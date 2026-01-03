@@ -69,7 +69,7 @@ export function UnitDialog({ mode = 'create', initialData, open, onOpenChange }:
         setIsOpen?.(false)
         if (mode === 'create') form.reset()
       }
-    } catch (error) {
+    } catch {
       toast.error('Terjadi kesalahan sistem')
     }
   }
@@ -112,7 +112,6 @@ export function UnitDialog({ mode = 'create', initialData, open, onOpenChange }:
                 <FormItem>
                   <FormLabel>Deskripsi (Opsional)</FormLabel>
                   <FormControl>
-                    {/* Bisa ganti Textarea jika deskripsi panjang */}
                     <Input placeholder="Keterangan singkat unit..." {...field} />
                   </FormControl>
                   <FormMessage />

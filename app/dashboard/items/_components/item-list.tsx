@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { AlertTriangle, Box, Calendar, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Box, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -115,15 +115,14 @@ export function ItemList({ data, categories }: ItemListProps) {
                     <Badge
                       className={`w-fit ${
                         item.isActive
-                          ? 'bg-green-600 hover:bg-green-700' // Hijau jika Aktif
-                          : 'bg-red-600 hover:bg-red-700' // Merah jika Non-Aktif
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-red-600 hover:bg-red-700'
                       }`}
                     >
                       {item.isActive ? 'Aktif' : 'Non-Aktif'}
                     </Badge>
                   </TableCell>
 
-                  {/* KOLOM AKSI */}
                   <TableCell className="py-4 text-right align-top">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -158,7 +157,12 @@ export function ItemList({ data, categories }: ItemListProps) {
           categories={categories}
           open={!!editingId}
           onOpenChange={(open) => !open && setEditingId(null)}
-          initialData={itemToEdit}
+          initialData={{
+            ...itemToEdit,
+            sku: itemToEdit.sku ?? undefined,
+            description: itemToEdit.description ?? undefined,
+            minStockAlert: itemToEdit.minStockAlert ?? undefined,
+          }}
         />
       )}
 

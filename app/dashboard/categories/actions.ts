@@ -20,7 +20,7 @@ export async function createCategory(data: unknown) {
     })
     revalidatePath('/dashboard/categories')
     return { success: true, message: 'Kategori berhasil ditambahkan' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menambahkan kategori' }
   }
 }
@@ -39,7 +39,7 @@ export async function updateCategory(id: string, data: unknown) {
 
     revalidatePath('/dashboard/categories')
     return { success: true, message: 'Kategori diperbarui' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal memperbarui kategori' }
   }
 }
@@ -49,7 +49,7 @@ export async function deleteCategory(id: string) {
     await db.delete(categories).where(eq(categories.id, id))
     revalidatePath('/dashboard/categories')
     return { success: true, message: 'Kategori dihapus' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menghapus kategori (mungkin sedang digunakan oleh barang)' }
   }
 }

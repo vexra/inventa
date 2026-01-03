@@ -21,7 +21,7 @@ export async function createUnit(data: unknown) {
     })
     revalidatePath('/dashboard/units')
     return { success: true, message: 'Unit berhasil ditambahkan' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menambahkan unit' }
   }
 }
@@ -41,7 +41,7 @@ export async function updateUnit(id: string, data: unknown) {
 
     revalidatePath('/dashboard/units')
     return { success: true, message: 'Data unit diperbarui' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal memperbarui unit' }
   }
 }
@@ -51,7 +51,7 @@ export async function deleteUnit(id: string) {
     await db.delete(units).where(eq(units.id, id))
     revalidatePath('/dashboard/units')
     return { success: true, message: 'Unit dihapus' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menghapus unit (mungkin sedang digunakan)' }
   }
 }

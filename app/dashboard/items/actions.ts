@@ -30,7 +30,7 @@ export async function createItem(data: unknown) {
     })
     revalidatePath('/dashboard/items')
     return { success: true, message: 'Barang berhasil ditambahkan' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menambahkan barang. SKU mungkin duplikat.' }
   }
 }
@@ -51,7 +51,7 @@ export async function updateItem(id: string, data: unknown) {
 
     revalidatePath('/dashboard/items')
     return { success: true, message: 'Data barang diperbarui' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal memperbarui barang' }
   }
 }
