@@ -1,6 +1,7 @@
 import { asc, ilike, sql } from 'drizzle-orm'
 
 import { categories } from '@/db/schema'
+import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { CategoryDialog } from './_components/category-dialog'
@@ -18,6 +19,10 @@ interface PageProps {
 }
 
 export default async function CategoriesPage({ searchParams }: PageProps) {
+  await requireAuth({
+    roles: ['administrator', 'warehouse_staff'],
+  })
+
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1

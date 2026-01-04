@@ -43,7 +43,6 @@ export default function NotFound() {
         </div>
       </div>
 
-      {/* Footer Teknis di bagian bawah layar */}
       <p className="text-muted-foreground/70 absolute bottom-8 text-xs font-medium tracking-wider uppercase">
         Error Code: 404 Not Found
       </p>

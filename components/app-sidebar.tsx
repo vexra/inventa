@@ -23,13 +23,14 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserNav } from '@/components/user-nav'
 import { authClient } from '@/lib/auth-client'
-import { type UserRole, roleNavItems } from '@/lib/config/dashboard-nav'
+import { type UserRole, roleNavItems } from '@/lib/menu-list'
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session, isPending } = authClient.useSession()
 
-  const userRole = session?.user?.role as UserRole | undefined
-  const navGroups = userRole ? roleNavItems[userRole] : []
+  const userRole = session?.user?.role as UserRole
+
+  const navGroups = session ? roleNavItems[userRole] : []
 
   const getInitials = (name: string) => {
     return name
@@ -52,7 +53,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Inventa</span>
-                  <span className="truncate text-xs">Manajemen Aset & Persediaan</span>
+                  <span className="truncate text-xs">Manajemen Aset</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -69,7 +70,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {Array.from({ length: 4 }).map((_, j) => (
+                    {Array.from({ length: 3 }).map((_, j) => (
                       <SidebarMenuItem key={j}>
                         <SidebarMenuButton disabled>
                           <Skeleton className="size-4" />
@@ -106,13 +107,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             {isPending ? (
-              <div className="ring-sidebar-ring flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm transition-[width,height,padding] outline-none">
+              <div className="flex items-center gap-2 p-2">
                 <Skeleton className="h-8 w-8 rounded-lg" />
-                <div className="grid flex-1 gap-1 text-left text-sm leading-tight">
+                <div className="space-y-1">
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-3 w-16" />
                 </div>
-                <Skeleton className="ml-auto size-4" />
               </div>
             ) : session?.user ? (
               <UserNav side="bottom" align="end">
@@ -133,11 +133,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <ChevronsUpDown className="ml-auto size-4" />
                 </SidebarMenuButton>
               </UserNav>
-            ) : (
-              <div className="text-muted-foreground flex h-12 items-center justify-center px-4 text-xs">
-                Belum masuk
-              </div>
-            )}
+            ) : null}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
