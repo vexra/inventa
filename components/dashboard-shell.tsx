@@ -22,7 +22,6 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { UserNav } from '@/components/user-nav'
 
-// PENTING: Hanya ganti nama functionnya, isinya sama persis
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const pathSegments = pathname.split('/').filter((segment) => segment !== '')
@@ -62,7 +61,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
 
           <div className="flex items-center gap-4">
-            {/* ... Search input, dll (kode Anda) ... */}
             <div className="flex items-center gap-2">
               <ModeToggle />
               <UserNav />

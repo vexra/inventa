@@ -142,7 +142,6 @@ export function ItemDialog({
                     <FormLabel>Kategori</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        {/* UPDATE: Menambahkan w-full agar select memanjang penuh */}
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih Kategori" />
                         </SelectTrigger>
@@ -195,7 +194,6 @@ export function ItemDialog({
                   <FormItem>
                     <FormLabel>Min. Stok Alert</FormLabel>
                     <FormControl>
-                      {/* FIX: Casting value dan handle onChange manual */}
                       <Input
                         type="number"
                         {...field}
