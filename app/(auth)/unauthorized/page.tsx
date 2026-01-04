@@ -17,8 +17,7 @@ export default function UnauthorizedPage() {
         </h1>
 
         <p className="mt-2 text-slate-600 dark:text-slate-400">
-          Maaf, Anda tidak memiliki izin untuk mengakses halaman ini. Halaman ini hanya tersedia
-          untuk pengguna dengan role tertentu.
+          Maaf, Anda tidak memiliki izin untuk mengakses halaman ini.
         </p>
 
         <div className="mt-8 flex gap-4">
