@@ -14,10 +14,15 @@ import {
   usageDetails,
   warehouseStocks,
 } from '@/db/schema'
+import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { itemSchema } from '@/lib/validations/item'
 
 export async function createItem(data: unknown) {
+  await requireAuth({
+    roles: ['administrator', 'warehouse_staff'],
+  })
+
   const parsed = itemSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
@@ -36,6 +41,10 @@ export async function createItem(data: unknown) {
 }
 
 export async function updateItem(id: string, data: unknown) {
+  await requireAuth({
+    roles: ['administrator', 'warehouse_staff'],
+  })
+
   const parsed = itemSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
@@ -57,6 +66,10 @@ export async function updateItem(id: string, data: unknown) {
 }
 
 export async function deleteItem(id: string) {
+  await requireAuth({
+    roles: ['administrator', 'warehouse_staff'],
+  })
+
   try {
     const checks = await Promise.all([
       db

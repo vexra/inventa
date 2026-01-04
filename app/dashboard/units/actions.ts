@@ -6,10 +6,15 @@ import { randomUUID } from 'crypto'
 import { eq } from 'drizzle-orm'
 
 import { units } from '@/db/schema'
+import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { unitSchema } from '@/lib/validations/unit'
 
 export async function createUnit(data: unknown) {
+  await requireAuth({
+    roles: ['administrator'],
+  })
+
   const parsed = unitSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
@@ -27,6 +32,10 @@ export async function createUnit(data: unknown) {
 }
 
 export async function updateUnit(id: string, data: unknown) {
+  await requireAuth({
+    roles: ['administrator'],
+  })
+
   const parsed = unitSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
@@ -47,6 +56,10 @@ export async function updateUnit(id: string, data: unknown) {
 }
 
 export async function deleteUnit(id: string) {
+  await requireAuth({
+    roles: ['administrator'],
+  })
+
   try {
     await db.delete(units).where(eq(units.id, id))
     revalidatePath('/dashboard/units')
