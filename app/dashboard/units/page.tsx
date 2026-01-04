@@ -1,6 +1,7 @@
 import { asc, ilike, or, sql } from 'drizzle-orm'
 
 import { units } from '@/db/schema'
+import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { UnitDialog } from './_components/unit-dialog'
@@ -18,6 +19,10 @@ interface PageProps {
 }
 
 export default async function UnitsPage({ searchParams }: PageProps) {
+  await requireAuth({
+    roles: ['administrator'],
+  })
+
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1

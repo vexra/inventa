@@ -24,10 +24,14 @@ type NavItem = {
   title: string
   url: string
   icon: LucideIcon
-  items?: { title: string; url: string }[]
 }
 
-export const roleNavItems: Record<UserRole, { title: string; items: NavItem[] }[]> = {
+type NavGroup = {
+  title: string
+  items: NavItem[]
+}
+
+export const roleNavItems: Record<UserRole, NavGroup[]> = {
   administrator: [
     {
       title: 'Umum',
@@ -57,7 +61,6 @@ export const roleNavItems: Record<UserRole, { title: string; items: NavItem[] }[
       ],
     },
   ],
-
   warehouse_staff: [
     {
       title: 'Inventaris',
@@ -67,14 +70,12 @@ export const roleNavItems: Record<UserRole, { title: string; items: NavItem[] }[
       ],
     },
   ],
-
   unit_staff: [
     {
       title: 'Operasional Unit',
       items: [{ title: 'Permintaan Saya', url: '/unit/requests', icon: FileText }],
     },
   ],
-
   executive: [
     {
       title: 'Laporan',

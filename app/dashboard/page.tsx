@@ -9,14 +9,24 @@ import {
 } from 'lucide-react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { requireAuth } from '@/lib/auth-guard'
 
-export default function Page() {
+export default async function Page() {
+  const session = await requireAuth({
+    roles: ['administrator', 'warehouse_staff', 'unit_staff', 'executive'],
+  })
+
+  const user = session.user
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">Ringkasan aktivitas sistem dan status inventaris.</p>
+          <p className="text-muted-foreground">
+            Halo, <span className="text-foreground font-medium">{user.name}</span>. Berikut
+            ringkasan aktivitas sistem.
+          </p>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -27,16 +37,18 @@ export default function Page() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pengguna</CardTitle>
-            <Users className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">128</div>
-            <p className="text-muted-foreground text-xs">+4 pengguna baru bulan ini</p>
-          </CardContent>
-        </Card>
+        {user.role === 'administrator' && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Pengguna</CardTitle>
+              <Users className="text-muted-foreground h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">128</div>
+              <p className="text-muted-foreground text-xs">+4 pengguna baru bulan ini</p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

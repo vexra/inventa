@@ -1,6 +1,7 @@
 import { and, asc, eq, ilike, isNull, or, sql } from 'drizzle-orm'
 
 import { categories, items } from '@/db/schema'
+import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { ItemDialog } from './_components/item-dialog'
@@ -18,6 +19,10 @@ interface PageProps {
 }
 
 export default async function ItemsPage({ searchParams }: PageProps) {
+  await requireAuth({
+    roles: ['administrator', 'warehouse_staff'],
+  })
+
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
