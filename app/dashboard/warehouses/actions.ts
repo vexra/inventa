@@ -6,10 +6,15 @@ import { randomUUID } from 'crypto'
 import { eq } from 'drizzle-orm'
 
 import { warehouses } from '@/db/schema'
+import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { warehouseSchema } from '@/lib/validations/warehouse'
 
 export async function createWarehouse(data: unknown) {
+  await requireAuth({
+    roles: ['administrator'],
+  })
+
   const parsed = warehouseSchema.safeParse(data)
   if (!parsed.success) return { error: 'Invalid data' }
 
@@ -27,6 +32,10 @@ export async function createWarehouse(data: unknown) {
 }
 
 export async function updateWarehouse(id: string, data: unknown) {
+  await requireAuth({
+    roles: ['administrator'],
+  })
+
   const parsed = warehouseSchema.safeParse(data)
   if (!parsed.success) return { error: 'Invalid data' }
 
@@ -47,6 +56,10 @@ export async function updateWarehouse(id: string, data: unknown) {
 }
 
 export async function deleteWarehouse(id: string) {
+  await requireAuth({
+    roles: ['administrator'],
+  })
+
   try {
     await db.delete(warehouses).where(eq(warehouses.id, id))
     revalidatePath('/dashboard/warehouses')

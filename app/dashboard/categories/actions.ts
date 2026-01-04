@@ -6,10 +6,13 @@ import { randomUUID } from 'crypto'
 import { eq } from 'drizzle-orm'
 
 import { categories } from '@/db/schema'
+import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { categorySchema } from '@/lib/validations/category'
 
 export async function createCategory(data: unknown) {
+  await requireAuth({ roles: ['administrator'] })
+
   const parsed = categorySchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
@@ -26,6 +29,8 @@ export async function createCategory(data: unknown) {
 }
 
 export async function updateCategory(id: string, data: unknown) {
+  await requireAuth({ roles: ['administrator'] })
+
   const parsed = categorySchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
@@ -45,6 +50,8 @@ export async function updateCategory(id: string, data: unknown) {
 }
 
 export async function deleteCategory(id: string) {
+  await requireAuth({ roles: ['administrator'] })
+
   try {
     await db.delete(categories).where(eq(categories.id, id))
     revalidatePath('/dashboard/categories')
