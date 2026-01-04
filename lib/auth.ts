@@ -16,7 +16,7 @@ export const auth = betterAuth({
   },
   plugins: [
     admin({
-      adminRole: ['administrator'],
+      adminRoles: ['administrator'],
       defaultRole: 'unit_staff',
     }),
   ],
@@ -28,13 +28,8 @@ export const auth = betterAuth({
         defaultValue: 'unit_staff',
         input: false,
       },
-    },
-  },
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,
-      strategy: 'jwe',
+      unitId: { type: 'string', required: false, input: false },
+      warehouseId: { type: 'string', required: false, input: false },
     },
   },
 })
