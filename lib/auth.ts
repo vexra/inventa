@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { admin } from 'better-auth/plugins'
 
 import * as schema from '@/db/schema'
 import { db } from '@/lib/db'
@@ -13,12 +14,18 @@ export const auth = betterAuth({
     enabled: true,
     autoSignIn: false,
   },
+  plugins: [
+    admin({
+      adminRole: ['administrator'],
+      defaultRole: 'unit_staff',
+    }),
+  ],
   user: {
     additionalFields: {
       role: {
         type: 'string',
         required: false,
-        defaultValue: 'Unit Staff',
+        defaultValue: 'unit_staff',
         input: false,
       },
     },
