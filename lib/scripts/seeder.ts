@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import { eq } from 'drizzle-orm'
 
 import { user, userRoleEnum } from '@/db/schema'
@@ -8,26 +7,26 @@ import { db } from '@/lib/db'
 type UserRole = (typeof userRoleEnum.enumValues)[number]
 
 async function main() {
-  const password = 'password123'
+  const password = process.env.DEFAULT_PASSWORD || 'password123'
 
   const seedData: { role: UserRole; email: string; userName: string }[] = [
     {
-      role: 'Administrator',
+      role: 'administrator',
       email: 'admin@inventa.fmipa.unila.ac.id',
       userName: 'Administrator User',
     },
     {
-      role: 'Warehouse Admin',
+      role: 'warehouse_staff',
       email: 'warehouse@inventa.fmipa.unila.ac.id',
       userName: 'Warehouse Admin User',
     },
     {
-      role: 'Unit Staff',
+      role: 'unit_staff',
       email: 'unit@inventa.fmipa.unila.ac.id',
       userName: 'Unit Staff User',
     },
     {
-      role: 'Executive',
+      role: 'executive',
       email: 'executive@inventa.fmipa.unila.ac.id',
       userName: 'Executive User',
     },
@@ -37,7 +36,6 @@ async function main() {
 
   for (const data of seedData) {
     const existingUsers = await db.select().from(user).where(eq(user.email, data.email)).limit(1)
-
     const existingUser = existingUsers[0]
 
     if (existingUser) {

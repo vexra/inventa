@@ -9,7 +9,7 @@
     "lint": "eslint",
     "format:check": "prettier --check --ignore-unknown .",
     "format": "prettier --write --ignore-unknown .",
-    "db:seed": "tsx db/seeder.ts"
+    "db:seed": "tsx lib/scripts/seeder.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -22,8 +22,8 @@ import {
 } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserNav } from '@/components/user-nav'
-import { type UserRole, roleNavItems } from '@/config/dashboard-nav'
 import { authClient } from '@/lib/auth-client'
+import { type UserRole, roleNavItems } from '@/lib/config/dashboard-nav'
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session, isPending } = authClient.useSession()

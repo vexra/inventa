@@ -35,11 +35,11 @@ export const adjustmentTypeEnum = pgEnum('adjustment_type', [
   'CORRECTION',
 ])
 
-export const userRoleEnum = pgEnum('user_role', [
-  'Administrator',
-  'Warehouse Admin',
-  'Unit Staff',
-  'Executive',
+export const userRoleEnum = pgEnum('roles', [
+  'administrator',
+  'warehouse_staff',
+  'unit_staff',
+  'executive',
 ])
 
 export const units = pgTable('units', {
@@ -94,18 +94,18 @@ export const user = pgTable(
     email: text('email').notNull().unique(),
     emailVerified: boolean('email_verified').default(false).notNull(),
     image: text('image'),
-
-    role: userRoleEnum('role').notNull(),
-
-    unitId: text('unit_id').references(() => units.id),
-    warehouseId: text('warehouse_id').references(() => warehouses.id),
-
-    isActive: boolean('is_active').default(true),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    role: userRoleEnum('role').default('unit_staff'),
+    banned: boolean('banned').default(false),
+    banReason: text('ban_reason'),
+    banExpires: timestamp('ban_expires'),
+
+    unitId: text('unit_id').references(() => units.id),
+    warehouseId: text('warehouse_id').references(() => warehouses.id),
   },
   (table) => [index('user_email_idx').on(table.email)],
 )
@@ -118,7 +118,6 @@ export const session = pgTable(
     token: text('token').notNull().unique(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
-      .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
     ipAddress: text('ip_address'),
@@ -126,11 +125,9 @@ export const session = pgTable(
     userId: text('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
+    impersonatedBy: text('impersonated_by'),
   },
-  (table) => [
-    index('session_user_id_idx').on(table.userId),
-    index('session_token_idx').on(table.token),
-  ],
+  (table) => [index('session_userId_idx').on(table.userId)],
 )
 
 export const account = pgTable(
