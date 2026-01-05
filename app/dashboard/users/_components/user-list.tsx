@@ -2,11 +2,19 @@
 
 import { useState } from 'react'
 
-import { Ban, KeyRound, MoreHorizontal, UserCog } from 'lucide-react'
+import { AlertTriangle, Ban, KeyRound, MoreHorizontal, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +23,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -38,9 +48,22 @@ export function UserList({
   warehouses: any[]
 }) {
   const [editingUser, setEditingUser] = useState<any>(null)
+
+  const [userToBan, setUserToBan] = useState<any>(null)
+  const [banReason, setBanReason] = useState('')
+
   const [isPending, setIsPending] = useState(false)
 
-  const handleBan = async (id: string, isBanned: boolean) => {
+  const onBanClick = (user: any) => {
+    if (user.banned) {
+      handleProcessBan(user.id, true, '')
+    } else {
+      setBanReason('')
+      setUserToBan(user)
+    }
+  }
+
+  const handleProcessBan = async (id: string, isBanned: boolean, reason: string) => {
     setIsPending(true)
     try {
       let result
@@ -48,13 +71,14 @@ export function UserList({
       if (isBanned) {
         result = await unbanUserAction(id)
       } else {
-        result = await banUserAction(id)
+        result = await banUserAction(id, reason)
       }
 
       if (result.error) {
         toast.error(result.error)
       } else {
         toast.success(result.message)
+        setUserToBan(null)
       }
     } catch {
       toast.error('Terjadi kesalahan sistem')
@@ -64,24 +88,14 @@ export function UserList({
   }
 
   const handleImpersonate = async (id: string) => {
-    // 1. Set status loading (opsional, jika Anda menggunakan state isPending di button)
     setIsPending(true)
-
     try {
-      // 2. Eksekusi API Impersonate
       await authClient.admin.impersonateUser({ userId: id })
-
       toast.success('Beralih akun...')
-
-      // 3. Force Hard Reload
-      // Penting agar Sidebar/Layout me-render ulang menu berdasarkan role user baru
       window.location.href = '/dashboard'
     } catch (error) {
-      // 4. Handle Error
       console.error(error)
       toast.error('Gagal beralih akun. Silakan coba lagi.')
-
-      // Matikan loading hanya jika gagal (jika sukses, halaman akan reload sendiri)
       setIsPending(false)
     }
   }
@@ -141,8 +155,9 @@ export function UserList({
                         <KeyRound className="mr-2 h-4 w-4" /> Masuk sbg User
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
+
                       <DropdownMenuItem
-                        onClick={() => handleBan(user.id, user.banned || false)}
+                        onClick={() => onBanClick(user)}
                         className={user.banned ? 'text-green-600' : 'text-red-600'}
                       >
                         <Ban className="mr-2 h-4 w-4" />{' '}
@@ -167,6 +182,45 @@ export function UserList({
           warehouses={warehouses}
         />
       )}
+
+      <Dialog open={!!userToBan} onOpenChange={(open) => !open && setUserToBan(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Blokir Pengguna
+            </DialogTitle>
+            <DialogDescription>
+              Anda akan memblokir akses login untuk <b>{userToBan?.name}</b>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4">
+            <div className="space-y-1">
+              <Label htmlFor="reason">Alasan Blokir (Opsional)</Label>
+              <Input
+                id="reason"
+                placeholder="Contoh: Spamming, Resign, dll..."
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUserToBan(null)} disabled={isPending}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleProcessBan(userToBan.id, false, banReason)}
+              disabled={isPending}
+            >
+              {isPending ? 'Memproses...' : 'Ya, Blokir User'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

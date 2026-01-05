@@ -104,23 +104,30 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
   }
 }
 
-export async function banUserAction(userId: string) {
+export async function banUserAction(userId: string, reason?: string) {
   await requireAuth({ roles: ['administrator'] })
-  const requestHeaders = await headers()
 
   try {
-    await auth.api.banUser({
-      body: {
-        userId: userId,
-        banReason: 'Dinonaktifkan oleh Administrator',
-      },
-      headers: requestHeaders,
-    })
+    await db
+      .update(user)
+      .set({
+        banned: true,
+        banReason: reason || 'Dinonaktifkan oleh Administrator',
+      })
+      .where(eq(user.id, userId))
+
+    const requestHeaders = await headers()
+    try {
+      await auth.api.revokeUserSessions({
+        body: { userId },
+        headers: requestHeaders,
+      })
+    } catch {}
 
     revalidatePath('/dashboard/users')
     return { success: true, message: 'User berhasil diblokir' }
   } catch (e: any) {
-    return { error: e.body?.message || 'Gagal memblokir user' }
+    return { error: e.message || 'Gagal memblokir user' }
   }
 }
 

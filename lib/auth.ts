@@ -4,7 +4,6 @@ import { admin } from 'better-auth/plugins'
 
 import * as schema from '@/db/schema'
 import { db } from '@/lib/db'
-// Import role yang sudah kita buat
 import { ac, administrator, executive, unit_staff, warehouse_staff } from '@/lib/permissions'
 
 export const auth = betterAuth({
@@ -18,18 +17,17 @@ export const auth = betterAuth({
   },
   plugins: [
     admin({
-      // 1. Masukkan Instance AC
       ac,
-      // 2. Mapping Role (String di DB -> Object Role AC)
       roles: {
         administrator,
         warehouse_staff,
         unit_staff,
         executive,
       },
-      // 3. Konfigurasi Role Admin Utama
       adminRoles: ['administrator'],
       defaultRole: 'unit_staff',
+      bannedUserMessage:
+        'Anda telah diblokir dari aplikasi ini. Silakan hubungi tim dukungan jika Anda merasa ini adalah sebuah kesalahan.',
     }),
   ],
   user: {
