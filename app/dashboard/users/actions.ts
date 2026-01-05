@@ -14,7 +14,7 @@ import { db } from '@/lib/db'
 const userFormSchema = z.object({
   name: z.string().min(2),
   email: z.email(),
-  password: z.string().min(8).or(z.literal('')).optional(),
+  password: z.string().min(8, 'Password minimal 8 karakter').or(z.literal('')).optional(),
   role: z.enum(['administrator', 'warehouse_staff', 'unit_staff', 'executive']),
   unitId: z.string().optional(),
   warehouseId: z.string().optional(),

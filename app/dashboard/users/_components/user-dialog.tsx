@@ -39,7 +39,7 @@ import { createUserAction, updateUserAction } from '../actions'
 const formSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
   email: z.email('Email tidak valid'),
-  password: z.string().optional(),
+  password: z.string().min(8, 'Password minimal 8 karakter').or(z.literal('')).optional(),
   role: z.enum(['administrator', 'warehouse_staff', 'unit_staff', 'executive']),
   unitId: z.string().optional(),
   warehouseId: z.string().optional(),
@@ -108,7 +108,7 @@ export function UserDialog({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {!isControlled && mode === 'create' && (
         <DialogTrigger asChild>
-          <Button className="bg-blue-600 text-white">
+          <Button className="bg-blue-600 text-white hover:bg-blue-700">
             <Plus className="mr-2 h-4 w-4" /> Tambah User
           </Button>
         </DialogTrigger>
