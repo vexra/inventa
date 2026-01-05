@@ -1,6 +1,6 @@
 import { asc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { units, user, warehouses } from '@/db/schema'
+import { requests, units, user, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
@@ -41,6 +41,9 @@ export default async function UsersPage({ searchParams }: PageProps) {
       warehouseId: user.warehouseId,
       unit: { name: units.name },
       warehouse: { name: warehouses.name },
+      usageCount: sql<number>`(
+        SELECT count(*) FROM ${requests} WHERE ${requests.userId} = ${user.id}
+      )`.mapWith(Number),
     })
     .from(user)
     .leftJoin(units, eq(user.unitId, units.id))
@@ -73,7 +76,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Pengguna</h1>
-          <p className="text-muted-foreground">Kelola akses, role, dan status pengguna sistem.</p>
+          <p className="text-muted-foreground">Kelola akses, role, dan status pengguna.</p>
         </div>
         <UserDialog mode="create" units={unitsData} warehouses={warehousesData} />
       </div>
@@ -86,12 +89,6 @@ export default async function UsersPage({ searchParams }: PageProps) {
         <UserList data={data} units={unitsData} warehouses={warehousesData} />
 
         {totalPages > 1 && <UserPagination totalPages={totalPages} />}
-
-        {data.length === 0 && query && (
-          <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan pengguna dengan kata kunci <strong>&quot;{query}&quot;</strong>.
-          </div>
-        )}
       </div>
     </div>
   )

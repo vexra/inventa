@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { AlertTriangle, Ban, KeyRound, MoreHorizontal, UserCog } from 'lucide-react'
+import { AlertTriangle, Ban, KeyRound, MoreHorizontal, Trash2, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/table'
 import { authClient } from '@/lib/auth-client'
 
-import { banUserAction, unbanUserAction } from '../actions'
+import { banUserAction, deleteUserAction, unbanUserAction } from '../actions'
 import { UserDialog } from './user-dialog'
 
 export function UserList({
@@ -48,10 +48,9 @@ export function UserList({
   warehouses: any[]
 }) {
   const [editingUser, setEditingUser] = useState<any>(null)
-
   const [userToBan, setUserToBan] = useState<any>(null)
   const [banReason, setBanReason] = useState('')
-
+  const [userToDelete, setUserToDelete] = useState<any>(null)
   const [isPending, setIsPending] = useState(false)
 
   const onBanClick = (user: any) => {
@@ -67,7 +66,6 @@ export function UserList({
     setIsPending(true)
     try {
       let result
-
       if (isBanned) {
         result = await unbanUserAction(id)
       } else {
@@ -96,6 +94,23 @@ export function UserList({
     } catch (error) {
       console.error(error)
       toast.error('Gagal beralih akun. Silakan coba lagi.')
+      setIsPending(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    setIsPending(true)
+    try {
+      const result = await deleteUserAction(id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(result.message)
+        setUserToDelete(null)
+      }
+    } catch {
+      toast.error('Gagal menghapus user')
+    } finally {
       setIsPending(false)
     }
   }
@@ -148,19 +163,40 @@ export function UserList({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Aksi</DropdownMenuLabel>
+
                       <DropdownMenuItem onClick={() => setEditingUser(user)}>
                         <UserCog className="mr-2 h-4 w-4" /> Edit Detail
                       </DropdownMenuItem>
+
                       <DropdownMenuItem onClick={() => handleImpersonate(user.id)}>
                         <KeyRound className="mr-2 h-4 w-4" /> Masuk sbg User
                       </DropdownMenuItem>
+
                       <DropdownMenuSeparator />
+
+                      {user.usageCount === 0 && (
+                        <DropdownMenuItem
+                          onClick={() => setUserToDelete(user)}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" /> Hapus
+                          Permanen
+                        </DropdownMenuItem>
+                      )}
 
                       <DropdownMenuItem
                         onClick={() => onBanClick(user)}
-                        className={user.banned ? 'text-green-600' : 'text-red-600'}
+                        className={
+                          user.banned
+                            ? 'text-green-600 focus:text-green-600'
+                            : 'text-red-600 focus:text-red-600'
+                        }
                       >
-                        <Ban className="mr-2 h-4 w-4" />{' '}
+                        <Ban
+                          className={`mr-2 h-4 w-4 ${
+                            user.banned ? 'text-green-600' : 'text-red-600'
+                          }`}
+                        />
                         {user.banned ? 'Buka Blokir' : 'Blokir User'}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -217,6 +253,36 @@ export function UserList({
               disabled={isPending}
             >
               {isPending ? 'Memproses...' : 'Ya, Blokir User'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Hapus Pengguna Permanen
+            </DialogTitle>
+            <DialogDescription>
+              Anda akan menghapus user <b>{userToDelete?.name}</b> secara permanen.
+              <br />
+              <br />
+              Tindakan ini <b>tidak dapat dibatalkan</b> dan data akun akan hilang selamanya dari
+              database.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUserToDelete(null)} disabled={isPending}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleDelete(userToDelete.id)}
+              disabled={isPending}
+            >
+              {isPending ? 'Menghapus...' : 'Ya, Hapus Permanen'}
             </Button>
           </DialogFooter>
         </DialogContent>

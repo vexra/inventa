@@ -3,10 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { user } from '@/db/schema'
+import { requests, user } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
@@ -145,5 +145,33 @@ export async function unbanUserAction(userId: string) {
     return { success: true, message: 'User berhasil diaktifkan kembali' }
   } catch (e: any) {
     return { error: e.body?.message || 'Gagal mengaktifkan user' }
+  }
+}
+
+export async function deleteUserAction(userId: string) {
+  await requireAuth({ roles: ['administrator'] })
+
+  try {
+    const usageCheck = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(requests)
+      .where(eq(requests.userId, userId))
+
+    const isUsed = Number(usageCheck[0]?.count || 0) > 0
+
+    if (isUsed) {
+      return { error: 'User tidak dapat dihapus karena memiliki riwayat transaksi.' }
+    }
+
+    const reqHeaders = await headers()
+    await auth.api.removeUser({ body: { userId }, headers: reqHeaders })
+
+    revalidatePath('/dashboard/users')
+    return { success: true, message: 'User berhasil dihapus permanen' }
+  } catch (e: any) {
+    if (e.code === '23503') {
+      return { error: 'Gagal: User ini terikat dengan data lain.' }
+    }
+    return { error: e.message || 'Gagal menghapus user' }
   }
 }
