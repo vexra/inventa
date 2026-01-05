@@ -55,10 +55,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
     {
       title: 'Sistem & Audit',
-      items: [
-        { title: 'Log Aktivitas', url: '/dashboard/logs/activity', icon: FileClock },
-        { title: 'Riwayat Audit', url: '/dashboard/logs/audit', icon: History },
-      ],
+      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
     },
   ],
   warehouse_staff: [
