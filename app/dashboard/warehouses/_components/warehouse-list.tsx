@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { Building2, MapPin, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { MapPin, MoreHorizontal, Pencil, Trash2, Warehouse } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -78,7 +78,7 @@ export function WarehouseList({ data }: { data: Warehouse[] }) {
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      <Building2 className="text-muted-foreground h-4 w-4" />
+                      <Warehouse className="text-muted-foreground h-4 w-4" />
                       {item.name}
                     </div>
                   </TableCell>

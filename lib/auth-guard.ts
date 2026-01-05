@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/lib/auth'
-import { type Action, type Resource, type Role, hasPermission } from '@/lib/permissions'
+import { type Action, type Resource, type Role, ac } from '@/lib/permissions'
 
 type AuthGuardOptions = {
   // Opsi 1: Hanya butuh login saja (tanpa cek role spesifik)
@@ -17,18 +17,15 @@ type AuthGuardOptions = {
   redirectTo?: string
 }
 
-/**
- * Fungsi ini memvalidasi session dan hak akses.
- * Jika valid, mengembalikan object session.
- * Jika tidak valid, otomatis redirect.
- */
+type StatementChecker = (roles: Role[]) => boolean
+
 export async function requireAuth(options: AuthGuardOptions = {}) {
   // 1. Ambil Session
   const session = await auth.api.getSession({
     headers: await headers(),
   })
 
-  // 2. Cek apakah user login
+  // 2. Cek Login
   if (!session) {
     redirect(options.redirectTo || '/sign-in')
   }
@@ -38,20 +35,34 @@ export async function requireAuth(options: AuthGuardOptions = {}) {
   // 3. Cek Role (Jika opsi roles diberikan)
   if (options.roles) {
     if (!options.roles.includes(userRole)) {
-      // User login, tapi role tidak cocok -> Lempar ke halaman unauthorized
       redirect('/unauthorized')
     }
   }
 
-  // 4. Cek Permission (Jika opsi permission diberikan)
+  // 4. Cek Permission (Menggunakan Access Control Better Auth)
   if (options.permission) {
     const { resource, action } = options.permission
-    if (!hasPermission(userRole, resource, action)) {
-      // User login, role oke, tapi tidak punya izin spesifik -> Lempar ke unauthorized
+
+    // Mengambil statement berdasarkan resource
+    // Kita gunakan 'as any' agar TS tidak error saat akses dynamic property
+    const resourceStatements = ac.statements[resource] as unknown as
+      | Record<string, StatementChecker>
+      | undefined
+
+    if (!resourceStatements) {
+      console.error(`Resource '${resource}' tidak didefinisikan di permissions.ts`)
+      redirect('/unauthorized')
+    }
+
+    // Ambil fungsi checker untuk action tersebut (contoh: items.create)
+    const actionChecker = resourceStatements[action]
+
+    // Cek apakah userRole memiliki izin
+    // Syntax: statement.action([role1, role2]) -> return boolean
+    if (!actionChecker || !actionChecker([userRole])) {
       redirect('/unauthorized')
     }
   }
 
-  // 5. Jika lolos semua, kembalikan session agar bisa dipakai di page
   return session
 }

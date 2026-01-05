@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { FileText, MoreHorizontal, Pencil, Trash2, Users } from 'lucide-react'
+import { Building2, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -78,7 +78,7 @@ export function UnitList({ data }: { data: Unit[] }) {
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      <Users className="text-muted-foreground h-4 w-4" />
+                      <Building2 className="text-muted-foreground h-4 w-4" />
                       {item.name}
                     </div>
                   </TableCell>
