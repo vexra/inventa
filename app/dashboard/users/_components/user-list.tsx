@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 
-import { useRouter } from 'next/navigation'
-
 import { Ban, KeyRound, MoreHorizontal, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -39,7 +37,6 @@ export function UserList({
   units: any[]
   warehouses: any[]
 }) {
-  const router = useRouter()
   const [editingUser, setEditingUser] = useState<any>(null)
   const [isPending, setIsPending] = useState(false)
 
@@ -67,10 +64,26 @@ export function UserList({
   }
 
   const handleImpersonate = async (id: string) => {
-    await authClient.admin.impersonateUser({ userId: id })
-    toast.success('Beralih akun...')
-    router.push('/dashboard')
-    router.refresh()
+    // 1. Set status loading (opsional, jika Anda menggunakan state isPending di button)
+    setIsPending(true)
+
+    try {
+      // 2. Eksekusi API Impersonate
+      await authClient.admin.impersonateUser({ userId: id })
+
+      toast.success('Beralih akun...')
+
+      // 3. Force Hard Reload
+      // Penting agar Sidebar/Layout me-render ulang menu berdasarkan role user baru
+      window.location.href = '/dashboard'
+    } catch (error) {
+      // 4. Handle Error
+      console.error(error)
+      toast.error('Gagal beralih akun. Silakan coba lagi.')
+
+      // Matikan loading hanya jika gagal (jika sukses, halaman akan reload sendiri)
+      setIsPending(false)
+    }
   }
 
   return (
