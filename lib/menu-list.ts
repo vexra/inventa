@@ -7,8 +7,8 @@ import {
   History,
   LayoutDashboard,
   type LucideIcon,
+  MonitorSmartphone,
   Package,
-  Shield,
   ShoppingBag,
   Tags,
   Truck,
@@ -50,7 +50,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Manajemen Pengguna',
       items: [
         { title: 'Daftar Pengguna', url: '/dashboard/users', icon: Users },
-        { title: 'Hak Akses & Role', url: '/dashboard/roles', icon: Shield },
+        { title: 'Sesi Login', url: '/dashboard/sessions', icon: MonitorSmartphone },
       ],
     },
     {
