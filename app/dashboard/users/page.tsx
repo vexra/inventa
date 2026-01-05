@@ -39,8 +39,8 @@ export default async function UsersPage({ searchParams }: PageProps) {
       banned: user.banned,
       unitId: user.unitId,
       warehouseId: user.warehouseId,
-      unit: { name: units.name },
-      warehouse: { name: warehouses.name },
+      unitName: units.name,
+      warehouseName: warehouses.name,
       usageCount: sql<number>`(
         SELECT count(*) FROM ${requests} WHERE ${requests.userId} = ${user.id}
       )`.mapWith(Number),
@@ -61,12 +61,25 @@ export default async function UsersPage({ searchParams }: PageProps) {
   const unitsPromise = db.select().from(units)
   const warehousesPromise = db.select().from(warehouses)
 
-  const [data, countResult, unitsData, warehousesData] = await Promise.all([
+  const [rawUsers, countResult, unitsData, warehousesData] = await Promise.all([
     dataPromise,
     countPromise,
     unitsPromise,
     warehousesPromise,
   ])
+
+  const data = rawUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role || 'unit_staff',
+    banned: u.banned || false,
+    unitId: u.unitId,
+    warehouseId: u.warehouseId,
+    usageCount: u.usageCount,
+    unit: u.unitName ? { name: u.unitName } : null,
+    warehouse: u.warehouseName ? { name: u.warehouseName } : null,
+  }))
 
   const totalItems = Number(countResult[0]?.count || 0)
   const totalPages = Math.ceil(totalItems / USERS_PER_PAGE)
