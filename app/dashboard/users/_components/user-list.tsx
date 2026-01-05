@@ -2,7 +2,17 @@
 
 import { useState } from 'react'
 
-import { AlertTriangle, Ban, KeyRound, MoreHorizontal, Trash2, UserCog } from 'lucide-react'
+import {
+  AlertTriangle,
+  Ban,
+  Building2,
+  KeyRound,
+  MoreHorizontal,
+  Trash2,
+  User,
+  UserCog,
+  Warehouse,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -115,6 +125,28 @@ export function UserList({
     }
   }
 
+  const renderPlacement = (user: any) => {
+    if (user.role === 'warehouse_staff' && user.warehouse) {
+      return (
+        <div className="flex items-center gap-2">
+          <Warehouse className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+
+          <span className="font-medium">{user.warehouse.name}</span>
+        </div>
+      )
+    }
+    if (user.role === 'unit_staff' && user.unit) {
+      return (
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+
+          <span className="font-medium">{user.unit.name}</span>
+        </div>
+      )
+    }
+    return <span className="text-muted-foreground">-</span>
+  }
+
   return (
     <>
       <div className="bg-card rounded-md border">
@@ -132,28 +164,31 @@ export function UserList({
             {data.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
-                  <div className="font-medium">{user.name}</div>
-                  <div className="text-muted-foreground text-xs">{user.email}</div>
+                  <div className="flex items-center gap-3">
+                    <User className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <div className="font-medium">{user.name}</div>
+                      <div className="text-muted-foreground text-xs">{user.email}</div>
+                    </div>
+                  </div>
                 </TableCell>
+
                 <TableCell>
                   <Badge variant="outline" className="capitalize">
                     {user.role?.replace('_', ' ')}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  {user.unit
-                    ? `Unit: ${user.unit.name}`
-                    : user.warehouse
-                      ? `Gudang: ${user.warehouse.name}`
-                      : '-'}
-                </TableCell>
+
+                <TableCell>{renderPlacement(user)}</TableCell>
+
                 <TableCell>
                   {user.banned ? (
                     <Badge variant="destructive">Banned</Badge>
                   ) : (
-                    <Badge variant="secondary">Aktif</Badge>
+                    <Badge className="bg-green-600 hover:bg-green-700">Aktif</Badge>
                   )}
                 </TableCell>
+
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
