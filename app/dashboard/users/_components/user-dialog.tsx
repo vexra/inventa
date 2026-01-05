@@ -113,6 +113,7 @@ export function UserDialog({
           </Button>
         </DialogTrigger>
       )}
+
       <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Tambah Pengguna' : 'Edit Pengguna'}</DialogTitle>
@@ -171,7 +172,7 @@ export function UserDialog({
                   <FormLabel>Role</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pilih role" />
                       </SelectTrigger>
                     </FormControl>
@@ -196,7 +197,7 @@ export function UserDialog({
                     <FormLabel>Unit Kerja</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ''}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih Unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -223,7 +224,7 @@ export function UserDialog({
                     <FormLabel>Gudang</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ''}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih Gudang" />
                         </SelectTrigger>
                       </FormControl>
