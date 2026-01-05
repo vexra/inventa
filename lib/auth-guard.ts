@@ -17,6 +17,8 @@ type AuthGuardOptions = {
   redirectTo?: string
 }
 
+type StatementChecker = (roles: Role[]) => boolean
+
 export async function requireAuth(options: AuthGuardOptions = {}) {
   // 1. Ambil Session
   const session = await auth.api.getSession({
@@ -43,7 +45,9 @@ export async function requireAuth(options: AuthGuardOptions = {}) {
 
     // Mengambil statement berdasarkan resource
     // Kita gunakan 'as any' agar TS tidak error saat akses dynamic property
-    const resourceStatements = ac.statements[resource] as any
+    const resourceStatements = ac.statements[resource] as unknown as
+      | Record<string, StatementChecker>
+      | undefined
 
     if (!resourceStatements) {
       console.error(`Resource '${resource}' tidak didefinisikan di permissions.ts`)

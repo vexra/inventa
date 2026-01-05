@@ -48,22 +48,42 @@ import { authClient } from '@/lib/auth-client'
 import { banUserAction, deleteUserAction, unbanUserAction } from '../actions'
 import { UserDialog } from './user-dialog'
 
-export function UserList({
-  data,
-  units,
-  warehouses,
-}: {
-  data: any[]
-  units: any[]
-  warehouses: any[]
-}) {
-  const [editingUser, setEditingUser] = useState<any>(null)
-  const [userToBan, setUserToBan] = useState<any>(null)
+interface UnitData {
+  id: string
+  name: string
+}
+
+interface WarehouseData {
+  id: string
+  name: string
+}
+
+interface UserData {
+  id: string
+  name: string
+  email: string
+  role: string
+  banned: boolean
+  banReason?: string | null
+  usageCount?: number
+  unit?: { name: string } | null
+  warehouse?: { name: string } | null
+}
+
+interface UserListProps {
+  data: UserData[]
+  units: UnitData[]
+  warehouses: WarehouseData[]
+}
+
+export function UserList({ data, units, warehouses }: UserListProps) {
+  const [editingUser, setEditingUser] = useState<UserData | null>(null)
+  const [userToBan, setUserToBan] = useState<UserData | null>(null)
   const [banReason, setBanReason] = useState('')
-  const [userToDelete, setUserToDelete] = useState<any>(null)
+  const [userToDelete, setUserToDelete] = useState<UserData | null>(null)
   const [isPending, setIsPending] = useState(false)
 
-  const onBanClick = (user: any) => {
+  const onBanClick = (user: UserData) => {
     if (user.banned) {
       handleProcessBan(user.id, true, '')
     } else {
@@ -125,12 +145,11 @@ export function UserList({
     }
   }
 
-  const renderPlacement = (user: any) => {
+  const renderPlacement = (user: UserData) => {
     if (user.role === 'warehouse_staff' && user.warehouse) {
       return (
         <div className="flex items-center gap-2">
           <Warehouse className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-
           <span className="font-medium">{user.warehouse.name}</span>
         </div>
       )
@@ -139,7 +158,6 @@ export function UserList({
       return (
         <div className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-
           <span className="font-medium">{user.unit.name}</span>
         </div>
       )
@@ -284,7 +302,7 @@ export function UserList({
             </Button>
             <Button
               variant="destructive"
-              onClick={() => handleProcessBan(userToBan.id, false, banReason)}
+              onClick={() => userToBan && handleProcessBan(userToBan.id, false, banReason)}
               disabled={isPending}
             >
               {isPending ? 'Memproses...' : 'Ya, Blokir User'}
@@ -314,7 +332,7 @@ export function UserList({
             </Button>
             <Button
               variant="destructive"
-              onClick={() => handleDelete(userToDelete.id)}
+              onClick={() => userToDelete && handleDelete(userToDelete.id)}
               disabled={isPending}
             >
               {isPending ? 'Menghapus...' : 'Ya, Hapus Permanen'}

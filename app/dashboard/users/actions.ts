@@ -20,6 +20,17 @@ const userFormSchema = z.object({
   warehouseId: z.string().optional(),
 })
 
+// Helper untuk mengambil pesan error secara aman
+function getErrorMessage(error: unknown, defaultMessage: string): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'object' && error !== null && 'body' in error) {
+    // Asumsi error dari Better Auth mungkin punya properti body.message
+    const errBody = (error as { body?: { message?: string } }).body
+    if (errBody?.message) return errBody.message
+  }
+  return defaultMessage
+}
+
 export async function createUserAction(data: z.infer<typeof userFormSchema>) {
   await requireAuth({ roles: ['administrator'] })
 
@@ -51,8 +62,8 @@ export async function createUserAction(data: z.infer<typeof userFormSchema>) {
 
     revalidatePath('/dashboard/users')
     return { success: true, message: 'Pengguna berhasil dibuat' }
-  } catch (e: any) {
-    return { error: e.message || 'Gagal membuat pengguna' }
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e, 'Gagal membuat pengguna') }
   }
 }
 
@@ -81,6 +92,7 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
       await auth.api.setRole({
         body: {
           userId: id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           role: parsed.data.role as any,
         },
         headers: requestHeaders,
@@ -99,8 +111,8 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
 
     revalidatePath('/dashboard/users')
     return { success: true, message: 'Pengguna berhasil diperbarui' }
-  } catch (e: any) {
-    return { error: e.body?.message || e.message || 'Gagal memperbarui pengguna' }
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e, 'Gagal memperbarui pengguna') }
   }
 }
 
@@ -122,12 +134,14 @@ export async function banUserAction(userId: string, reason?: string) {
         body: { userId },
         headers: requestHeaders,
       })
-    } catch {}
+    } catch {
+      // Ignore session revocation errors
+    }
 
     revalidatePath('/dashboard/users')
     return { success: true, message: 'User berhasil diblokir' }
-  } catch (e: any) {
-    return { error: e.message || 'Gagal memblokir user' }
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e, 'Gagal memblokir user') }
   }
 }
 
@@ -143,8 +157,8 @@ export async function unbanUserAction(userId: string) {
 
     revalidatePath('/dashboard/users')
     return { success: true, message: 'User berhasil diaktifkan kembali' }
-  } catch (e: any) {
-    return { error: e.body?.message || 'Gagal mengaktifkan user' }
+  } catch (e: unknown) {
+    return { error: getErrorMessage(e, 'Gagal mengaktifkan user') }
   }
 }
 
@@ -168,10 +182,12 @@ export async function deleteUserAction(userId: string) {
 
     revalidatePath('/dashboard/users')
     return { success: true, message: 'User berhasil dihapus permanen' }
-  } catch (e: any) {
-    if (e.code === '23503') {
-      return { error: 'Gagal: User ini terikat dengan data lain.' }
+  } catch (e: unknown) {
+    if (typeof e === 'object' && e !== null && 'code' in e) {
+      if ((e as { code: string }).code === '23503') {
+        return { error: 'Gagal: User ini terikat dengan data lain.' }
+      }
     }
-    return { error: e.message || 'Gagal menghapus user' }
+    return { error: getErrorMessage(e, 'Gagal menghapus user') }
   }
 }

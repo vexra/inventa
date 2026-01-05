@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Plus } from 'lucide-react'
@@ -45,9 +45,20 @@ const formSchema = z.object({
   warehouseId: z.string().optional(),
 })
 
+type UserRole = z.infer<typeof formSchema>['role']
+
+interface UserInitialData {
+  id: string
+  name: string
+  email: string
+  role: string
+  unitId?: string | null
+  warehouseId?: string | null
+}
+
 interface UserDialogProps {
   mode?: 'create' | 'edit'
-  initialData?: any
+  initialData?: UserInitialData | null
   units: { id: string; name: string }[]
   warehouses: { id: string; name: string }[]
   open?: boolean
@@ -73,13 +84,17 @@ export function UserDialog({
       name: initialData?.name || '',
       email: initialData?.email || '',
       password: '',
-      role: initialData?.role || 'unit_staff',
+      role: (initialData?.role as UserRole) || 'unit_staff',
       unitId: initialData?.unitId || '',
       warehouseId: initialData?.warehouseId || '',
     },
   })
 
-  const role = form.watch('role')
+  const role = useWatch({
+    control: form.control,
+    name: 'role',
+  })
+
   const isLoading = form.formState.isSubmitting
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -92,6 +107,10 @@ export function UserDialog({
     if (mode === 'create') {
       result = await createUserAction(values)
     } else {
+      if (!initialData?.id) {
+        toast.error('ID User tidak ditemukan')
+        return
+      }
       result = await updateUserAction(initialData.id, values)
     }
 
