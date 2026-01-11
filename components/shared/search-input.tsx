@@ -9,8 +9,14 @@ import { useDebouncedCallback } from 'use-debounce'
 
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 
-export function UnitSearch() {
+interface SearchInputProps {
+  placeholder?: string
+  className?: string
+}
+
+export function SearchInput({ placeholder = 'Cari...', className }: SearchInputProps) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const { replace } = useRouter()
@@ -32,17 +38,22 @@ export function UnitSearch() {
   }, 300)
 
   return (
-    <div className="relative flex flex-1 shrink-0">
+    // PERBAIKAN:
+    // 1. Saya hapus 'flex flex-1 shrink-0' agar tidak memaksa lebar penuh.
+    // 2. Saya tambahkan 'cn(..., className)' agar Anda bisa mengatur lebar lewat props.
+    <div className={cn('relative', className)}>
       <label htmlFor="search" className="sr-only">
-        Cari Unit
+        Cari
       </label>
       <Input
-        className="w-full pl-10 md:w-75"
-        placeholder="Cari nama unit..."
+        // Input mengikuti lebar wrapper (div parent)
+        className="w-full pl-10"
+        placeholder={placeholder}
         onChange={(e) => handleSearch(e.target.value)}
         defaultValue={searchParams.get('q')?.toString()}
       />
-      <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500" />
+      <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+
       {isPending && (
         <div className="absolute top-1/2 right-3 -translate-y-1/2">
           <Spinner className="h-4 w-4" />

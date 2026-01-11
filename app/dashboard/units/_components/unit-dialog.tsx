@@ -26,18 +26,42 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { UnitFormValues, unitSchema } from '@/lib/validations/unit'
 
 import { createUnit, updateUnit } from '../actions'
 
-interface UnitDialogProps {
-  mode?: 'create' | 'edit'
-  initialData?: { id: string; name: string; description: string | null }
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+interface FacultyOption {
+  id: string
+  name: string
 }
 
-export function UnitDialog({ mode = 'create', initialData, open, onOpenChange }: UnitDialogProps) {
+interface UnitDialogProps {
+  mode?: 'create' | 'edit'
+  initialData?: {
+    id: string
+    name: string
+    description: string | null
+    facultyId: string | null
+  }
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  faculties: FacultyOption[]
+}
+
+export function UnitDialog({
+  mode = 'create',
+  initialData,
+  open,
+  onOpenChange,
+  faculties = [],
+}: UnitDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const isControlled = open !== undefined
   const isOpen = isControlled ? open : internalOpen
@@ -48,6 +72,7 @@ export function UnitDialog({ mode = 'create', initialData, open, onOpenChange }:
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
+      facultyId: initialData?.facultyId || '',
     },
   })
 
@@ -84,27 +109,57 @@ export function UnitDialog({ mode = 'create', initialData, open, onOpenChange }:
         </DialogTrigger>
       )}
 
-      <DialogContent className="sm:max-w-106.25">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Tambah Unit Baru' : 'Edit Unit'}</DialogTitle>
-          <DialogDescription>Kelola data unit kerja atau departemen.</DialogDescription>
+          <DialogDescription>Hubungkan unit kerja dengan fakultas terkait.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
+              name="facultyId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fakultas Induk</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={mode === 'edit'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih Fakultas..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {faculties.map((faculty) => (
+                        <SelectItem key={faculty.id} value={faculty.id}>
+                          {faculty.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nama Unit</FormLabel>
+                  <FormLabel>Nama Unit / Jurusan</FormLabel>
                   <FormControl>
-                    <Input placeholder="Contoh: Laboratorium Kimia" {...field} />
+                    <Input placeholder="Contoh: Jurusan Biologi" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="description"
@@ -112,12 +167,13 @@ export function UnitDialog({ mode = 'create', initialData, open, onOpenChange }:
                 <FormItem>
                   <FormLabel>Deskripsi (Opsional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Keterangan singkat unit..." {...field} />
+                    <Input placeholder="Keterangan singkat..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <DialogFooter>
               <Button
                 type="submit"
