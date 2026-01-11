@@ -1,6 +1,8 @@
 import { asc, count, ilike, or } from 'drizzle-orm'
 import { AlertCircle } from 'lucide-react'
 
+import { PaginationControls } from '@/components/shared/pagination-controls'
+import { SearchInput } from '@/components/shared/search-input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -16,8 +18,6 @@ import { user } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
-import { SessionPagination } from './_components/session-pagination'
-import { SessionSearch } from './_components/session-search'
 import { SessionSheet } from './_components/session-sheet'
 
 const ITEMS_PER_PAGE = 10
@@ -30,7 +30,7 @@ interface PageProps {
 }
 
 export default async function SessionsPage({ searchParams }: PageProps) {
-  await requireAuth({ roles: ['administrator'] })
+  await requireAuth({ roles: ['super_admin'] })
 
   const params = await searchParams
   const query = params.q || ''
@@ -79,11 +79,8 @@ export default async function SessionsPage({ searchParams }: PageProps) {
         </AlertDescription>
       </Alert>
 
-      <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-        <SessionSearch />
-        <div className="text-muted-foreground text-sm">
-          Total Pengguna: <strong>{totalUsers}</strong>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <SearchInput placeholder="Cari nama pengguna..." className="w-full sm:max-w-xs" />
       </div>
 
       <div className="bg-card rounded-md border">
@@ -133,7 +130,7 @@ export default async function SessionsPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex justify-end">
-        <SessionPagination totalPages={totalPages} />
+        <PaginationControls totalPages={totalPages} />
       </div>
     </div>
   )
