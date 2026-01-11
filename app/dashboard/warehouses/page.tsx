@@ -32,7 +32,6 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
     ? or(ilike(warehouses.name, `%${query}%`), ilike(warehouses.description, `%${query}%`))
     : undefined
 
-  // 1. Fetch Data Gudang + Nama Fakultas
   const dataPromise = db
     .select({
       id: warehouses.id,
@@ -40,7 +39,7 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
       type: warehouses.type,
       description: warehouses.description,
       facultyId: warehouses.facultyId,
-      facultyName: faculties.name, // Join result
+      facultyName: faculties.name,
     })
     .from(warehouses)
     .leftJoin(faculties, eq(warehouses.facultyId, faculties.id))
@@ -49,13 +48,11 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
     .offset(offset)
     .orderBy(asc(warehouses.name))
 
-  // 2. Count Total
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
     .from(warehouses)
     .where(searchCondition)
 
-  // 3. Fetch List Fakultas (Untuk Dropdown Create/Edit)
   const facultiesPromise = db
     .select({ id: faculties.id, name: faculties.name })
     .from(faculties)
@@ -85,7 +82,6 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* Pass facultiesList ke List (untuk Edit Mode) */}
         <WarehouseList data={data} faculties={facultiesList} />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}

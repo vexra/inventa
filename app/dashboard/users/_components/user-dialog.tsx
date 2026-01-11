@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Plus } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -40,7 +40,7 @@ const formSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
   email: z.email('Email tidak valid'),
   password: z.string().min(8, 'Password minimal 8 karakter').or(z.literal('')).optional(),
-  role: z.enum(['administrator', 'warehouse_staff', 'unit_staff', 'executive']),
+  role: z.enum(['super_admin', 'faculty_admin', 'unit_admin', 'warehouse_staff', 'unit_staff']),
   unitId: z.string().optional(),
   warehouseId: z.string().optional(),
 })
@@ -57,26 +57,37 @@ interface UserInitialData {
 }
 
 interface UserDialogProps {
-  mode?: 'create' | 'edit'
-  initialData?: UserInitialData | null
-  units: { id: string; name: string }[]
-  warehouses: { id: string; name: string }[]
+  mode: 'create' | 'edit'
+  initialData?: UserInitialData
+  units?: { id: string; name: string }[]
+  warehouses?: { id: string; name: string }[]
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
 
 export function UserDialog({
-  mode = 'create',
+  mode,
   initialData,
-  units,
-  warehouses,
+  units = [],
+  warehouses = [],
   open,
   onOpenChange,
 }: UserDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
+
+  const [showPassword, setShowPassword] = useState(false)
+
   const isControlled = open !== undefined
   const isOpen = isControlled ? open : internalOpen
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen
+
+  const defaultRole = (
+    ['super_admin', 'faculty_admin', 'unit_admin', 'warehouse_staff', 'unit_staff'].includes(
+      initialData?.role || '',
+    )
+      ? initialData?.role
+      : 'unit_staff'
+  ) as UserRole
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -84,42 +95,40 @@ export function UserDialog({
       name: initialData?.name || '',
       email: initialData?.email || '',
       password: '',
-      role: (initialData?.role as UserRole) || 'unit_staff',
-      unitId: initialData?.unitId || '',
-      warehouseId: initialData?.warehouseId || '',
+      role: defaultRole,
+      unitId: initialData?.unitId || undefined,
+      warehouseId: initialData?.warehouseId || undefined,
     },
   })
 
-  const role = useWatch({
-    control: form.control,
-    name: 'role',
-  })
-
   const isLoading = form.formState.isSubmitting
+  const role = useWatch({ control: form.control, name: 'role' })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (mode === 'create' && !values.password) {
-      form.setError('password', { message: 'Password wajib diisi' })
-      return
-    }
-
-    let result
-    if (mode === 'create') {
-      result = await createUserAction(values)
-    } else {
-      if (!initialData?.id) {
-        toast.error('ID User tidak ditemukan')
-        return
+    try {
+      if (mode === 'create') {
+        const res = await createUserAction(values)
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success('User berhasil dibuat')
+          setIsOpen?.(false)
+          form.reset()
+          setShowPassword(false)
+        }
+      } else {
+        if (!initialData?.id) return
+        const res = await updateUserAction(initialData.id, values)
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success('User berhasil diperbarui')
+          setIsOpen?.(false)
+          setShowPassword(false)
+        }
       }
-      result = await updateUserAction(initialData.id, values)
-    }
-
-    if (result?.error) {
-      toast.error(result.error)
-    } else {
-      toast.success(result?.message)
-      setIsOpen?.(false)
-      if (mode === 'create') form.reset()
+    } catch {
+      toast.error('Terjadi kesalahan')
     }
   }
 
@@ -133,10 +142,11 @@ export function UserDialog({
         </DialogTrigger>
       )}
 
-      <DialogContent className="sm:max-w-125">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Tambah Pengguna' : 'Edit Pengguna'}</DialogTitle>
+          <DialogTitle>{mode === 'create' ? 'Tambah Pengguna Baru' : 'Edit Pengguna'}</DialogTitle>
         </DialogHeader>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -146,7 +156,7 @@ export function UserDialog({
                 <FormItem>
                   <FormLabel>Nama Lengkap</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input placeholder="Nama user" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -160,7 +170,7 @@ export function UserDialog({
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input {...field} disabled={mode === 'edit'} />
+                    <Input placeholder="email@contoh.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -173,10 +183,38 @@ export function UserDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Password {mode === 'edit' && '(Kosongkan jika tidak diganti)'}
+                    Password{' '}
+                    {mode === 'edit' && (
+                      <span className="text-muted-foreground text-xs">
+                        (Isi jika ingin mengganti)
+                      </span>
+                    )}
                   </FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="********"
+                        {...field}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="text-muted-foreground h-4 w-4" />
+                        ) : (
+                          <Eye className="text-muted-foreground h-4 w-4" />
+                        )}
+                        <span className="sr-only">
+                          {showPassword ? 'Hide password' : 'Show password'}
+                        </span>
+                      </Button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -188,18 +226,19 @@ export function UserDialog({
               name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel>Peran (Role)</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Pilih role" />
+                        <SelectValue placeholder="Pilih Peran" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="administrator">Administrator</SelectItem>
-                      <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
-                      <SelectItem value="unit_staff">Unit Staff</SelectItem>
-                      <SelectItem value="executive">Executive</SelectItem>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                      <SelectItem value="faculty_admin">Admin Fakultas</SelectItem>
+                      <SelectItem value="unit_admin">Admin Unit/Prodi</SelectItem>
+                      <SelectItem value="warehouse_staff">Staf Gudang</SelectItem>
+                      <SelectItem value="unit_staff">Staf Unit/User Biasa</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -207,13 +246,13 @@ export function UserDialog({
               )}
             />
 
-            {role === 'unit_staff' && (
+            {(role === 'unit_staff' || role === 'unit_admin') && (
               <FormField
                 control={form.control}
                 name="unitId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Unit Kerja</FormLabel>
+                    <FormLabel>Unit / Prodi</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
@@ -262,7 +301,11 @@ export function UserDialog({
             )}
 
             <DialogFooter>
-              <Button type="submit" disabled={isLoading}>
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Simpan
               </Button>
             </DialogFooter>
