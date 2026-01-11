@@ -1,13 +1,13 @@
 import { asc, ilike, sql } from 'drizzle-orm'
 
+import { PaginationControls } from '@/components/shared/pagination-controls'
+import { SearchInput } from '@/components/shared/search-input'
 import { categories } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { CategoryDialog } from './_components/category-dialog'
 import { CategoryList } from './_components/category-list'
-import { CategoryPagination } from './_components/category-pagination'
-import { CategorySearch } from './_components/category-search'
 
 const ITEMS_PER_PAGE = 10
 
@@ -59,13 +59,13 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <CategorySearch />
+        <SearchInput placeholder="Cari kategori..." className="w-full sm:max-w-xs" />
       </div>
 
       <div className="flex flex-col gap-4">
         <CategoryList data={data} />
 
-        {totalPages > 1 && <CategoryPagination totalPages={totalPages} />}
+        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 
         {data.length === 0 && query && (
           <div className="text-muted-foreground py-10 text-center">
