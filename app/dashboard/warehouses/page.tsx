@@ -1,13 +1,13 @@
-import { asc, ilike, or, sql } from 'drizzle-orm'
+import { asc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { warehouses } from '@/db/schema'
+import { PaginationControls } from '@/components/shared/pagination-controls'
+import { SearchInput } from '@/components/shared/search-input'
+import { faculties, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { WarehouseDialog } from './_components/warehouse-dialog'
 import { WarehouseList } from './_components/warehouse-list'
-import { WarehousePagination } from './_components/warehouse-pagination'
-import { WarehouseSearch } from './_components/warehouse-search'
 
 const ITEMS_PER_PAGE = 10
 
@@ -20,7 +20,7 @@ interface PageProps {
 
 export default async function WarehousesPage({ searchParams }: PageProps) {
   await requireAuth({
-    roles: ['administrator'],
+    roles: ['super_admin'],
   })
 
   const params = await searchParams
@@ -29,12 +29,20 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
 
   const searchCondition = query
-    ? or(ilike(warehouses.name, `%${query}%`), ilike(warehouses.location, `%${query}%`))
+    ? or(ilike(warehouses.name, `%${query}%`), ilike(warehouses.description, `%${query}%`))
     : undefined
 
   const dataPromise = db
-    .select()
+    .select({
+      id: warehouses.id,
+      name: warehouses.name,
+      type: warehouses.type,
+      description: warehouses.description,
+      facultyId: warehouses.facultyId,
+      facultyName: faculties.name,
+    })
     .from(warehouses)
+    .leftJoin(faculties, eq(warehouses.facultyId, faculties.id))
     .where(searchCondition)
     .limit(ITEMS_PER_PAGE)
     .offset(offset)
@@ -45,7 +53,16 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
     .from(warehouses)
     .where(searchCondition)
 
-  const [data, countResult] = await Promise.all([dataPromise, countPromise])
+  const facultiesPromise = db
+    .select({ id: faculties.id, name: faculties.name })
+    .from(faculties)
+    .orderBy(asc(faculties.name))
+
+  const [data, countResult, facultiesList] = await Promise.all([
+    dataPromise,
+    countPromise,
+    facultiesPromise,
+  ])
 
   const totalItems = Number(countResult[0]?.count || 0)
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
@@ -55,19 +72,19 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Data Gudang</h1>
-          <p className="text-muted-foreground">Kelola daftar gudang penyimpanan barang</p>
+          <p className="text-muted-foreground">Kelola gudang penyimpanan Bahan Kimia & ATK</p>
         </div>
-        <WarehouseDialog mode="create" />
+        <WarehouseDialog mode="create" faculties={facultiesList} />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <WarehouseSearch />
+        <SearchInput placeholder="Cari nama gudang..." className="w-full sm:max-w-xs" />
       </div>
 
       <div className="flex flex-col gap-4">
-        <WarehouseList data={data} />
+        <WarehouseList data={data} faculties={facultiesList} />
 
-        {totalPages > 1 && <WarehousePagination totalPages={totalPages} />}
+        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 
         {data.length === 0 && query && (
           <div className="text-muted-foreground py-10 text-center">

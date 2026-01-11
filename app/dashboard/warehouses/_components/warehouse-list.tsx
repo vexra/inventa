@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { MapPin, MoreHorizontal, Pencil, Trash2, Warehouse } from 'lucide-react'
+import { FlaskConical, MoreHorizontal, Package, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -35,13 +36,26 @@ import {
 import { deleteWarehouse } from '../actions'
 import { WarehouseDialog } from './warehouse-dialog'
 
-type Warehouse = {
+type WarehouseWithFaculty = {
   id: string
   name: string
-  location: string | null
+  type: 'CHEMICAL' | 'GENERAL_ATK'
+  description: string | null
+  facultyId: string | null
+  facultyName: string | null
 }
 
-export function WarehouseList({ data }: { data: Warehouse[] }) {
+interface FacultyOption {
+  id: string
+  name: string
+}
+
+interface WarehouseListProps {
+  data: WarehouseWithFaculty[]
+  faculties: FacultyOption[]
+}
+
+export function WarehouseList({ data, faculties }: WarehouseListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -62,35 +76,50 @@ export function WarehouseList({ data }: { data: Warehouse[] }) {
           <TableHeader>
             <TableRow>
               <TableHead>Nama Gudang</TableHead>
-              <TableHead>Lokasi</TableHead>
-              <TableHead className="w-25 text-right">Aksi</TableHead>
+              <TableHead>Jenis</TableHead>
+              <TableHead>Fakultas</TableHead>
+              <TableHead>Deskripsi</TableHead>
+              <TableHead className="w-20 text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center">
+                <TableCell colSpan={5} className="h-24 text-center">
                   Tidak ada data gudang.
                 </TableCell>
               </TableRow>
             ) : (
               data.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Warehouse className="text-muted-foreground h-4 w-4" />
-                      {item.name}
-                    </div>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={`gap-1 ${
+                        item.type === 'CHEMICAL'
+                          ? 'border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100' // Warna Kimia (Soft Orange)
+                          : 'border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100' // Warna Umum (Soft Blue)
+                      }`}
+                    >
+                      {item.type === 'CHEMICAL' ? (
+                        <>
+                          <FlaskConical className="h-3 w-3" /> Kimia
+                        </>
+                      ) : (
+                        <>
+                          <Package className="h-3 w-3" /> Umum
+                        </>
+                      )}
+                    </Badge>
                   </TableCell>
                   <TableCell>
-                    {item.location ? (
-                      <div className="text-muted-foreground flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        {item.location}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground italic">-</span>
-                    )}
+                    <span className="text-muted-foreground text-sm">{item.facultyName || '-'}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-muted-foreground block max-w-50 truncate text-sm">
+                      {item.description || '-'}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -126,16 +155,17 @@ export function WarehouseList({ data }: { data: Warehouse[] }) {
           open={!!editingId}
           onOpenChange={(open) => !open && setEditingId(null)}
           initialData={warehouseToEdit}
+          faculties={faculties}
         />
       )}
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Apakah anda yakin?</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Gudang?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tindakan ini tidak dapat dibatalkan. Data gudang dan stok yang terkait mungkin akan
-              terpengaruh.
+              Tindakan ini tidak dapat dibatalkan. Pastikan gudang ini sudah <strong>kosong</strong>{' '}
+              sebelum dihapus.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
