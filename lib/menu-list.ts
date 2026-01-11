@@ -1,9 +1,9 @@
 import {
   Building,
   Building2,
-  Component,
   FileClock,
   FlaskConical,
+  Layers,
   LayoutDashboard,
   type LucideIcon,
   MapPin,
@@ -50,7 +50,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       items: [
         { title: 'Kategori', url: '/dashboard/categories', icon: Tags },
         { title: 'Barang Habis Pakai', url: '/dashboard/consumables', icon: FlaskConical },
-        { title: 'Model Aset', url: '/dashboard/asset-models', icon: Component },
+        { title: 'Model Aset', url: '/dashboard/asset-models', icon: Layers },
       ],
     },
 

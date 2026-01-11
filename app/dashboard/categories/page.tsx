@@ -20,7 +20,7 @@ interface PageProps {
 
 export default async function CategoriesPage({ searchParams }: PageProps) {
   await requireAuth({
-    roles: ['administrator'],
+    roles: ['super_admin'],
   })
 
   const params = await searchParams
