@@ -84,7 +84,7 @@ export default async function Page() {
       .select({ value: count() })
       .from(warehouseStocks)
       .leftJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
-      .where(sql`${warehouseStocks.quantity} <= ${consumables.minStockAlert}`),
+      .where(sql`${warehouseStocks.quantity} <= ${consumables.minimumStock}`),
 
     // [BHP] Request Menunggu
     db

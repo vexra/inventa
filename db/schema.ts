@@ -246,7 +246,7 @@ export const consumables = pgTable('consumables', {
   sku: text('sku').unique(), // Stock Keeping Unit (Kode Barang)
 
   baseUnit: text('base_unit').notNull(), // Satuan terkecil (Liter, Pcs, Rim)
-  minStockAlert: integer('min_stock_alert').default(10), // Trigger notifikasi jika stok tipis
+  minimumStock: integer('minimum_stock').default(10), // Trigger notifikasi jika stok tipis
 
   hasExpiry: boolean('has_expiry').default(false).notNull(), // Apakah butuh tracking kadaluarsa?
   image: text('image'),
