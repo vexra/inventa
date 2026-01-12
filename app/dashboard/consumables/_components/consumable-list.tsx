@@ -158,9 +158,9 @@ export function ConsumableList({ data, categories }: ConsumableListProps) {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setDeletingId(item.id)}
-                          className="text-red-600 focus:bg-red-100 focus:text-red-600 dark:focus:bg-red-900/30"
+                          className="text-red-600 focus:text-red-600"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                          <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" /> Hapus
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
