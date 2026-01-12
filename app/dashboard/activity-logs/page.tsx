@@ -10,7 +10,7 @@ import { db } from '@/lib/db'
 
 import { LogsTable } from './_components/activity-logs-table'
 
-const ITEMS_PER_PAGE = 20
+const ITEMS_PER_PAGE = 10
 
 interface PageProps {
   searchParams: Promise<{
