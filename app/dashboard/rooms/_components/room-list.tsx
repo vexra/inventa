@@ -210,7 +210,6 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
         />
       )}
 
-      {/* Alert Dialog Hapus tetap sama ... */}
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

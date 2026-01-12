@@ -119,7 +119,6 @@ export function RoomDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Field Nama */}
             <FormField
               control={form.control}
               name="name"
@@ -135,7 +134,6 @@ export function RoomDialog({
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {/* Field Unit */}
               <FormField
                 control={form.control}
                 name="unitId"
@@ -144,7 +142,7 @@ export function RoomDialog({
                     <FormLabel>Milik Unit/Jurusan</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih Unit" />
                         </SelectTrigger>
                       </FormControl>
@@ -161,7 +159,6 @@ export function RoomDialog({
                 )}
               />
 
-              {/* Field Tipe */}
               <FormField
                 control={form.control}
                 name="type"
@@ -170,7 +167,7 @@ export function RoomDialog({
                     <FormLabel>Jenis Ruangan</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Pilih Jenis" />
                         </SelectTrigger>
                       </FormControl>
@@ -187,7 +184,6 @@ export function RoomDialog({
               />
             </div>
 
-            {/* Field Deskripsi */}
             <FormField
               control={form.control}
               name="description"
