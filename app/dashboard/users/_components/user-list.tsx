@@ -2,15 +2,17 @@
 
 import { useState } from 'react'
 
+import { useRouter } from 'next/navigation'
+
 import {
-  AlertTriangle,
   Ban,
   Building2,
   KeyRound,
   MoreHorizontal,
+  School,
   Trash2,
-  User,
   UserCog,
+  VenetianMask,
   Warehouse,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -45,15 +47,26 @@ import {
 } from '@/components/ui/table'
 import { authClient } from '@/lib/auth-client'
 
-import { banUserAction, deleteUserAction, unbanUserAction } from '../actions'
+import {
+  banUserAction,
+  deleteUserAction,
+  logImpersonationAction,
+  unbanUserAction,
+} from '../actions'
 import { UserDialog } from './user-dialog'
 
 interface UnitData {
   id: string
   name: string
+  facultyId: string | null
 }
 
 interface WarehouseData {
+  id: string
+  name: string
+}
+
+interface FacultyData {
   id: string
   name: string
 }
@@ -65,104 +78,108 @@ interface UserData {
   role: string
   banned: boolean
   banReason?: string | null
-  usageCount?: number
-  unit?: { name: string } | null
-  warehouse?: { name: string } | null
+  usageCount: number
+
+  unitId: string | null
+  warehouseId: string | null
+  facultyId: string | null
+  unitFacultyId: string | null
+
+  unit: { name: string } | null
+  warehouse: { name: string } | null
 }
 
 interface UserListProps {
   data: UserData[]
   units: UnitData[]
   warehouses: WarehouseData[]
+  faculties: FacultyData[]
 }
 
-export function UserList({ data, units, warehouses }: UserListProps) {
-  const [editingUser, setEditingUser] = useState<UserData | null>(null)
+export function UserList({ data, units, warehouses, faculties }: UserListProps) {
+  const router = useRouter()
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [isPending, setIsPending] = useState(false)
+
   const [userToBan, setUserToBan] = useState<UserData | null>(null)
   const [banReason, setBanReason] = useState('')
   const [userToDelete, setUserToDelete] = useState<UserData | null>(null)
-  const [isPending, setIsPending] = useState(false)
 
-  const onBanClick = (user: UserData) => {
-    if (user.banned) {
-      handleProcessBan(user.id, true, '')
-    } else {
-      setBanReason('')
-      setUserToBan(user)
+  const [userToImpersonate, setUserToImpersonate] = useState<UserData | null>(null)
+
+  const userToEdit = data.find((u) => u.id === editingId)
+
+  const confirmImpersonate = async () => {
+    if (!userToImpersonate) return
+
+    setIsPending(true)
+    const toastId = toast.loading(`Menyiapkan sesi ${userToImpersonate.name}...`)
+
+    try {
+      await logImpersonationAction(userToImpersonate.id)
+
+      const { data, error } = await authClient.admin.impersonateUser({
+        userId: userToImpersonate.id,
+      })
+
+      if (error) {
+        toast.error(error.message || 'Gagal login sebagai user', { id: toastId })
+        setIsPending(false)
+        setUserToImpersonate(null)
+      } else {
+        toast.success(`Berhasil masuk sebagai ${userToImpersonate.name}`, { id: toastId })
+
+        window.location.href = '/dashboard'
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan sistem', { id: toastId })
+      setIsPending(false)
+      setUserToImpersonate(null)
     }
   }
 
-  const handleProcessBan = async (id: string, isBanned: boolean, reason: string) => {
+  const handleProcessBan = async (userId: string, isBanned: boolean, reason?: string) => {
     setIsPending(true)
     try {
-      let result
       if (isBanned) {
-        result = await unbanUserAction(id)
+        const res = await unbanUserAction(userId)
+        if (res.error) toast.error(res.error)
+        else {
+          toast.success(res.message)
+          setUserToBan(null)
+          setBanReason('')
+        }
       } else {
-        result = await banUserAction(id, reason)
+        const res = await banUserAction(userId, reason)
+        if (res.error) toast.error(res.error)
+        else {
+          toast.success(res.message)
+          setUserToBan(null)
+          setBanReason('')
+        }
       }
-
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success(result.message)
-        setUserToBan(null)
-      }
-    } catch {
-      toast.error('Terjadi kesalahan sistem')
+    } catch (error) {
+      toast.error('Gagal memproses status user')
     } finally {
       setIsPending(false)
     }
   }
 
-  const handleImpersonate = async (id: string) => {
+  const handleDelete = async (userId: string) => {
     setIsPending(true)
     try {
-      await authClient.admin.impersonateUser({ userId: id })
-      toast.success('Beralih akun...')
-      window.location.href = '/dashboard'
-    } catch (error) {
-      console.error(error)
-      toast.error('Gagal beralih akun. Silakan coba lagi.')
-      setIsPending(false)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    setIsPending(true)
-    try {
-      const result = await deleteUserAction(id)
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        toast.success(result.message)
+      const res = await deleteUserAction(userId)
+      if (res.error) toast.error(res.error)
+      else {
+        toast.success(res.message)
         setUserToDelete(null)
       }
-    } catch {
+    } catch (error) {
       toast.error('Gagal menghapus user')
     } finally {
       setIsPending(false)
     }
-  }
-
-  const renderPlacement = (user: UserData) => {
-    if (user.role === 'warehouse_staff' && user.warehouse) {
-      return (
-        <div className="flex items-center gap-2">
-          <Warehouse className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-          <span className="font-medium">{user.warehouse.name}</span>
-        </div>
-      )
-    }
-    if (user.role === 'unit_staff' && user.unit) {
-      return (
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-          <span className="font-medium">{user.unit.name}</span>
-        </div>
-      )
-    }
-    return <span className="text-muted-foreground">-</span>
   }
 
   return (
@@ -171,146 +188,287 @@ export function UserList({ data, units, warehouses }: UserListProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nama</TableHead>
+              <TableHead>User</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Penempatan</TableHead>
+              <TableHead>Afiliasi</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Aksi</TableHead>
+              <TableHead className="w-12.5"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <User className="h-4 w-4 text-blue-600" />
-                    <div>
-                      <div className="font-medium">{user.name}</div>
-                      <div className="text-muted-foreground text-xs">{user.email}</div>
+            {data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-muted-foreground h-24 text-center">
+                  Tidak ada pengguna ditemukan.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{user.name}</span>
+                      <span className="text-muted-foreground text-xs">{user.email}</span>
                     </div>
-                  </div>
-                </TableCell>
+                  </TableCell>
 
-                <TableCell>
-                  <Badge variant="outline" className="capitalize">
-                    {user.role?.replace('_', ' ')}
-                  </Badge>
-                </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {user.role.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
 
-                <TableCell>{renderPlacement(user)}</TableCell>
+                  <TableCell>
+                    {user.unit ? (
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm">{user.unit.name}</span>
+                      </div>
+                    ) : user.warehouse ? (
+                      <div className="flex items-center gap-2">
+                        <Warehouse className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm">{user.warehouse.name}</span>
+                      </div>
+                    ) : user.role === 'faculty_admin' ? (
+                      <div className="flex items-center gap-2">
+                        <School className="h-4 w-4 text-purple-500" />
+                        <span className="text-sm">
+                          {faculties.find((f) => f.id === user.facultyId)?.name || (
+                            <span className="text-muted-foreground italic">Belum set fakultas</span>
+                          )}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
+                  </TableCell>
 
-                <TableCell>
-                  {user.banned ? (
-                    <Badge variant="destructive">Banned</Badge>
-                  ) : (
-                    <Badge className="bg-green-600 hover:bg-green-700">Aktif</Badge>
-                  )}
-                </TableCell>
+                  <TableCell>
+                    {user.banned ? (
+                      <Badge variant="destructive">Banned</Badge>
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
+                      >
+                        Aktif
+                      </Badge>
+                    )}
+                  </TableCell>
 
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={isPending}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Aksi</DropdownMenuLabel>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Aksi</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
 
-                      <DropdownMenuItem onClick={() => setEditingUser(user)}>
-                        <UserCog className="mr-2 h-4 w-4" /> Edit Detail
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem onClick={() => handleImpersonate(user.id)}>
-                        <KeyRound className="mr-2 h-4 w-4" /> Masuk sbg User
-                      </DropdownMenuItem>
-
-                      <DropdownMenuSeparator />
-
-                      {user.usageCount === 0 && (
                         <DropdownMenuItem
-                          onClick={() => setUserToDelete(user)}
+                          onClick={() => setUserToImpersonate(user)}
+                          disabled={isPending || user.role === 'super_admin'}
+                        >
+                          <VenetianMask className="mr-2 h-4 w-4" /> Login Sebagai User
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        <DropdownMenuItem onClick={() => setEditingId(user.id)}>
+                          <UserCog className="mr-2 h-4 w-4" /> Edit Role/Data
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem onClick={() => setUserToBan(user)}>
+                          {user.banned ? (
+                            <>
+                              <KeyRound className="mr-2 h-4 w-4" /> Buka Blokir
+                            </>
+                          ) : (
+                            <>
+                              <Ban className="mr-2 h-4 w-4" /> Blokir User
+                            </>
+                          )}
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        <DropdownMenuItem
                           className="text-red-600 focus:text-red-600"
+                          onClick={() => setUserToDelete(user)}
                         >
                           <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" /> Hapus
                           Permanen
                         </DropdownMenuItem>
-                      )}
-
-                      <DropdownMenuItem
-                        onClick={() => onBanClick(user)}
-                        className={
-                          user.banned
-                            ? 'text-green-600 focus:text-green-600'
-                            : 'text-red-600 focus:text-red-600'
-                        }
-                      >
-                        <Ban
-                          className={`mr-2 h-4 w-4 ${
-                            user.banned ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        />
-                        {user.banned ? 'Buka Blokir' : 'Blokir User'}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
 
-      {editingUser && (
-        <UserDialog
-          mode="edit"
-          open={!!editingUser}
-          onOpenChange={(open) => !open && setEditingUser(null)}
-          initialData={editingUser}
-          units={units}
-          warehouses={warehouses}
-        />
-      )}
-
-      <Dialog open={!!userToBan} onOpenChange={(open) => !open && setUserToBan(null)}>
-        <DialogContent>
+      {/* --- DIALOG IMPERSONATE --- */}
+      <Dialog
+        open={!!userToImpersonate}
+        onOpenChange={(open) => !open && setUserToImpersonate(null)}
+      >
+        <DialogContent className="sm:max-w-md dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Blokir Pengguna
-            </DialogTitle>
-            <DialogDescription>
-              Anda akan memblokir akses login untuk <b>{userToBan?.name}</b>.
+            <div className="mb-2 flex flex-col items-center gap-2">
+              <div className="rounded-full bg-blue-100 p-3 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                <VenetianMask className="h-6 w-6" />
+              </div>
+              <DialogTitle className="text-center text-xl">Login Sebagai User</DialogTitle>
+            </div>
+            <DialogDescription className="text-center text-slate-500 dark:text-slate-400">
+              Anda akan masuk ke dalam sistem sebagai:
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-4">
-            <div className="space-y-1">
-              <Label htmlFor="reason">Alasan Blokir (Opsional)</Label>
+          {/* User Profile Card */}
+          <div className="mb-2 flex items-center justify-center rounded-lg border bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+            <div className="text-center">
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {userToImpersonate?.name}
+              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                {userToImpersonate?.email}
+              </div>
+              <Badge
+                variant="outline"
+                className="mt-2 border-blue-200 bg-white text-blue-600 capitalize dark:border-blue-900 dark:bg-slate-950 dark:text-blue-400"
+              >
+                {userToImpersonate?.role?.replace('_', ' ')}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Warning Box */}
+          <div className="rounded-md border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-950/30">
+            <div className="flex gap-3">
+              <div className="mt-0.5 text-blue-600 dark:text-blue-400">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+              </div>
+              <div className="text-sm text-blue-900 dark:text-blue-100">
+                <p className="mb-1 font-semibold">Mode Penyamaran</p>
+                <p className="leading-relaxed opacity-90 dark:text-blue-200/80">
+                  Sesi Super Admin Anda akan <strong>dijeda</strong>. Untuk kembali, Anda perlu
+                  Logout atau menekan tombol "Stop Impersonating".
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4 gap-2 sm:justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => setUserToImpersonate(null)}
+              disabled={isPending}
+              className="w-full text-slate-500 hover:text-slate-800 sm:w-auto dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={confirmImpersonate}
+              disabled={isPending}
+              className="w-full bg-blue-600 text-white shadow-sm hover:bg-blue-700 sm:w-auto dark:bg-blue-600 dark:hover:bg-blue-500"
+            >
+              {isPending ? (
+                <>Mengalihkan Sesi...</>
+              ) : (
+                <>
+                  <VenetianMask className="mr-2 h-4 w-4" />
+                  Masuk Sekarang
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- DIALOG EDIT --- */}
+      {editingId && userToEdit && (
+        <UserDialog
+          mode="edit"
+          open={!!editingId}
+          onOpenChange={(open) => !open && setEditingId(null)}
+          units={units}
+          warehouses={warehouses}
+          faculties={faculties}
+          initialData={{
+            id: userToEdit.id,
+            name: userToEdit.name,
+            email: userToEdit.email,
+            role: userToEdit.role as any,
+            unitId: userToEdit.unitId || undefined,
+            warehouseId: userToEdit.warehouseId || undefined,
+            facultyId:
+              userToEdit.role === 'faculty_admin'
+                ? userToEdit.facultyId || undefined
+                : userToEdit.unitFacultyId || undefined,
+          }}
+        />
+      )}
+
+      {/* --- DIALOG BAN / UNBAN --- */}
+      <Dialog open={!!userToBan} onOpenChange={(open) => !open && setUserToBan(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{userToBan?.banned ? 'Buka Blokir User' : 'Blokir User'}</DialogTitle>
+            <DialogDescription>
+              {userToBan?.banned
+                ? 'User akan dapat login kembali.'
+                : 'User tidak akan bisa login ke sistem.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!userToBan?.banned && (
+            <div className="grid gap-2 py-2">
+              <Label htmlFor="reason">Alasan Blokir</Label>
               <Input
                 id="reason"
-                placeholder="Contoh: Spamming, Resign, dll..."
+                placeholder="Contoh: Resign, Penyalahgunaan akun..."
                 value={banReason}
                 onChange={(e) => setBanReason(e.target.value)}
               />
             </div>
-          </div>
+          )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setUserToBan(null)} disabled={isPending}>
               Batal
             </Button>
             <Button
-              variant="destructive"
-              onClick={() => userToBan && handleProcessBan(userToBan.id, false, banReason)}
+              variant={userToBan?.banned ? 'default' : 'destructive'}
+              onClick={() =>
+                userToBan && handleProcessBan(userToBan.id, userToBan.banned, banReason)
+              }
               disabled={isPending}
             >
-              {isPending ? 'Memproses...' : 'Ya, Blokir User'}
+              {isPending ? 'Memproses...' : userToBan?.banned ? 'Buka Blokir' : 'Ya, Blokir'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* --- DIALOG DELETE --- */}
       <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
         <DialogContent>
           <DialogHeader>
@@ -322,8 +480,7 @@ export function UserList({ data, units, warehouses }: UserListProps) {
               Anda akan menghapus user <b>{userToDelete?.name}</b> secara permanen.
               <br />
               <br />
-              Tindakan ini <b>tidak dapat dibatalkan</b> dan data akun akan hilang selamanya dari
-              database.
+              Tindakan ini <b>tidak dapat dibatalkan</b>.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

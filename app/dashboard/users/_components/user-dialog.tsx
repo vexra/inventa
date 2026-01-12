@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -36,58 +36,102 @@ import {
 
 import { createUserAction, updateUserAction } from '../actions'
 
-const formSchema = z.object({
-  name: z.string().min(2, 'Nama minimal 2 karakter'),
-  email: z.email('Email tidak valid'),
-  password: z.string().min(8, 'Password minimal 8 karakter').or(z.literal('')).optional(),
-  role: z.enum(['super_admin', 'faculty_admin', 'unit_admin', 'warehouse_staff', 'unit_staff']),
-  unitId: z.string().optional(),
-  warehouseId: z.string().optional(),
-})
+const formSchema = z
+  .object({
+    name: z.string().min(2, 'Nama minimal 2 karakter'),
+    email: z.email('Email tidak valid'),
+    password: z.string().optional(),
+    role: z.enum(['super_admin', 'faculty_admin', 'unit_admin', 'warehouse_staff', 'unit_staff']),
+    unitId: z.string().optional(),
+    warehouseId: z.string().optional(),
+    facultyId: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === 'faculty_admin' && !data.facultyId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Wajib memilih Fakultas untuk role Admin Fakultas.',
+        path: ['facultyId'],
+      })
+    }
+
+    if (['unit_admin', 'unit_staff'].includes(data.role)) {
+      if (!data.facultyId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Pilih Fakultas dahulu untuk memuat daftar Unit.',
+          path: ['facultyId'],
+        })
+      }
+      if (!data.unitId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Unit/Jurusan wajib dipilih.',
+          path: ['unitId'],
+        })
+      }
+    }
+
+    if (data.role === 'warehouse_staff' && !data.warehouseId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Wajib memilih Gudang tempat bertugas.',
+        path: ['warehouseId'],
+      })
+    }
+  })
 
 type UserRole = z.infer<typeof formSchema>['role']
 
-interface UserInitialData {
+interface UnitData {
   id: string
   name: string
-  email: string
-  role: string
-  unitId?: string | null
-  warehouseId?: string | null
+  facultyId: string | null
+}
+
+interface WarehouseData {
+  id: string
+  name: string
+}
+
+interface FacultyData {
+  id: string
+  name: string
 }
 
 interface UserDialogProps {
-  mode: 'create' | 'edit'
-  initialData?: UserInitialData
-  units?: { id: string; name: string }[]
-  warehouses?: { id: string; name: string }[]
+  mode?: 'create' | 'edit'
+  initialData?: {
+    id: string
+    name: string
+    email: string
+    role: UserRole
+    unitId?: string
+    warehouseId?: string
+    facultyId?: string
+  }
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  units: UnitData[]
+  warehouses: WarehouseData[]
+  faculties: FacultyData[]
 }
 
 export function UserDialog({
-  mode,
+  mode = 'create',
   initialData,
-  units = [],
-  warehouses = [],
   open,
   onOpenChange,
+  units,
+  warehouses,
+  faculties,
 }: UserDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
-
-  const [showPassword, setShowPassword] = useState(false)
-
   const isControlled = open !== undefined
   const isOpen = isControlled ? open : internalOpen
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen
 
-  const defaultRole = (
-    ['super_admin', 'faculty_admin', 'unit_admin', 'warehouse_staff', 'unit_staff'].includes(
-      initialData?.role || '',
-    )
-      ? initialData?.role
-      : 'unit_staff'
-  ) as UserRole
+  const [showPassword, setShowPassword] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -95,42 +139,61 @@ export function UserDialog({
       name: initialData?.name || '',
       email: initialData?.email || '',
       password: '',
-      role: defaultRole,
-      unitId: initialData?.unitId || undefined,
-      warehouseId: initialData?.warehouseId || undefined,
+      role: initialData?.role || 'unit_staff',
+      unitId: initialData?.unitId || '',
+      warehouseId: initialData?.warehouseId || '',
+      facultyId: initialData?.facultyId || '',
     },
   })
 
-  const isLoading = form.formState.isSubmitting
   const role = useWatch({ control: form.control, name: 'role' })
+  const selectedFacultyId = useWatch({ control: form.control, name: 'facultyId' })
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const filteredUnits = selectedFacultyId
+    ? units.filter((u) => u.facultyId === selectedFacultyId)
+    : []
+
+  useEffect(() => {
+    const currentUnit = units.find((u) => u.id === form.getValues('unitId'))
+    if (currentUnit && currentUnit.facultyId !== selectedFacultyId && selectedFacultyId) {
+      form.setValue('unitId', '')
+    }
+  }, [selectedFacultyId, units, form])
+
+  const isLoading = form.formState.isSubmitting
+
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    if (mode === 'create' && (!data.password || data.password.length < 8)) {
+      form.setError('password', { message: 'Password wajib diisi minimal 8 karakter' })
+      return
+    }
+
     try {
+      let result
       if (mode === 'create') {
-        const res = await createUserAction(values)
-        if (res.error) {
-          toast.error(res.error)
-        } else {
-          toast.success('User berhasil dibuat')
-          setIsOpen?.(false)
-          form.reset()
-          setShowPassword(false)
-        }
+        result = await createUserAction(data as any)
+      } else if (initialData?.id) {
+        result = await updateUserAction(initialData.id, data as any)
+      }
+
+      if (result?.error) {
+        toast.error(result.error)
       } else {
-        if (!initialData?.id) return
-        const res = await updateUserAction(initialData.id, values)
-        if (res.error) {
-          toast.error(res.error)
-        } else {
-          toast.success('User berhasil diperbarui')
-          setIsOpen?.(false)
+        toast.success(result?.message)
+        setIsOpen?.(false)
+        if (mode === 'create') {
+          form.reset()
           setShowPassword(false)
         }
       }
     } catch {
-      toast.error('Terjadi kesalahan')
+      toast.error('Terjadi kesalahan sistem')
     }
   }
+
+  const needsFaculty = ['faculty_admin', 'unit_admin', 'unit_staff'].includes(role)
+  const needsUnit = ['unit_admin', 'unit_staff'].includes(role)
+  const needsWarehouse = role === 'warehouse_staff'
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -142,23 +205,25 @@ export function UserDialog({
         </DialogTrigger>
       )}
 
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-150">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Tambah Pengguna Baru' : 'Edit Pengguna'}</DialogTitle>
+          <DialogTitle>{mode === 'create' ? 'Tambah User Baru' : 'Edit User'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nama Lengkap</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nama user" {...field} />
-                  </FormControl>
-                  <FormMessage />
+                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
+                  <FormLabel className="text-right">Nama Lengkap</FormLabel>
+                  <div className="col-span-3">
+                    <FormControl>
+                      <Input placeholder="Nama user" {...field} />
+                    </FormControl>
+                    <FormMessage className="mt-1 text-xs" />
+                  </div>
                 </FormItem>
               )}
             />
@@ -167,12 +232,14 @@ export function UserDialog({
               control={form.control}
               name="email"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="email@contoh.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
+                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
+                  <FormLabel className="text-right">Email</FormLabel>
+                  <div className="col-span-3">
+                    <FormControl>
+                      <Input placeholder="email@universitas.ac.id" {...field} />
+                    </FormControl>
+                    <FormMessage className="mt-1 text-xs" />
+                  </div>
                 </FormItem>
               )}
             />
@@ -181,130 +248,179 @@ export function UserDialog({
               control={form.control}
               name="password"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Password{' '}
-                    {mode === 'edit' && (
-                      <span className="text-muted-foreground text-xs">
-                        (Isi jika ingin mengganti)
-                      </span>
-                    )}
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="********"
-                        {...field}
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="text-muted-foreground h-4 w-4" />
-                        ) : (
-                          <Eye className="text-muted-foreground h-4 w-4" />
-                        )}
-                        <span className="sr-only">
-                          {showPassword ? 'Hide password' : 'Show password'}
-                        </span>
-                      </Button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
+                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
+                  <FormLabel className="text-right">Password</FormLabel>
+                  <div className="col-span-3">
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder={
+                            mode === 'create' ? 'Min. 8 karakter' : 'Isi jika ingin ubah'
+                          }
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="text-muted-foreground h-4 w-4" />
+                          ) : (
+                            <Eye className="text-muted-foreground h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage className="mt-1 text-xs" />
+                  </div>
                 </FormItem>
               )}
             />
+
+            <div className="my-2 border-t" />
 
             <FormField
               control={form.control}
               name="role"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Peran (Role)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Pilih Peran" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="super_admin">Super Admin</SelectItem>
-                      <SelectItem value="faculty_admin">Admin Fakultas</SelectItem>
-                      <SelectItem value="unit_admin">Admin Unit/Prodi</SelectItem>
-                      <SelectItem value="warehouse_staff">Staf Gudang</SelectItem>
-                      <SelectItem value="unit_staff">Staf Unit/User Biasa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
+                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
+                  <FormLabel className="text-right">Role Access</FormLabel>
+                  <div className="col-span-3">
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Pilih Role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                        <SelectItem value="faculty_admin">Admin Fakultas</SelectItem>
+                        <SelectItem value="unit_admin">Admin Unit/Jurusan</SelectItem>
+                        <SelectItem value="unit_staff">Staff Unit/Dosen</SelectItem>
+                        <SelectItem value="warehouse_staff">Petugas Gudang</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="mt-1 text-xs" />
+                  </div>
                 </FormItem>
               )}
             />
 
-            {(role === 'unit_staff' || role === 'unit_admin') && (
+            {needsFaculty && (
+              <FormField
+                control={form.control}
+                name="facultyId"
+                render={({ field }) => (
+                  <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
+                    <FormLabel className="text-right">
+                      Fakultas{' '}
+                      {role !== 'faculty_admin' && (
+                        <span className="text-muted-foreground block text-[10px] font-normal">
+                          (Filter Unit)
+                        </span>
+                      )}
+                    </FormLabel>
+                    <div className="col-span-3">
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Pilih Fakultas" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {faculties.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="mt-1 text-xs" />
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {needsUnit && (
               <FormField
                 control={form.control}
                 name="unitId"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unit / Prodi</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Pilih Unit" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {units.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                  <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
+                    <FormLabel className="text-right">Unit / Jurusan</FormLabel>
+                    <div className="col-span-3">
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ''}
+                        disabled={!selectedFacultyId}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue
+                              placeholder={selectedFacultyId ? 'Pilih Unit' : 'Pilih Fakultas dulu'}
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {filteredUnits.length > 0 ? (
+                            filteredUnits.map((u) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="text-muted-foreground p-2 text-center text-sm">
+                              Tidak ada unit di fakultas ini
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="mt-1 text-xs" />
+                    </div>
                   </FormItem>
                 )}
               />
             )}
 
-            {role === 'warehouse_staff' && (
+            {needsWarehouse && (
               <FormField
                 control={form.control}
                 name="warehouseId"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Gudang</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Pilih Gudang" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {warehouses.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                  <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
+                    <FormLabel className="text-right">Gudang</FormLabel>
+                    <div className="col-span-3">
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Pilih Gudang" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {warehouses.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="mt-1 text-xs" />
+                    </div>
                   </FormItem>
                 )}
               />
             )}
 
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="bg-blue-600 text-white hover:bg-blue-700"
+                className="w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Simpan
               </Button>

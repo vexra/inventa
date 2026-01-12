@@ -19,6 +19,7 @@ const userFormSchema = z.object({
   role: z.enum(['super_admin', 'faculty_admin', 'unit_admin', 'warehouse_staff', 'unit_staff']),
   unitId: z.string().optional(),
   warehouseId: z.string().optional(),
+  facultyId: z.string().optional(),
 })
 
 function getErrorMessage(error: unknown, defaultMessage: string): string {
@@ -37,42 +38,44 @@ export async function createUserAction(data: z.infer<typeof userFormSchema>) {
   if (!parsed.success) return { error: 'Data tidak valid' }
   if (!parsed.data.password) return { error: 'Password wajib diisi untuk user baru' }
 
+  const { role, unitId, warehouseId, facultyId } = parsed.data
+
+  const finalFacultyId = role === 'faculty_admin' ? facultyId : null
+  const finalUnitId = ['unit_admin', 'unit_staff'].includes(role) ? unitId : null
+  const finalWarehouseId = role === 'warehouse_staff' ? warehouseId : null
+
   try {
     const newUser = await auth.api.createUser({
       body: {
         email: parsed.data.email,
         password: parsed.data.password,
         name: parsed.data.name,
+        data: {
+          unitId: finalUnitId,
+          warehouseId: finalWarehouseId,
+          facultyId: finalFacultyId,
+          emailVerified: true,
+          role: role,
+        },
       },
     })
 
     if (!newUser) return { error: 'Gagal membuat user di auth provider' }
 
-    await db.transaction(async (tx) => {
-      await tx
-        .update(user)
-        .set({
-          unitId: parsed.data.unitId || null,
-          warehouseId: parsed.data.warehouseId || null,
-          emailVerified: true,
-          role: parsed.data.role,
-        })
-        .where(eq(user.id, newUser.user.id))
-
-      await tx.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: 'CREATE',
-        tableName: 'user',
-        recordId: newUser.user.id,
-        newValues: {
-          name: parsed.data.name,
-          email: parsed.data.email,
-          role: parsed.data.role,
-          unitId: parsed.data.unitId,
-          warehouseId: parsed.data.warehouseId,
-        },
-      })
+    await db.insert(auditLogs).values({
+      id: randomUUID(),
+      userId: session.user.id,
+      action: 'CREATE',
+      tableName: 'user',
+      recordId: newUser.user.id,
+      newValues: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        role: role,
+        unitId: finalUnitId,
+        warehouseId: finalWarehouseId,
+        facultyId: finalFacultyId,
+      },
     })
 
     revalidatePath('/dashboard/users')
@@ -88,6 +91,12 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
   const parsed = userFormSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
+  const { role, unitId, warehouseId, facultyId } = parsed.data
+
+  const finalFacultyId = role === 'faculty_admin' ? facultyId : null
+  const finalUnitId = ['unit_admin', 'unit_staff'].includes(role) ? unitId : null
+  const finalWarehouseId = role === 'warehouse_staff' ? warehouseId : null
+
   const requestHeaders = await headers()
 
   try {
@@ -98,6 +107,10 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
         userId: id,
         data: {
           name: parsed.data.name,
+          unitId: finalUnitId,
+          warehouseId: finalWarehouseId,
+          facultyId: finalFacultyId,
+          role: role,
         },
       },
       headers: requestHeaders,
@@ -113,25 +126,20 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
       })
     }
 
-    await db.transaction(async (tx) => {
-      await tx
-        .update(user)
-        .set({
-          unitId: parsed.data.unitId || null,
-          warehouseId: parsed.data.warehouseId || null,
-          role: parsed.data.role,
-        })
-        .where(eq(user.id, id))
-
-      await tx.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: 'UPDATE',
-        tableName: 'user',
-        recordId: id,
-        oldValues: oldData,
-        newValues: { ...parsed.data, password: '[REDACTED]' },
-      })
+    await db.insert(auditLogs).values({
+      id: randomUUID(),
+      userId: session.user.id,
+      action: 'UPDATE',
+      tableName: 'user',
+      recordId: id,
+      oldValues: oldData,
+      newValues: {
+        ...parsed.data,
+        unitId: finalUnitId,
+        warehouseId: finalWarehouseId,
+        facultyId: finalFacultyId,
+        password: '[REDACTED]',
+      },
     })
 
     revalidatePath('/dashboard/users')
@@ -242,5 +250,27 @@ export async function deleteUserAction(userId: string) {
       }
     }
     return { error: getErrorMessage(e, 'Gagal menghapus user') }
+  }
+}
+
+export async function logImpersonationAction(targetUserId: string) {
+  const session = await requireAuth({ roles: ['super_admin'] })
+
+  try {
+    await db.insert(auditLogs).values({
+      id: randomUUID(),
+      userId: session.user.id,
+      action: 'IMPERSONATE',
+      tableName: 'user',
+      recordId: targetUserId,
+      newValues: {
+        message: `Super Admin ${session.user.name} started impersonating user ${targetUserId}`,
+      },
+    })
+
+    return { success: true }
+  } catch (e: unknown) {
+    console.error('Audit Log Error:', e)
+    return { success: false }
   }
 }
