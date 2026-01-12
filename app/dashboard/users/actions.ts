@@ -43,9 +43,6 @@ export async function createUserAction(data: z.infer<typeof userFormSchema>) {
         email: parsed.data.email,
         password: parsed.data.password,
         name: parsed.data.name,
-        // PERBAIKAN DI SINI: Gunakan 'as any' untuk bypass validasi tipe role Better Auth
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        role: parsed.data.role as any,
       },
     })
 
@@ -101,8 +98,6 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
         userId: id,
         data: {
           name: parsed.data.name,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          role: parsed.data.role as any,
         },
       },
       headers: requestHeaders,
@@ -149,34 +144,25 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
 
 export async function banUserAction(userId: string, reason?: string) {
   const session = await requireAuth({ roles: ['super_admin'] })
+  const requestHeaders = await headers()
 
   try {
-    await db.transaction(async (tx) => {
-      await tx
-        .update(user)
-        .set({
-          banned: true,
-          banReason: reason || 'Dinonaktifkan oleh Administrator',
-        })
-        .where(eq(user.id, userId))
-
-      await tx.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: 'UPDATE',
-        tableName: 'user',
-        recordId: userId,
-        newValues: { banned: true, banReason: reason },
-      })
+    await auth.api.banUser({
+      body: {
+        userId,
+        banReason: reason || 'Dinonaktifkan oleh Administrator',
+      },
+      headers: requestHeaders,
     })
 
-    const requestHeaders = await headers()
-    try {
-      await auth.api.revokeUserSessions({
-        body: { userId },
-        headers: requestHeaders,
-      })
-    } catch {}
+    await db.insert(auditLogs).values({
+      id: randomUUID(),
+      userId: session.user.id,
+      action: 'UPDATE',
+      tableName: 'user',
+      recordId: userId,
+      newValues: { banned: true, banReason: reason },
+    })
 
     revalidatePath('/dashboard/users')
     return { success: true, message: 'User berhasil diblokir' }
@@ -195,17 +181,13 @@ export async function unbanUserAction(userId: string) {
       headers: requestHeaders,
     })
 
-    await db.transaction(async (tx) => {
-      await tx.update(user).set({ banned: false, banReason: null }).where(eq(user.id, userId))
-
-      await tx.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: 'UPDATE',
-        tableName: 'user',
-        recordId: userId,
-        newValues: { banned: false },
-      })
+    await db.insert(auditLogs).values({
+      id: randomUUID(),
+      userId: session.user.id,
+      action: 'UPDATE',
+      tableName: 'user',
+      recordId: userId,
+      newValues: { banned: false },
     })
 
     revalidatePath('/dashboard/users')
