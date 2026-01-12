@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { Building2, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Building2, FileText, GraduationCap, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -35,13 +35,25 @@ import {
 import { deleteUnit } from '../actions'
 import { UnitDialog } from './unit-dialog'
 
-type Unit = {
+type UnitWithFaculty = {
   id: string
   name: string
   description: string | null
+  facultyId: string | null
+  facultyName: string | null
 }
 
-export function UnitList({ data }: { data: Unit[] }) {
+type FacultyOption = {
+  id: string
+  name: string
+}
+
+interface UnitListProps {
+  data: UnitWithFaculty[]
+  faculties: FacultyOption[]
+}
+
+export function UnitList({ data, faculties }: UnitListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -62,6 +74,7 @@ export function UnitList({ data }: { data: Unit[] }) {
           <TableHeader>
             <TableRow>
               <TableHead>Nama Unit</TableHead>
+              <TableHead>Fakultas</TableHead>
               <TableHead>Deskripsi</TableHead>
               <TableHead className="w-25 text-right">Aksi</TableHead>
             </TableRow>
@@ -69,7 +82,7 @@ export function UnitList({ data }: { data: Unit[] }) {
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center">
+                <TableCell colSpan={4} className="h-24 text-center">
                   Tidak ada data unit.
                 </TableCell>
               </TableRow>
@@ -83,10 +96,16 @@ export function UnitList({ data }: { data: Unit[] }) {
                     </div>
                   </TableCell>
                   <TableCell>
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="text-muted-foreground h-4 w-4" />
+                      <span className="text-sm">{item.facultyName || '-'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     {item.description ? (
                       <div className="text-muted-foreground flex items-center gap-2">
                         <FileText className="h-4 w-4" />
-                        {item.description}
+                        <span className="max-w-50 truncate">{item.description}</span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground italic">-</span>
@@ -126,6 +145,7 @@ export function UnitList({ data }: { data: Unit[] }) {
           open={!!editingId}
           onOpenChange={(open) => !open && setEditingId(null)}
           initialData={unitToEdit}
+          faculties={faculties}
         />
       )}
 

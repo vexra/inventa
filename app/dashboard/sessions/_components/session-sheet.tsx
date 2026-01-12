@@ -54,9 +54,7 @@ export function SessionSheet({ userId, userName }: SessionSheetProps) {
 
   useEffect(() => {
     if (!isOpen) return
-
     let isActive = true
-
     const fetchSessions = async () => {
       setIsLoading(true)
       try {
@@ -73,9 +71,7 @@ export function SessionSheet({ userId, userName }: SessionSheetProps) {
         if (isActive) setIsLoading(false)
       }
     }
-
     fetchSessions()
-
     return () => {
       isActive = false
     }
@@ -99,7 +95,7 @@ export function SessionSheet({ userId, userName }: SessionSheetProps) {
     if (!sessionToRevoke) return
 
     setIsRevokingSingle(true)
-    const res = await revokeSessionAction(sessionToRevoke)
+    const res = await revokeSessionAction(sessionToRevoke, userId)
 
     if (res.success) {
       toast.success('Sesi berhasil dihentikan')

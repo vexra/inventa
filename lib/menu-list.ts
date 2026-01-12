@@ -1,17 +1,14 @@
 import {
-  BarChart,
-  Box,
+  Building,
   Building2,
   FileClock,
-  FileText,
-  History,
+  FlaskConical,
+  Layers,
   LayoutDashboard,
   type LucideIcon,
+  MapPin,
   MonitorSmartphone,
-  Package,
-  ShoppingBag,
   Tags,
-  Truck,
   Users,
   Warehouse,
 } from 'lucide-react'
@@ -32,54 +29,43 @@ type NavGroup = {
 }
 
 export const roleNavItems: Record<UserRole, NavGroup[]> = {
-  administrator: [
+  super_admin: [
     {
-      title: 'Umum',
+      title: 'Utama',
       items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
     },
+
     {
-      title: 'Data Master',
+      title: 'Organisasi & Lokasi',
       items: [
-        { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
+        { title: 'Fakultas', url: '/dashboard/faculties', icon: Building },
         { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
-        { title: 'Barang', url: '/dashboard/items', icon: Package },
-        { title: 'Kategori', url: '/dashboard/categories', icon: Tags },
+        { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
+        { title: 'Ruangan', url: '/dashboard/rooms', icon: MapPin },
       ],
     },
+
     {
-      title: 'Manajemen Pengguna',
+      title: 'Katalog Barang',
       items: [
-        { title: 'Daftar Pengguna', url: '/dashboard/users', icon: Users },
-        { title: 'Sesi Login', url: '/dashboard/sessions', icon: MonitorSmartphone },
+        { title: 'Kategori', url: '/dashboard/categories', icon: Tags },
+        { title: 'Barang Habis Pakai', url: '/dashboard/consumables', icon: FlaskConical },
+        { title: 'Model Aset', url: '/dashboard/asset-models', icon: Layers },
       ],
     },
+
     {
       title: 'Sistem & Audit',
-      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
-    },
-  ],
-  warehouse_staff: [
-    {
-      title: 'Inventaris',
       items: [
-        { title: 'Stok Gudang', url: '/warehouse', icon: Box },
-        { title: 'Riwayat Keluar/Masuk', url: '/warehouse/logs', icon: Truck },
+        { title: 'Pengguna', url: '/dashboard/users', icon: Users },
+        { title: 'Sesi Login', url: '/dashboard/sessions', icon: MonitorSmartphone },
+        { title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock },
       ],
     },
   ],
-  unit_staff: [
-    {
-      title: 'Operasional Unit',
-      items: [{ title: 'Permintaan Saya', url: '/unit/requests', icon: FileText }],
-    },
-  ],
-  executive: [
-    {
-      title: 'Laporan',
-      items: [
-        { title: 'Analisis', url: '/exec/analytics', icon: BarChart },
-        { title: 'Ringkasan Keuangan', url: '/exec/revenue', icon: ShoppingBag },
-      ],
-    },
-  ],
+
+  warehouse_staff: [],
+  faculty_admin: [],
+  unit_admin: [],
+  unit_staff: [],
 }

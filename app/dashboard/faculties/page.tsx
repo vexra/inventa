@@ -1,13 +1,13 @@
-import { asc, ilike, sql } from 'drizzle-orm'
+import { asc, ilike, or, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'
-import { categories } from '@/db/schema'
+import { faculties } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
-import { CategoryDialog } from './_components/category-dialog'
-import { CategoryList } from './_components/category-list'
+import { FacultyDialog } from './_components/faculty-dialog'
+import { FacultyList } from './_components/faculty-list'
 
 const ITEMS_PER_PAGE = 10
 
@@ -18,7 +18,7 @@ interface PageProps {
   }>
 }
 
-export default async function CategoriesPage({ searchParams }: PageProps) {
+export default async function FacultiesPage({ searchParams }: PageProps) {
   await requireAuth({
     roles: ['super_admin'],
   })
@@ -28,19 +28,25 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
 
-  const searchCondition = query ? ilike(categories.name, `%${query}%`) : undefined
+  const searchCondition = query
+    ? or(ilike(faculties.name, `%${query}%`), ilike(faculties.description, `%${query}%`))
+    : undefined
 
   const dataPromise = db
-    .select()
-    .from(categories)
+    .select({
+      id: faculties.id,
+      name: faculties.name,
+      description: faculties.description,
+    })
+    .from(faculties)
     .where(searchCondition)
     .limit(ITEMS_PER_PAGE)
     .offset(offset)
-    .orderBy(asc(categories.name))
+    .orderBy(asc(faculties.name))
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
-    .from(categories)
+    .from(faculties)
     .where(searchCondition)
 
   const [data, countResult] = await Promise.all([dataPromise, countPromise])
@@ -52,24 +58,25 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Kategori</h1>
-          <p className="text-muted-foreground">Kelola kategori untuk pengelompokan jenis barang</p>
+          <h1 className="text-3xl font-bold tracking-tight">Data Fakultas</h1>
+          <p className="text-muted-foreground">Kelola daftar fakultas induk universitas</p>
         </div>
-        <CategoryDialog mode="create" />
+
+        <FacultyDialog mode="create" />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <SearchInput placeholder="Cari kategori..." className="w-full sm:max-w-xs" />
+        <SearchInput placeholder="Cari nama fakultas..." className="w-full sm:max-w-xs" />
       </div>
 
       <div className="flex flex-col gap-4">
-        <CategoryList data={data} />
+        <FacultyList data={data} />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 
         {data.length === 0 && query && (
           <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan kategori dengan kata kunci <strong>&quot;{query}&quot;</strong>.
+            Tidak ditemukan fakultas dengan kata kunci <strong>&quot;{query}&quot;</strong>.
           </div>
         )}
       </div>

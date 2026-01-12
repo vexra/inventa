@@ -14,15 +14,19 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-interface TransactionVolumeChartProps {
-  chartData: {
-    labels: string[]
-    requests: number[]
-    procurements: number[]
-  }
+interface ChartDataset {
+  label: string
+  data: number[]
+  backgroundColor: string
+  borderColor?: string
 }
 
-export function TransactionVolumeChart({ chartData }: TransactionVolumeChartProps) {
+interface TransactionVolumeChartProps {
+  labels: string[]
+  datasets: ChartDataset[]
+}
+
+export function TransactionVolumeChart({ labels, datasets }: TransactionVolumeChartProps) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -38,9 +42,7 @@ export function TransactionVolumeChart({ chartData }: TransactionVolumeChartProp
       y: {
         beginAtZero: true,
         grid: { color: 'rgba(0, 0, 0, 0.05)' },
-        ticks: {
-          precision: 0,
-        },
+        ticks: { precision: 0 },
       },
       x: {
         grid: { display: false },
@@ -54,25 +56,13 @@ export function TransactionVolumeChart({ chartData }: TransactionVolumeChartProp
   }
 
   const data = {
-    labels: chartData.labels,
-    datasets: [
-      {
-        label: 'Permintaan (Requests)',
-        data: chartData.requests,
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        hoverBackgroundColor: 'rgba(59, 130, 246, 1)',
-        borderRadius: 4,
-        barPercentage: 0.6,
-      },
-      {
-        label: 'Pengadaan (Procurements)',
-        data: chartData.procurements,
-        backgroundColor: 'rgba(234, 179, 8, 0.8)',
-        hoverBackgroundColor: 'rgba(234, 179, 8, 1)',
-        borderRadius: 4,
-        barPercentage: 0.6,
-      },
-    ],
+    labels,
+    datasets: datasets.map((ds) => ({
+      ...ds,
+      hoverBackgroundColor: ds.backgroundColor,
+      borderRadius: 4,
+      barPercentage: 0.6,
+    })),
   }
 
   return (

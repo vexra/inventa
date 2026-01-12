@@ -26,15 +26,34 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { WarehouseFormValues, warehouseSchema } from '@/lib/validations/warehouse'
 
 import { createWarehouse, updateWarehouse } from '../actions'
 
+interface FacultyOption {
+  id: string
+  name: string
+}
+
 interface WarehouseDialogProps {
   mode?: 'create' | 'edit'
-  initialData?: { id: string; name: string; location: string | null }
+  initialData?: {
+    id: string
+    name: string
+    type: 'CHEMICAL' | 'GENERAL_ATK'
+    facultyId: string | null
+    description: string | null
+  }
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  faculties: FacultyOption[]
 }
 
 export function WarehouseDialog({
@@ -42,6 +61,7 @@ export function WarehouseDialog({
   initialData,
   open,
   onOpenChange,
+  faculties = [],
 }: WarehouseDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const isControlled = open !== undefined
@@ -52,7 +72,9 @@ export function WarehouseDialog({
     resolver: zodResolver(warehouseSchema),
     defaultValues: {
       name: initialData?.name || '',
-      location: initialData?.location || '',
+      type: initialData?.type || 'GENERAL_ATK',
+      facultyId: initialData?.facultyId || undefined,
+      description: initialData?.description || '',
     },
   })
 
@@ -89,14 +111,16 @@ export function WarehouseDialog({
         </DialogTrigger>
       )}
 
-      <DialogContent className="sm:max-w-106.25">
+      {/* Lebarkan dialog agar dropdown panjang muat */}
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Tambah Gudang Baru' : 'Edit Gudang'}</DialogTitle>
-          <DialogDescription>Isi detail informasi gudang di bawah ini.</DialogDescription>
+          <DialogTitle>{mode === 'create' ? 'Tambah Gudang' : 'Edit Gudang'}</DialogTitle>
+          <DialogDescription>Kelola lokasi penyimpanan aset dan bahan.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* FIELD 1: NAMA */}
             <FormField
               control={form.control}
               name="name"
@@ -104,25 +128,79 @@ export function WarehouseDialog({
                 <FormItem>
                   <FormLabel>Nama Gudang</FormLabel>
                   <FormControl>
-                    <Input placeholder="Contoh: Gudang Utama Logistik" {...field} />
+                    <Input placeholder="Contoh: Gudang Kimia A" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* FIELD 2: TIPE GUDANG */}
             <FormField
               control={form.control}
-              name="location"
+              name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Lokasi (Opsional)</FormLabel>
+                  <FormLabel>Jenis Gudang</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      {/* PERBAIKAN: Tambahkan className="w-full" disini */}
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Pilih Jenis" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="GENERAL_ATK">Umum / ATK</SelectItem>
+                      <SelectItem value="CHEMICAL">Bahan Kimia (B3)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* FIELD 3: FAKULTAS */}
+            <FormField
+              control={form.control}
+              name="facultyId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Milik Fakultas</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                    <FormControl>
+                      {/* PERBAIKAN: Tambahkan className="w-full" disini juga */}
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Pilih Fakultas" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {faculties.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* FIELD 4: DESKRIPSI */}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Deskripsi / Lokasi</FormLabel>
                   <FormControl>
-                    <Input placeholder="Contoh: Gedung A, Lantai 1" {...field} />
+                    <Input placeholder="Detail lokasi atau keterangan..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <DialogFooter>
               <Button
                 type="submit"

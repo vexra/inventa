@@ -1,13 +1,13 @@
 import { asc, eq, ilike, or, sql } from 'drizzle-orm'
 
+import { PaginationControls } from '@/components/shared/pagination-controls'
+import { SearchInput } from '@/components/shared/search-input'
 import { requests, units, user, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { UserDialog } from './_components/user-dialog'
 import { UserList } from './_components/user-list'
-import { UserPagination } from './_components/user-pagination'
-import { UserSearch } from './_components/user-search'
 
 const USERS_PER_PAGE = 10
 
@@ -19,7 +19,7 @@ interface PageProps {
 }
 
 export default async function UsersPage({ searchParams }: PageProps) {
-  await requireAuth({ roles: ['administrator'] })
+  await requireAuth({ roles: ['super_admin'] })
 
   const params = await searchParams
   const query = params.q || ''
@@ -42,7 +42,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
       unitName: units.name,
       warehouseName: warehouses.name,
       usageCount: sql<number>`(
-        SELECT count(*) FROM ${requests} WHERE ${requests.userId} = ${user.id}
+        SELECT count(*) FROM ${requests} WHERE ${requests.requesterId} = ${user.id}
       )`.mapWith(Number),
     })
     .from(user)
@@ -95,13 +95,13 @@ export default async function UsersPage({ searchParams }: PageProps) {
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <UserSearch />
+        <SearchInput placeholder="Cari nama pengguna..." className="w-full sm:max-w-xs" />
       </div>
 
       <div className="flex flex-col gap-4">
         <UserList data={data} units={unitsData} warehouses={warehousesData} />
 
-        {totalPages > 1 && <UserPagination totalPages={totalPages} />}
+        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
       </div>
     </div>
   )

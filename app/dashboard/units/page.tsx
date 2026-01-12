@@ -1,13 +1,13 @@
-import { asc, ilike, or, sql } from 'drizzle-orm'
+import { asc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { units } from '@/db/schema'
+import { PaginationControls } from '@/components/shared/pagination-controls'
+import { SearchInput } from '@/components/shared/search-input'
+import { faculties, units } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { UnitDialog } from './_components/unit-dialog'
 import { UnitList } from './_components/unit-list'
-import { UnitPagination } from './_components/unit-pagination'
-import { UnitSearch } from './_components/unit-search'
 
 const ITEMS_PER_PAGE = 10
 
@@ -20,7 +20,7 @@ interface PageProps {
 
 export default async function UnitsPage({ searchParams }: PageProps) {
   await requireAuth({
-    roles: ['administrator'],
+    roles: ['super_admin'],
   })
 
   const params = await searchParams
@@ -33,8 +33,15 @@ export default async function UnitsPage({ searchParams }: PageProps) {
     : undefined
 
   const dataPromise = db
-    .select()
+    .select({
+      id: units.id,
+      name: units.name,
+      description: units.description,
+      facultyId: units.facultyId,
+      facultyName: faculties.name,
+    })
     .from(units)
+    .leftJoin(faculties, eq(units.facultyId, faculties.id))
     .where(searchCondition)
     .limit(ITEMS_PER_PAGE)
     .offset(offset)
@@ -45,7 +52,19 @@ export default async function UnitsPage({ searchParams }: PageProps) {
     .from(units)
     .where(searchCondition)
 
-  const [data, countResult] = await Promise.all([dataPromise, countPromise])
+  const facultiesPromise = db
+    .select({
+      id: faculties.id,
+      name: faculties.name,
+    })
+    .from(faculties)
+    .orderBy(asc(faculties.name))
+
+  const [data, countResult, facultiesList] = await Promise.all([
+    dataPromise,
+    countPromise,
+    facultiesPromise,
+  ])
 
   const totalItems = Number(countResult[0]?.count || 0)
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
@@ -57,17 +76,18 @@ export default async function UnitsPage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">Data Unit</h1>
           <p className="text-muted-foreground">Kelola daftar unit kerja dan departemen</p>
         </div>
-        <UnitDialog mode="create" />
+
+        <UnitDialog mode="create" faculties={facultiesList} />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <UnitSearch />
+        <SearchInput placeholder="Cari nama unit..." className="w-full sm:max-w-xs" />
       </div>
 
       <div className="flex flex-col gap-4">
-        <UnitList data={data} />
+        <UnitList data={data} faculties={facultiesList} />
 
-        {totalPages > 1 && <UnitPagination totalPages={totalPages} />}
+        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 
         {data.length === 0 && query && (
           <div className="text-muted-foreground py-10 text-center">

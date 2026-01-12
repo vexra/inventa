@@ -4,7 +4,14 @@ import { admin } from 'better-auth/plugins'
 
 import * as schema from '@/db/schema'
 import { db } from '@/lib/db'
-import { ac, administrator, executive, unit_staff, warehouse_staff } from '@/lib/permissions'
+import {
+  ac,
+  faculty_admin,
+  super_admin,
+  unit_admin,
+  unit_staff,
+  warehouse_staff,
+} from '@/lib/permissions'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -19,12 +26,13 @@ export const auth = betterAuth({
     admin({
       ac,
       roles: {
-        administrator,
-        warehouse_staff,
+        super_admin,
+        faculty_admin,
+        unit_admin,
         unit_staff,
-        executive,
+        warehouse_staff,
       },
-      adminRoles: ['administrator'],
+      adminRoles: ['super_admin'],
       defaultRole: 'unit_staff',
       bannedUserMessage:
         'Anda telah diblokir dari aplikasi ini. Silakan hubungi tim dukungan jika Anda merasa ini adalah sebuah kesalahan.',

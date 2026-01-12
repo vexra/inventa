@@ -26,65 +26,49 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { UnitFormValues, unitSchema } from '@/lib/validations/unit'
+import { FacultyFormValues, facultySchema } from '@/lib/validations/faculty'
 
-import { createUnit, updateUnit } from '../actions'
+import { createFaculty, updateFaculty } from '../actions'
 
-interface FacultyOption {
-  id: string
-  name: string
-}
-
-interface UnitDialogProps {
+interface FacultyDialogProps {
   mode?: 'create' | 'edit'
   initialData?: {
     id: string
     name: string
     description: string | null
-    facultyId: string | null
   }
   open?: boolean
   onOpenChange?: (open: boolean) => void
-  faculties: FacultyOption[]
 }
 
-export function UnitDialog({
+export function FacultyDialog({
   mode = 'create',
   initialData,
   open,
   onOpenChange,
-  faculties = [],
-}: UnitDialogProps) {
+}: FacultyDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const isControlled = open !== undefined
   const isOpen = isControlled ? open : internalOpen
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen
 
-  const form = useForm<UnitFormValues>({
-    resolver: zodResolver(unitSchema),
+  const form = useForm<FacultyFormValues>({
+    resolver: zodResolver(facultySchema),
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
-      facultyId: initialData?.facultyId || '',
     },
   })
 
   const isLoading = form.formState.isSubmitting
 
-  async function onSubmit(data: UnitFormValues) {
+  async function onSubmit(data: FacultyFormValues) {
     try {
       let result
       if (mode === 'create') {
-        result = await createUnit(data)
+        result = await createFaculty(data)
       } else if (initialData?.id) {
-        result = await updateUnit(initialData.id, data)
+        result = await updateFaculty(initialData.id, data)
       }
 
       if (result?.error) {
@@ -104,56 +88,27 @@ export function UnitDialog({
       {!isControlled && mode === 'create' && (
         <DialogTrigger asChild>
           <Button className="bg-blue-600 text-white hover:bg-blue-700">
-            <Plus className="mr-2 h-4 w-4" /> Tambah Unit
+            <Plus className="mr-2 h-4 w-4" /> Tambah Fakultas
           </Button>
         </DialogTrigger>
       )}
 
-      <DialogContent className="sm:max-w-125">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Tambah Unit Baru' : 'Edit Unit'}</DialogTitle>
-          <DialogDescription>Hubungkan unit kerja dengan fakultas terkait.</DialogDescription>
+          <DialogTitle>{mode === 'create' ? 'Tambah Fakultas Baru' : 'Edit Fakultas'}</DialogTitle>
+          <DialogDescription>Kelola data fakultas atau departemen induk.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="facultyId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fakultas Induk</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={mode === 'edit'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Fakultas..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {faculties.map((faculty) => (
-                        <SelectItem key={faculty.id} value={faculty.id}>
-                          {faculty.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nama Unit / Jurusan</FormLabel>
+                  <FormLabel>Nama Fakultas</FormLabel>
                   <FormControl>
-                    <Input placeholder="Contoh: Jurusan Biologi" {...field} />
+                    <Input placeholder="Contoh: Fakultas Teknik" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
