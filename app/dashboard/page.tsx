@@ -1,4 +1,4 @@
-import { count, desc, eq, gte, inArray, sql } from 'drizzle-orm'
+import { count, desc, eq, gte } from 'drizzle-orm'
 import {
   Activity,
   ArrowUpRight,
@@ -21,7 +21,6 @@ import {
   assetModels,
   categories,
   consumables,
-  fixedAssets,
   procurementAssets,
   procurementConsumables,
   procurements,
@@ -30,7 +29,6 @@ import {
   systemActivityLogs,
   units,
   user,
-  warehouseStocks,
   warehouses,
 } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
@@ -53,13 +51,9 @@ export default async function Page() {
   const [
     // 1. Consumables Metrics
     totalConsumables,
-    lowStockItems,
-    pendingRequests,
 
     // 2. Asset Metrics
-    totalFixedAssets,
     totalAssetModels,
-    brokenAssets,
 
     // 3. Activity Logs
     recentLogs,
@@ -79,30 +73,8 @@ export default async function Page() {
     // [BHP] Total Katalog
     db.select({ value: count() }).from(consumables),
 
-    // [BHP] Stok Menipis (Data tetap diambil, opsi jika ingin dikembalikan)
-    db
-      .select({ value: count() })
-      .from(warehouseStocks)
-      .leftJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
-      .where(sql`${warehouseStocks.quantity} <= ${consumables.minimumStock}`),
-
-    // [BHP] Request Menunggu
-    db
-      .select({ value: count() })
-      .from(requests)
-      .where(inArray(requests.status, ['PENDING_UNIT', 'PENDING_FACULTY'])),
-
-    // [ASSET] Total Fisik
-    db.select({ value: count() }).from(fixedAssets),
-
     // [ASSET] Total Model (Jenis)
     db.select({ value: count() }).from(assetModels),
-
-    // [ASSET] Rusak/Maintenance
-    db
-      .select({ value: count() })
-      .from(fixedAssets)
-      .where(sql`${fixedAssets.condition} != 'GOOD'`),
 
     // Logs
     db
@@ -382,11 +354,18 @@ export default async function Page() {
   )
 }
 
+type LogItem = {
+  action: string | null
+  description: string | null
+  createdAt: Date | null
+  userName: string | null
+}
+
 function RecentActivityList({
   logs,
   formatTime,
 }: {
-  logs: any[]
+  logs: LogItem[]
   formatTime: (d: Date | null) => string
 }) {
   return (

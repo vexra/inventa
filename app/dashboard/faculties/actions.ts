@@ -112,9 +112,11 @@ export async function deleteFaculty(id: string) {
 
     revalidatePath('/dashboard/faculties')
     return { success: true, message: 'Fakultas dihapus' }
-  } catch (error: any) {
+  } catch (error) {
+    const dbError = error as { code?: string }
+
     // Error handling foreign key (jika fakultas masih punya Unit)
-    if (error.code === '23503') {
+    if (dbError.code === '23503') {
       return { error: 'Gagal hapus: Fakultas ini masih memiliki Unit aktif.' }
     }
     return { error: 'Gagal menghapus fakultas' }

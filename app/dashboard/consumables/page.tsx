@@ -104,8 +104,8 @@ export default async function ConsumablesPage({ searchParams }: PageProps) {
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 
         {formattedData.length === 0 && query && (
-          <div className="text-muted-foreground py-12 text-center">
-            Tidak ada barang ditemukan untuk "{query}"
+          <div className="text-muted-foreground py-10 text-center">
+            Tidak ditemukan barang dengan kata kunci <strong>&quot;{query}&quot;</strong>.
           </div>
         )}
       </div>

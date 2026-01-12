@@ -19,7 +19,7 @@ export async function getUserSessionsAction(userId: string) {
       headers: await headers(),
     })
     return { success: true, data: response }
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Gagal mengambil data sesi.' }
   }
 }

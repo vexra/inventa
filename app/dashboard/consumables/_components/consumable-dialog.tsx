@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { type Resolver, useForm } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Plus } from 'lucide-react'
@@ -84,7 +84,7 @@ export function ConsumableDialog({
   }
 
   const form = useForm<ConsumableFormValues>({
-    resolver: zodResolver(consumableSchema) as any,
+    resolver: zodResolver(consumableSchema) as Resolver<ConsumableFormValues>,
     defaultValues,
   })
 

@@ -118,8 +118,10 @@ export async function deleteRoom(id: string) {
 
     revalidatePath('/dashboard/rooms')
     return { success: true, message: 'Ruangan dihapus' }
-  } catch (error: any) {
-    if (error.code === '23503') {
+  } catch (error) {
+    const dbError = error as { code?: string }
+
+    if (dbError.code === '23503') {
       return { error: 'Gagal: Ruangan ini masih memiliki Aset atau Data Stok.' }
     }
     return { error: 'Gagal menghapus ruangan' }

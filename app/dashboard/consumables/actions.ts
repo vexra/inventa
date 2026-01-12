@@ -58,8 +58,10 @@ export async function createConsumable(data: unknown) {
 
     revalidatePath('/dashboard/consumables')
     return { success: true, message: 'Barang berhasil ditambahkan' }
-  } catch (error: any) {
-    if (error.message === 'DUPLICATE_SKU') {
+  } catch (error) {
+    const err = error as { message?: string }
+
+    if (err.message === 'DUPLICATE_SKU') {
       return { error: 'Gagal: SKU sudah digunakan.' }
     }
     console.error('Create consumable error:', error)
@@ -116,8 +118,10 @@ export async function updateConsumable(id: string, data: unknown) {
 
     revalidatePath('/dashboard/consumables')
     return { success: true, message: 'Data barang diperbarui' }
-  } catch (error: any) {
-    if (error.message === 'DUPLICATE_SKU') {
+  } catch (error) {
+    const err = error as { message?: string }
+
+    if (err.message === 'DUPLICATE_SKU') {
       return { error: 'Gagal: SKU sudah digunakan.' }
     }
     console.error('Update consumable error:', error)
@@ -150,8 +154,10 @@ export async function deleteConsumable(id: string) {
 
     revalidatePath('/dashboard/consumables')
     return { success: true, message: 'Barang dihapus' }
-  } catch (error: any) {
-    if (error.code === '23503') {
+  } catch (error) {
+    const err = error as { code?: string }
+
+    if (err.code === '23503') {
       return {
         error: 'Gagal: Barang ini masih digunakan dalam data stok.',
       }

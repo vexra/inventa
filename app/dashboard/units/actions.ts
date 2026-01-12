@@ -114,10 +114,14 @@ export async function deleteUnit(id: string) {
 
     revalidatePath('/dashboard/units')
     return { success: true, message: 'Unit dihapus' }
-  } catch (error: any) {
+  } catch (error) {
+    const dbError = error as { code?: string }
+
     // Error handling spesifik database (Postgres Error Code 23503: Foreign Key Violation)
-    if (error.code === '23503') {
-      return { error: 'Gagal hapus: Unit ini masih memiliki User atau Aset aktif.' }
+    if (dbError.code === '23503') {
+      return {
+        error: 'Gagal hapus: Unit ini masih memiliki User atau Aset aktif.',
+      }
     }
     return { error: 'Gagal menghapus unit' }
   }

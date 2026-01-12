@@ -116,9 +116,11 @@ export async function deleteWarehouse(id: string) {
 
     revalidatePath('/dashboard/warehouses')
     return { success: true, message: 'Gudang dihapus' }
-  } catch (error: any) {
+  } catch (error) {
+    const dbError = error as { code?: string }
+
     // Handle FK error (jika gudang masih punya stok)
-    if (error.code === '23503') {
+    if (dbError.code === '23503') {
       return {
         error: 'Gagal hapus: Gudang masih menyimpan stok barang atau aset.',
       }

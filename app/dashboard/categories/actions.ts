@@ -99,14 +99,16 @@ export async function deleteCategory(id: string) {
         tableName: 'categories',
         recordId: id,
         oldValues: oldData,
+        newValues: oldData,
       })
     })
 
     revalidatePath('/dashboard/categories')
     return { success: true, message: 'Kategori dihapus' }
-  } catch (error: any) {
-    // Handle error jika kategori sedang dipakai di tabel consumables/asset_models
-    if (error.code === '23503') {
+  } catch (error) {
+    const dbError = error as { code?: string }
+    // Handle error jika kategori sedang dipakai (Foreign Key Violation - Postgres Code 23503)
+    if (dbError.code === '23503') {
       return {
         error: 'Gagal hapus: Kategori ini sedang digunakan oleh Barang atau Aset.',
       }
