@@ -46,6 +46,7 @@ export const auth = betterAuth({
         defaultValue: 'unit_staff',
         input: false,
       },
+      facultyId: { type: 'string', required: false, input: false },
       unitId: { type: 'string', required: false, input: false },
       warehouseId: { type: 'string', required: false, input: false },
     },

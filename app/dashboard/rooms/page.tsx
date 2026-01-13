@@ -19,7 +19,6 @@ interface PageProps {
 }
 
 export default async function RoomsPage({ searchParams }: PageProps) {
-  // 1. Ambil session user
   const session = await requireAuth({
     roles: ['super_admin', 'unit_admin'],
   })
@@ -33,7 +32,6 @@ export default async function RoomsPage({ searchParams }: PageProps) {
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
 
-  // 2. Base Filter (Pencarian Text)
   const textSearch = query
     ? or(
         ilike(rooms.name, `%${query}%`),
@@ -42,14 +40,11 @@ export default async function RoomsPage({ searchParams }: PageProps) {
       )
     : undefined
 
-  // 3. Role Filter (Penting!)
   // Jika bukan Super Admin, WAJIB filter berdasarkan unitId user tersebut
   const roleFilter = !isSuperAdmin && userUnitId ? eq(rooms.unitId, userUnitId) : undefined
 
-  // Gabungkan filter dengan operator AND
   const finalCondition = and(textSearch, roleFilter)
 
-  // 4. Query Data Rooms
   const dataPromise = db
     .select({
       id: rooms.id,
@@ -73,7 +68,6 @@ export default async function RoomsPage({ searchParams }: PageProps) {
     .leftJoin(units, eq(rooms.unitId, units.id))
     .where(finalCondition)
 
-  // 5. Query Opsi Units untuk Dialog
   // Jika Unit Admin, opsi unit di dropdown create/edit HANYA unit dia sendiri
   const unitsCondition = !isSuperAdmin && userUnitId ? eq(units.id, userUnitId) : undefined
 
@@ -105,7 +99,6 @@ export default async function RoomsPage({ searchParams }: PageProps) {
           </p>
         </div>
 
-        {/* Kirim unitsList yang sudah difilter ke Dialog */}
         <RoomDialog mode="create" units={unitsList} />
       </div>
 
@@ -114,7 +107,6 @@ export default async function RoomsPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* Pass prop isSuperAdmin ke List */}
         <RoomList data={data} units={unitsList} isSuperAdmin={isSuperAdmin} />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}

@@ -102,8 +102,10 @@ export const user = pgTable('user', {
   banned: boolean('banned').default(false),
   banReason: text('ban_reason'),
   banExpires: timestamp('ban_expires'),
-  unitId: text('unit_id').references(() => units.id),
-  warehouseId: text('warehouse_id').references(() => warehouses.id),
+
+  facultyId: text('faculty_id').references(() => faculties.id), // Diisi HANYA jika role = faculty_admin
+  unitId: text('unit_id').references(() => units.id), // Diisi jika role = unit_admin / unit_staff
+  warehouseId: text('warehouse_id').references(() => warehouses.id), // Diisi jika role = warehouse_staff
 })
 
 export const session = pgTable(
@@ -637,6 +639,7 @@ export const systemActivityLogs = pgTable('system_activity_logs', {
 export const facultiesRelations = relations(faculties, ({ many }) => ({
   units: many(units),
   warehouses: many(warehouses),
+  users: many(user),
 }))
 
 export const unitsRelations = relations(units, ({ one, many }) => ({
@@ -820,6 +823,7 @@ export const usageDetailsRelations = relations(usageDetails, ({ one }) => ({
 
 // --- USER ---
 export const userRelations = relations(user, ({ one, many }) => ({
+  faculty: one(faculties, { fields: [user.facultyId], references: [faculties.id] }),
   unit: one(units, { fields: [user.unitId], references: [units.id] }),
   warehouse: one(warehouses, { fields: [user.warehouseId], references: [warehouses.id] }),
   sessions: many(session),

@@ -1,5 +1,3 @@
-import { Metadata } from 'next'
-
 import { desc, eq, ilike, or, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'

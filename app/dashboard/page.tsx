@@ -1,15 +1,16 @@
 import { count, desc, eq, gte } from 'drizzle-orm'
 import {
   Activity,
-  ArrowUpRight,
   Box,
   Building2,
   Database,
+  FilePen,
+  FilePlus,
   FlaskConical,
   Layers,
   MapPin,
-  Package,
   Tags,
+  Trash2,
   Users,
   Warehouse,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   assetModels,
+  auditLogs,
   categories,
   consumables,
   procurementAssets,
@@ -26,7 +28,6 @@ import {
   procurements,
   requests,
   rooms,
-  systemActivityLogs,
   units,
   user,
   warehouses,
@@ -55,7 +56,7 @@ export default async function Page() {
     // 2. Asset Metrics
     totalAssetModels,
 
-    // 3. Activity Logs
+    // 3. Activity Logs (FROM AUDIT LOGS)
     recentLogs,
 
     // 4. Chart Data Sources
@@ -76,17 +77,17 @@ export default async function Page() {
     // [ASSET] Total Model (Jenis)
     db.select({ value: count() }).from(assetModels),
 
-    // Logs
+    // Logs (Audit Logs)
     db
       .select({
-        action: systemActivityLogs.actionType,
-        description: systemActivityLogs.description,
-        createdAt: systemActivityLogs.createdAt,
+        action: auditLogs.action,
+        tableName: auditLogs.tableName,
+        createdAt: auditLogs.createdAt,
         userName: user.name,
       })
-      .from(systemActivityLogs)
-      .leftJoin(user, eq(systemActivityLogs.actorId, user.id))
-      .orderBy(desc(systemActivityLogs.createdAt))
+      .from(auditLogs)
+      .leftJoin(user, eq(auditLogs.userId, user.id))
+      .orderBy(desc(auditLogs.createdAt))
       .limit(5),
 
     // Chart: Requests (BHP)
@@ -154,8 +155,17 @@ export default async function Page() {
 
   const formatTimeAgo = (date: Date | null) => {
     if (!date) return '-'
+
     const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - new Date(date).getTime()) / 1000)
+    const eventDate = new Date(date)
+
+    const diffInSeconds = Math.floor((now.getTime() - eventDate.getTime()) / 1000)
+
+    // Jika selisih negatif (waktu masa depan/beda timezone), return "Baru saja"
+    if (diffInSeconds < 0) {
+      return 'Baru saja'
+    }
+
     if (diffInSeconds < 60) return `${diffInSeconds} detik lalu`
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit lalu`
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam lalu`
@@ -354,9 +364,10 @@ export default async function Page() {
   )
 }
 
+// FIX: Update tipe LogItem untuk Audit Log
 type LogItem = {
   action: string | null
-  description: string | null
+  tableName: string | null
   createdAt: Date | null
   userName: string | null
 }
@@ -385,12 +396,12 @@ function RecentActivityList({
             logs.map((log, index) => (
               <div className="flex items-start" key={index}>
                 <div className="mt-0.5 mr-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
-                  {log.action?.includes('LOGIN') ? (
-                    <Activity className="h-4 w-4 text-blue-500" />
-                  ) : log.action?.includes('REQUEST') ? (
-                    <ArrowUpRight className="h-4 w-4 text-green-500" />
-                  ) : log.action?.includes('STOCK') ? (
-                    <Package className="h-4 w-4 text-orange-500" />
+                  {log.action === 'CREATE' ? (
+                    <FilePlus className="h-4 w-4 text-green-500" />
+                  ) : log.action === 'UPDATE' ? (
+                    <FilePen className="h-4 w-4 text-blue-500" />
+                  ) : log.action === 'DELETE' ? (
+                    <Trash2 className="h-4 w-4 text-red-500" />
                   ) : (
                     <Activity className="h-4 w-4 text-slate-500" />
                   )}
@@ -405,7 +416,8 @@ function RecentActivityList({
                     </span>
                   </div>
                   <p className="text-muted-foreground truncate text-xs">
-                    {log.description || log.action}
+                    <span className="text-foreground font-semibold">{log.action}</span> pada{' '}
+                    {log.tableName}
                   </p>
                 </div>
               </div>

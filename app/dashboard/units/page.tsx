@@ -19,9 +19,7 @@ interface PageProps {
 }
 
 export default async function UnitsPage({ searchParams }: PageProps) {
-  await requireAuth({
-    roles: ['super_admin'],
-  })
+  await requireAuth({ roles: ['super_admin'] })
 
   const params = await searchParams
   const query = params.q || ''

@@ -131,7 +131,7 @@ export async function updateConsumable(id: string, data: unknown) {
 
 export async function deleteConsumable(id: string) {
   const session = await requireAuth({
-    roles: ['super_admin'],
+    roles: ['super_admin', 'warehouse_staff'],
   })
 
   try {

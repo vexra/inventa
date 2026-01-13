@@ -2,7 +2,7 @@ import { asc, eq, ilike, or, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'
-import { requests, units, user, warehouses } from '@/db/schema'
+import { faculties, requests, units, user, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
@@ -39,16 +39,20 @@ export default async function UsersPage({ searchParams }: PageProps) {
       banned: user.banned,
       unitId: user.unitId,
       warehouseId: user.warehouseId,
+      facultyId: user.facultyId,
+
       unitName: units.name,
+      unitFacultyId: units.facultyId,
       warehouseName: warehouses.name,
-      usageCount: sql<number>`(
-        SELECT count(*) FROM ${requests} WHERE ${requests.requesterId} = ${user.id}
-      )`.mapWith(Number),
+
+      usageCount: sql<number>`count(${requests.id})`,
     })
     .from(user)
     .leftJoin(units, eq(user.unitId, units.id))
     .leftJoin(warehouses, eq(user.warehouseId, warehouses.id))
+    .leftJoin(requests, eq(user.id, requests.requesterId))
     .where(searchCondition)
+    .groupBy(user.id, units.id, warehouses.id)
     .limit(USERS_PER_PAGE)
     .offset(offset)
     .orderBy(asc(user.name))
@@ -58,14 +62,16 @@ export default async function UsersPage({ searchParams }: PageProps) {
     .from(user)
     .where(searchCondition)
 
-  const unitsPromise = db.select().from(units)
-  const warehousesPromise = db.select().from(warehouses)
+  const unitsPromise = db.select().from(units).orderBy(asc(units.name))
+  const warehousesPromise = db.select().from(warehouses).orderBy(asc(warehouses.name))
+  const facultiesPromise = db.select().from(faculties).orderBy(asc(faculties.name))
 
-  const [rawUsers, countResult, unitsData, warehousesData] = await Promise.all([
+  const [rawUsers, countResult, unitsData, warehousesData, facultiesData] = await Promise.all([
     dataPromise,
     countPromise,
     unitsPromise,
     warehousesPromise,
+    facultiesPromise,
   ])
 
   const data = rawUsers.map((u) => ({
@@ -76,6 +82,8 @@ export default async function UsersPage({ searchParams }: PageProps) {
     banned: u.banned || false,
     unitId: u.unitId,
     warehouseId: u.warehouseId,
+    facultyId: u.facultyId,
+    unitFacultyId: u.unitFacultyId,
     usageCount: u.usageCount,
     unit: u.unitName ? { name: u.unitName } : null,
     warehouse: u.warehouseName ? { name: u.warehouseName } : null,
@@ -91,7 +99,12 @@ export default async function UsersPage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">Pengguna</h1>
           <p className="text-muted-foreground">Kelola akses, role, dan status pengguna.</p>
         </div>
-        <UserDialog mode="create" units={unitsData} warehouses={warehousesData} />
+        <UserDialog
+          mode="create"
+          units={unitsData}
+          warehouses={warehousesData}
+          faculties={facultiesData}
+        />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
@@ -99,7 +112,12 @@ export default async function UsersPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <UserList data={data} units={unitsData} warehouses={warehousesData} />
+        <UserList
+          data={data}
+          units={unitsData}
+          warehouses={warehousesData}
+          faculties={facultiesData}
+        />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
       </div>
