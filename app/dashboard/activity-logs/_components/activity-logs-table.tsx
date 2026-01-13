@@ -69,15 +69,21 @@ export function LogsTable({ data }: LogsTableProps) {
                 </TableCell>
                 <TableCell>
                   <Badge
-                    variant="outline"
+                    variant="secondary"
                     className={cn(
-                      'w-20 justify-center font-mono text-xs font-bold',
+                      'w-auto min-w-20 justify-center px-2 font-medium shadow-none',
+
                       log.action === 'CREATE' &&
-                        'border-green-200 bg-green-50 text-green-700 hover:bg-green-100',
+                        'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/15 dark:text-green-400 dark:hover:bg-green-500/25',
+
                       log.action === 'UPDATE' &&
-                        'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+                        'bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:hover:bg-blue-500/25',
+
                       log.action === 'DELETE' &&
-                        'border-red-200 bg-red-50 text-red-700 hover:bg-red-100',
+                        'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25',
+
+                      log.action === 'IMPERSONATE' &&
+                        'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:hover:bg-purple-500/25',
                     )}
                   >
                     {log.action}
