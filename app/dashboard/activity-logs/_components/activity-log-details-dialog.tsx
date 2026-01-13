@@ -1,5 +1,7 @@
 'use client'
 
+import { useMemo } from 'react'
+
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -10,9 +12,51 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 
 import { LogEntry } from './activity-logs-table'
+
+function JsonViewer({ data }: { data: any }) {
+  const coloredHtml = useMemo(() => {
+    if (!data) return null
+
+    let json = JSON.stringify(data, null, 2)
+
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+    return json.replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      (match) => {
+        let cls = 'text-orange-600 dark:text-orange-400'
+
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'text-blue-600 dark:text-blue-400 font-semibold'
+          } else {
+            cls = 'text-green-600 dark:text-green-400'
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'text-red-600 dark:text-red-400 font-semibold'
+        } else if (/null/.test(match)) {
+          cls = 'text-gray-500 dark:text-gray-400 italic'
+        }
+
+        return `<span class="${cls}">${match}</span>`
+      },
+    )
+  }, [data])
+
+  if (!data) {
+    return <p className="text-muted-foreground text-xs italic">Tidak ada data</p>
+  }
+
+  return (
+    <pre
+      className="font-mono text-xs leading-relaxed"
+      dangerouslySetInnerHTML={{ __html: coloredHtml || '' }}
+    />
+  )
+}
 
 interface LogDetailsDialogProps {
   open: boolean
@@ -52,16 +96,17 @@ export function LogDetailsDialog({ open, onOpenChange, data }: LogDetailsDialogP
             <h4 className="text-muted-foreground mb-2 text-xs font-bold tracking-wider uppercase">
               Data Lama (Old)
             </h4>
-            <ScrollArea className="bg-card h-62.5 w-full rounded-md border p-2">
-              {data.oldValues ? (
-                <pre className="font-mono text-xs leading-relaxed">
-                  {JSON.stringify(data.oldValues, null, 2)}
-                </pre>
-              ) : (
-                <p className="text-muted-foreground text-xs italic">
-                  Tidak ada data lama (Creation)
-                </p>
-              )}
+            <ScrollArea className="bg-card h-64 w-full rounded-md border">
+              <div className="p-4">
+                {data.oldValues ? (
+                  <JsonViewer data={data.oldValues} />
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">
+                    Tidak ada data lama (Creation)
+                  </p>
+                )}
+              </div>
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
 
@@ -69,16 +114,17 @@ export function LogDetailsDialog({ open, onOpenChange, data }: LogDetailsDialogP
             <h4 className="text-muted-foreground mb-2 text-xs font-bold tracking-wider uppercase">
               Data Baru (New)
             </h4>
-            <ScrollArea className="bg-card h-62.5 w-full rounded-md border p-2">
-              {data.newValues ? (
-                <pre className="font-mono text-xs leading-relaxed">
-                  {JSON.stringify(data.newValues, null, 2)}
-                </pre>
-              ) : (
-                <p className="text-muted-foreground text-xs italic">
-                  Tidak ada data baru (Deletion)
-                </p>
-              )}
+            <ScrollArea className="bg-card h-64 w-full rounded-md border">
+              <div className="p-4">
+                {data.newValues ? (
+                  <JsonViewer data={data.newValues} />
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">
+                    Tidak ada data baru (Deletion)
+                  </p>
+                )}
+              </div>
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
         </div>
