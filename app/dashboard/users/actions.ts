@@ -257,6 +257,17 @@ export async function logImpersonationAction(targetUserId: string) {
   const session = await requireAuth({ roles: ['super_admin'] })
 
   try {
+    const [targetUser] = await db
+      .select({
+        name: user.name,
+        email: user.email,
+      })
+      .from(user)
+      .where(eq(user.id, targetUserId))
+      .limit(1)
+
+    const targetInfo = targetUser ? `${targetUser.name} (${targetUser.email})` : 'Unknown User'
+
     await db.insert(auditLogs).values({
       id: randomUUID(),
       userId: session.user.id,
@@ -264,7 +275,10 @@ export async function logImpersonationAction(targetUserId: string) {
       tableName: 'user',
       recordId: targetUserId,
       newValues: {
-        message: `Super Admin ${session.user.name} started impersonating user ${targetUserId}`,
+        targetUserId: targetUserId,
+        targetUserName: targetUser?.name,
+        targetUserEmail: targetUser?.email,
+        message: `Super Admin ${session.user.name} started impersonating user ${targetInfo}`,
       },
     })
 
