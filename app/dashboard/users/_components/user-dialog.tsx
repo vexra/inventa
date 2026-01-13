@@ -205,25 +205,23 @@ export function UserDialog({
         </DialogTrigger>
       )}
 
-      <DialogContent className="sm:max-w-150">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Tambah User Baru' : 'Edit User'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
-                  <FormLabel className="text-right">Nama Lengkap</FormLabel>
-                  <div className="col-span-3">
-                    <FormControl>
-                      <Input placeholder="Nama user" {...field} />
-                    </FormControl>
-                    <FormMessage className="mt-1 text-xs" />
-                  </div>
+                <FormItem>
+                  <FormLabel>Nama Lengkap</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nama user" {...field} />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -232,14 +230,12 @@ export function UserDialog({
               control={form.control}
               name="email"
               render={({ field }) => (
-                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
-                  <FormLabel className="text-right">Email</FormLabel>
-                  <div className="col-span-3">
-                    <FormControl>
-                      <Input placeholder="email@universitas.ac.id" {...field} />
-                    </FormControl>
-                    <FormMessage className="mt-1 text-xs" />
-                  </div>
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="email@universitas.ac.id" {...field} />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -248,64 +244,69 @@ export function UserDialog({
               control={form.control}
               name="password"
               render={({ field }) => (
-                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
-                  <FormLabel className="text-right">Password</FormLabel>
-                  <div className="col-span-3">
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder={
-                            mode === 'create' ? 'Min. 8 karakter' : 'Isi jika ingin ubah'
-                          }
-                          {...field}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="text-muted-foreground h-4 w-4" />
-                          ) : (
-                            <Eye className="text-muted-foreground h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage className="mt-1 text-xs" />
-                  </div>
+                <FormItem>
+                  <FormLabel>
+                    Password{' '}
+                    {mode === 'edit' && (
+                      <span className="text-muted-foreground text-xs font-normal">(Opsional)</span>
+                    )}
+                  </FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder={
+                          mode === 'create' ? 'Min. 8 karakter' : 'Isi jika ingin ubah password'
+                        }
+                        {...field}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="text-muted-foreground h-4 w-4" />
+                        ) : (
+                          <Eye className="text-muted-foreground h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="my-2 border-t" />
+            <div className="my-2 border-t pt-2">
+              <h4 className="text-muted-foreground mb-3 text-sm font-medium">
+                Hak Akses & Wilayah Kerja
+              </h4>
+            </div>
 
             <FormField
               control={form.control}
               name="role"
               render={({ field }) => (
-                <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
-                  <FormLabel className="text-right">Role Access</FormLabel>
-                  <div className="col-span-3">
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Pilih Role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="super_admin">Super Admin</SelectItem>
-                        <SelectItem value="faculty_admin">Admin Fakultas</SelectItem>
-                        <SelectItem value="unit_admin">Admin Unit/Jurusan</SelectItem>
-                        <SelectItem value="unit_staff">Staff Unit/Dosen</SelectItem>
-                        <SelectItem value="warehouse_staff">Petugas Gudang</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage className="mt-1 text-xs" />
-                  </div>
+                <FormItem>
+                  <FormLabel>Role Access</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Pilih Role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                      <SelectItem value="faculty_admin">Admin Fakultas</SelectItem>
+                      <SelectItem value="unit_admin">Admin Unit/Jurusan</SelectItem>
+                      <SelectItem value="unit_staff">Staff Unit/Dosen</SelectItem>
+                      <SelectItem value="warehouse_staff">Petugas Gudang</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -315,32 +316,30 @@ export function UserDialog({
                 control={form.control}
                 name="facultyId"
                 render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
-                    <FormLabel className="text-right">
+                  <FormItem>
+                    <FormLabel>
                       Fakultas{' '}
                       {role !== 'faculty_admin' && (
-                        <span className="text-muted-foreground block text-[10px] font-normal">
+                        <span className="text-muted-foreground text-xs font-normal">
                           (Filter Unit)
                         </span>
                       )}
                     </FormLabel>
-                    <div className="col-span-3">
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Pilih Fakultas" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {faculties.map((f) => (
-                            <SelectItem key={f.id} value={f.id}>
-                              {f.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage className="mt-1 text-xs" />
-                    </div>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Pilih Fakultas" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {faculties.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -351,37 +350,35 @@ export function UserDialog({
                 control={form.control}
                 name="unitId"
                 render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
-                    <FormLabel className="text-right">Unit / Jurusan</FormLabel>
-                    <div className="col-span-3">
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value || ''}
-                        disabled={!selectedFacultyId}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue
-                              placeholder={selectedFacultyId ? 'Pilih Unit' : 'Pilih Fakultas dulu'}
-                            />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {filteredUnits.length > 0 ? (
-                            filteredUnits.map((u) => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.name}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="text-muted-foreground p-2 text-center text-sm">
-                              Tidak ada unit di fakultas ini
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage className="mt-1 text-xs" />
-                    </div>
+                  <FormItem>
+                    <FormLabel>Unit / Jurusan</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ''}
+                      disabled={!selectedFacultyId}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue
+                            placeholder={selectedFacultyId ? 'Pilih Unit' : 'Pilih Fakultas dulu'}
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredUnits.length > 0 ? (
+                          filteredUnits.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="text-muted-foreground p-2 text-center text-sm">
+                            Tidak ada unit di fakultas ini
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -392,37 +389,36 @@ export function UserDialog({
                 control={form.control}
                 name="warehouseId"
                 render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4 space-y-0">
-                    <FormLabel className="text-right">Gudang</FormLabel>
-                    <div className="col-span-3">
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Pilih Gudang" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {warehouses.map((w) => (
-                            <SelectItem key={w.id} value={w.id}>
-                              {w.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage className="mt-1 text-xs" />
-                    </div>
+                  <FormItem>
+                    <FormLabel>Gudang</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Pilih Gudang" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {warehouses.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
             )}
 
-            <DialogFooter className="mt-4">
+            <DialogFooter className="pt-4">
               <Button
                 type="submit"
                 disabled={isLoading}
                 className="w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Simpan
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {mode === 'create' ? 'Simpan' : 'Perbarui'}
               </Button>
             </DialogFooter>
           </form>
