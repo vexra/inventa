@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { userRoleEnum } from '@/db/schema'
 
 import { createUserAction, updateUserAction } from '../actions'
 
@@ -41,7 +42,7 @@ const formSchema = z
     name: z.string().min(2, 'Nama minimal 2 karakter'),
     email: z.email('Email tidak valid'),
     password: z.string().optional(),
-    role: z.enum(['super_admin', 'faculty_admin', 'unit_admin', 'warehouse_staff', 'unit_staff']),
+    role: z.enum(userRoleEnum.enumValues),
     unitId: z.string().optional(),
     warehouseId: z.string().optional(),
     facultyId: z.string().optional(),
@@ -133,13 +134,15 @@ export function UserDialog({
 
   const [showPassword, setShowPassword] = useState(false)
 
+  const defaultRole = 'unit_staff'
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: initialData?.name || '',
       email: initialData?.email || '',
       password: '',
-      role: initialData?.role || 'unit_staff',
+      role: initialData?.role || defaultRole,
       unitId: initialData?.unitId || '',
       warehouseId: initialData?.warehouseId || '',
       facultyId: initialData?.facultyId || '',
@@ -171,9 +174,12 @@ export function UserDialog({
     try {
       let result
       if (mode === 'create') {
-        result = await createUserAction(data as any)
+        result = await createUserAction(data as Parameters<typeof createUserAction>[0])
       } else if (initialData?.id) {
-        result = await updateUserAction(initialData.id, data as any)
+        result = await updateUserAction(
+          initialData.id,
+          data as Parameters<typeof updateUserAction>[1],
+        )
       }
 
       if (result?.error) {
@@ -299,11 +305,11 @@ export function UserDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="super_admin">Super Admin</SelectItem>
-                      <SelectItem value="faculty_admin">Admin Fakultas</SelectItem>
-                      <SelectItem value="unit_admin">Admin Unit/Jurusan</SelectItem>
-                      <SelectItem value="unit_staff">Staff Unit/Dosen</SelectItem>
-                      <SelectItem value="warehouse_staff">Petugas Gudang</SelectItem>
+                      {userRoleEnum.enumValues.map((roleValue) => (
+                        <SelectItem key={roleValue} value={roleValue}>
+                          {roleValue.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

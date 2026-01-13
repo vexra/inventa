@@ -16,9 +16,9 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 
 import { LogEntry } from './activity-logs-table'
 
-function JsonViewer({ data }: { data: any }) {
+function JsonViewer({ data }: { data: unknown }) {
   const coloredHtml = useMemo(() => {
-    if (!data) return null
+    if (data === null || data === undefined) return null
 
     let json = JSON.stringify(data, null, 2)
 

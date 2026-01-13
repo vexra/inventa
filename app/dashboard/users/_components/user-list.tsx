@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 
-import { useRouter } from 'next/navigation'
-
 import {
   Ban,
   Building2,
@@ -45,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { userRoleEnum } from '@/db/schema'
 import { authClient } from '@/lib/auth-client'
 
 import {
@@ -54,6 +53,8 @@ import {
   unbanUserAction,
 } from '../actions'
 import { UserDialog } from './user-dialog'
+
+type UserRole = (typeof userRoleEnum.enumValues)[number]
 
 interface UnitData {
   id: string
@@ -97,8 +98,6 @@ interface UserListProps {
 }
 
 export function UserList({ data, units, warehouses, faculties }: UserListProps) {
-  const router = useRouter()
-
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
 
@@ -119,7 +118,7 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
     try {
       await logImpersonationAction(userToImpersonate.id)
 
-      const { data, error } = await authClient.admin.impersonateUser({
+      const { error } = await authClient.admin.impersonateUser({
         userId: userToImpersonate.id,
       })
 
@@ -132,7 +131,7 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
 
         window.location.href = '/dashboard'
       }
-    } catch (err) {
+    } catch {
       toast.error('Terjadi kesalahan sistem', { id: toastId })
       setIsPending(false)
       setUserToImpersonate(null)
@@ -159,7 +158,7 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
           setBanReason('')
         }
       }
-    } catch (error) {
+    } catch {
       toast.error('Gagal memproses status user')
     } finally {
       setIsPending(false)
@@ -175,7 +174,7 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
         toast.success(res.message)
         setUserToDelete(null)
       }
-    } catch (error) {
+    } catch {
       toast.error('Gagal menghapus user')
     } finally {
       setIsPending(false)
@@ -370,7 +369,7 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
                 <p className="mb-1 font-semibold">Mode Penyamaran</p>
                 <p className="leading-relaxed opacity-90 dark:text-blue-200/80">
                   Sesi Super Admin Anda akan <strong>dijeda</strong>. Untuk kembali, Anda perlu
-                  Logout atau menekan tombol "Stop Impersonating".
+                  Logout atau menekan tombol &quot;Stop Impersonating&quot;.
                 </p>
               </div>
             </div>
@@ -416,7 +415,8 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
             id: userToEdit.id,
             name: userToEdit.name,
             email: userToEdit.email,
-            role: userToEdit.role as any,
+            // 2. Cast string role ke tipe UserRole yang valid
+            role: userToEdit.role as UserRole,
             unitId: userToEdit.unitId || undefined,
             warehouseId: userToEdit.warehouseId || undefined,
             facultyId:
