@@ -70,7 +70,7 @@ export default async function WarehouseStocksPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="mt-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <SearchInput placeholder="Cari nama barang atau SKU..." className="w-full sm:max-w-xs" />
         <StockFilter currentFilter={statusFilter} />
       </div>
