@@ -28,7 +28,7 @@ const procurementSchema = z.object({
 })
 
 export async function createProcurement(data: z.infer<typeof procurementSchema>) {
-  const session = await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
+  const session = await requireAuth({ roles: ['warehouse_staff'] })
 
   if (!session.user.warehouseId) {
     return { error: 'Anda tidak terdaftar di gudang manapun.' }
@@ -88,7 +88,7 @@ export async function createProcurement(data: z.infer<typeof procurementSchema>)
 }
 
 export async function updateProcurement(id: string, data: z.infer<typeof procurementSchema>) {
-  const session = await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
+  const session = await requireAuth({ roles: ['warehouse_staff'] })
 
   if (!session.user.warehouseId) {
     return { error: 'Anda tidak terdaftar di gudang manapun.' }
@@ -104,7 +104,7 @@ export async function updateProcurement(id: string, data: z.infer<typeof procure
     return { error: 'Pengajuan tidak ditemukan.' }
   }
 
-  if (session.user.role !== 'super_admin' && existingProcurement.userId !== session.user.id) {
+  if (existingProcurement.userId !== session.user.id) {
     return { error: 'Anda tidak memiliki akses.' }
   }
 
@@ -174,7 +174,7 @@ export async function updateProcurement(id: string, data: z.infer<typeof procure
 }
 
 export async function deleteProcurement(id: string) {
-  const session = await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
+  const session = await requireAuth({ roles: ['warehouse_staff'] })
 
   const [existingProcurement] = await db
     .select()
@@ -186,7 +186,7 @@ export async function deleteProcurement(id: string) {
     return { error: 'Pengajuan tidak ditemukan.' }
   }
 
-  if (session.user.role !== 'super_admin' && existingProcurement.userId !== session.user.id) {
+  if (existingProcurement.userId !== session.user.id) {
     return { error: 'Anda tidak memiliki akses.' }
   }
 
@@ -230,7 +230,7 @@ export async function deleteProcurement(id: string) {
 }
 
 export async function getProcurements(page = 1, limit = 10, query = '') {
-  const session = await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
+  const session = await requireAuth({ roles: ['warehouse_staff'] })
   const offset = (page - 1) * limit
 
   // 1. Base Condition (Filter Role)
@@ -279,7 +279,7 @@ export async function getProcurements(page = 1, limit = 10, query = '') {
     .orderBy(desc(procurements.createdAt))
 
   const procurementIds = headers.map((h) => h.id)
-  let itemsData: any[] = []
+  let itemsData: (typeof procurementConsumables.$inferSelect)[] = []
 
   // Fetch Items hanya untuk procurement yang tampil
   if (procurementIds.length > 0) {
