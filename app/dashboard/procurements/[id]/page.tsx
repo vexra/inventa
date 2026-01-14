@@ -47,7 +47,7 @@ interface PageProps {
 }
 
 export default async function ProcurementDetailPage({ params }: PageProps) {
-  const session = await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
+  await requireAuth({ roles: ['warehouse_staff'] })
 
   const { id } = await params
 
@@ -246,7 +246,7 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
 
                         {log.notes && (
                           <p className="text-muted-foreground bg-muted/50 mt-1 rounded p-2 text-sm">
-                            "{log.notes}"
+                            &quot;{log.notes}&quot;
                           </p>
                         )}
 

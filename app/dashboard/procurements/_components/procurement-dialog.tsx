@@ -135,7 +135,7 @@ export function ProcurementDialog({
         setOpen(false)
         if (!isEditMode) form.reset()
       }
-    } catch (error) {
+    } catch {
       toast.error('Terjadi kesalahan sistem')
     }
   }
