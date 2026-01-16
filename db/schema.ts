@@ -80,6 +80,13 @@ export const assetConditionEnum = pgEnum('asset_condition', [
   'MAINTENANCE', // Sedang diservis
 ])
 
+// Kondisi Penerimaan Barang (Quality Control Inbound)
+export const receiptConditionEnum = pgEnum('receipt_condition', [
+  'GOOD', // Diterima baik
+  'DAMAGED', // Rusak saat pengiriman
+  'INCOMPLETE', // Jumlah/Part kurang
+])
+
 /**
  * =========================================
  * 2. AUTHENTICATION & USER MANAGEMENT
@@ -461,6 +468,9 @@ export const procurements = pgTable('procurements', {
   notes: text('notes'),
 
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 })
 
 // History status pengadaan
@@ -493,6 +503,7 @@ export const procurementConsumables = pgTable('procurement_consumables', {
 
   batchNumber: text('batch_number'),
   expiryDate: timestamp('expiry_date'),
+  condition: receiptConditionEnum('condition'),
 })
 
 // Detail Aset Tetap yang dibeli (Otomatis jadi Fixed Assets saat Completed)

@@ -6,7 +6,7 @@ import Link from 'next/link'
 
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import { Calendar, Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Calendar, Eye, MoreHorizontal, PackageCheck, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -41,6 +41,7 @@ import { procurementStatusEnum } from '@/db/schema'
 
 import { deleteProcurement } from '../actions'
 import { ProcurementDialog } from './procurement-dialog'
+import { ReceiveDialog } from './receive-dialog'
 
 type ProcurementStatus = (typeof procurementStatusEnum.enumValues)[number]
 
@@ -51,7 +52,13 @@ interface ProcurementData {
   requestDate: Date | null
   notes: string | null
   requester: { name: string | null } | null
-  items: { consumableId: string; quantity: string }[]
+  items: {
+    id: string
+    consumableId: string
+    consumableName: string | null
+    unit: string | null
+    quantity: string | number
+  }[]
 }
 
 interface ConsumableOption {
@@ -69,7 +76,11 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  const [receivingId, setReceivingId] = useState<string | null>(null)
+
   const itemToEdit = data.find((item) => item.id === editingId)
+
+  const itemToReceive = data.find((item) => item.id === receivingId)
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -167,7 +178,12 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
                           </Link>
                         </DropdownMenuItem>
 
-                        {/* HANYA TAMPIL JIKA STATUS PENDING */}
+                        {item.status === 'APPROVED' && (
+                          <DropdownMenuItem onClick={() => setReceivingId(item.id)}>
+                            <PackageCheck className="mr-2 h-4 w-4" /> Terima Barang
+                          </DropdownMenuItem>
+                        )}
+
                         {item.status === 'PENDING' && (
                           <>
                             <DropdownMenuSeparator />
@@ -193,12 +209,26 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
         </Table>
       </div>
 
+      {receivingId && itemToReceive && (
+        <ReceiveDialog
+          procurement={itemToReceive}
+          open={!!receivingId}
+          onOpenChange={(open) => !open && setReceivingId(null)}
+        />
+      )}
+
       {editingId && itemToEdit && (
         <ProcurementDialog
           consumables={consumables}
           open={!!editingId}
           onOpenChange={(open) => !open && setEditingId(null)}
-          initialData={itemToEdit}
+          initialData={{
+            ...itemToEdit,
+            items: itemToEdit.items.map((i) => ({
+              consumableId: i.consumableId,
+              quantity: Number(i.quantity),
+            })),
+          }}
           trigger={<span className="hidden"></span>}
         />
       )}
@@ -226,7 +256,6 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
   )
 }
 
-// 3. Gunakan tipe ProcurementStatus di sini
 const STATUS_CONFIG: Record<ProcurementStatus, { label: string; className: string }> = {
   PENDING: {
     label: 'Menunggu',
@@ -236,7 +265,7 @@ const STATUS_CONFIG: Record<ProcurementStatus, { label: string; className: strin
   APPROVED: {
     label: 'Disetujui',
     className:
-      'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+      'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
   },
   REJECTED: {
     label: 'Ditolak',

@@ -81,11 +81,6 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: ClipboardList,
         },
         {
-          title: 'Penerimaan Barang',
-          url: '/dashboard/inbound',
-          icon: ArrowDownToLine,
-        },
-        {
           title: 'Stock Opname',
           url: '/dashboard/stock-opname',
           icon: PackageCheck,

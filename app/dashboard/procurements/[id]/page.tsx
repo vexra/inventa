@@ -35,19 +35,21 @@ import {
   procurementStatusEnum,
   procurementTimelines,
   procurements,
+  receiptConditionEnum,
   user,
 } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 type ProcurementStatus = (typeof procurementStatusEnum.enumValues)[number]
+type ReceiptCondition = (typeof receiptConditionEnum.enumValues)[number]
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
 export default async function ProcurementDetailPage({ params }: PageProps) {
-  await requireAuth({ roles: ['warehouse_staff'] })
+  await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
 
   const { id } = await params
 
@@ -77,6 +79,9 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
       quantity: procurementConsumables.quantity,
       consumableName: consumables.name,
       unit: consumables.baseUnit,
+      condition: procurementConsumables.condition,
+      batchNumber: procurementConsumables.batchNumber,
+      expiryDate: procurementConsumables.expiryDate,
     })
     .from(procurementConsumables)
     .leftJoin(consumables, eq(procurementConsumables.consumableId, consumables.id))
@@ -183,8 +188,10 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
                   <TableRow>
                     <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Nama Barang</TableHead>
-                    <TableHead className="text-right">Jumlah</TableHead>
-                    <TableHead className="w-24">Satuan</TableHead>
+                    <TableHead className="text-center">Jml</TableHead>
+                    <TableHead>Kondisi (QC)</TableHead>
+                    <TableHead>No. Batch</TableHead>
+                    <TableHead>Expired</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -193,11 +200,35 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
                       <TableCell className="text-muted-foreground text-center">
                         {index + 1}
                       </TableCell>
-                      <TableCell className="font-medium">{item.consumableName}</TableCell>
-                      <TableCell className="text-right font-mono text-base">
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{item.consumableName}</span>
+                          <span className="text-muted-foreground text-[10px]">{item.unit}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center font-mono font-medium">
                         {Number(item.quantity)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{item.unit}</TableCell>
+
+                      <TableCell>
+                        {item.condition ? (
+                          <ConditionBadge condition={item.condition as ReceiptCondition} />
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {item.batchNumber || (
+                          <span className="text-muted-foreground italic">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {item.expiryDate ? (
+                          format(new Date(item.expiryDate), 'dd/MM/yyyy')
+                        ) : (
+                          <span className="text-muted-foreground italic">-</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -304,6 +335,28 @@ function StatusBadge({ status }: { status: ProcurementStatus | string | null }) 
     >
       <Icon className="h-3.5 w-3.5" />
       {STATUS_LABEL_MAP[normalizedStatus] || normalizedStatus}
+    </Badge>
+  )
+}
+
+function ConditionBadge({ condition }: { condition: ReceiptCondition | null }) {
+  if (!condition) return null
+
+  const styles: Record<ReceiptCondition, string> = {
+    GOOD: 'bg-green-100 text-green-700 border-green-200',
+    DAMAGED: 'bg-red-100 text-red-700 border-red-200',
+    INCOMPLETE: 'bg-orange-100 text-orange-700 border-orange-200',
+  }
+
+  const labels: Record<ReceiptCondition, string> = {
+    GOOD: 'Baik',
+    DAMAGED: 'Rusak',
+    INCOMPLETE: 'Kurang',
+  }
+
+  return (
+    <Badge variant="outline" className={`text-[10px] font-normal ${styles[condition]}`}>
+      {labels[condition]}
     </Badge>
   )
 }
