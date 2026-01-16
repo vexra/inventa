@@ -1,4 +1,4 @@
-import { desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, desc, eq, ilike, or, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'
@@ -18,8 +18,8 @@ interface PageProps {
 }
 
 export default async function LogsPage({ searchParams }: PageProps) {
-  await requireAuth({
-    roles: ['super_admin'],
+  const session = await requireAuth({
+    roles: ['super_admin', 'warehouse_staff', 'faculty_admin', 'unit_admin', 'unit_staff'],
   })
 
   const params = await searchParams
@@ -27,9 +27,15 @@ export default async function LogsPage({ searchParams }: PageProps) {
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
 
+  const isSuperAdmin = session.user.role === 'super_admin'
+
   const searchCondition = query
     ? or(ilike(user.name, `%${query}%`), ilike(auditLogs.tableName, `%${query}%`))
     : undefined
+
+  const userCondition = isSuperAdmin ? undefined : eq(auditLogs.userId, session.user.id)
+
+  const finalCondition = and(searchCondition, userCondition)
 
   const dataPromise = db
     .select({
@@ -46,7 +52,7 @@ export default async function LogsPage({ searchParams }: PageProps) {
     })
     .from(auditLogs)
     .leftJoin(user, eq(auditLogs.userId, user.id))
-    .where(searchCondition)
+    .where(finalCondition)
     .limit(ITEMS_PER_PAGE)
     .offset(offset)
     .orderBy(desc(auditLogs.createdAt))
@@ -55,7 +61,7 @@ export default async function LogsPage({ searchParams }: PageProps) {
     .select({ count: sql<number>`count(*)` })
     .from(auditLogs)
     .leftJoin(user, eq(auditLogs.userId, user.id))
-    .where(searchCondition)
+    .where(finalCondition)
 
   const [data, countResult] = await Promise.all([dataPromise, countPromise])
 
@@ -67,13 +73,17 @@ export default async function LogsPage({ searchParams }: PageProps) {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Activity Logs</h1>
         <p className="text-muted-foreground">
-          Memantau riwayat perubahan data (Create, Update, Delete) pada sistem.
+          {isSuperAdmin
+            ? 'Memantau seluruh riwayat perubahan data sistem.'
+            : 'Memantau riwayat aktivitas akun Anda.'}
         </p>
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
         <SearchInput
-          placeholder="Cari berdasarkan User atau Tabel..."
+          placeholder={
+            isSuperAdmin ? 'Cari berdasarkan User atau Tabel...' : 'Cari riwayat aktivitas...'
+          }
           className="w-full sm:max-w-xs"
         />
       </div>
@@ -85,7 +95,9 @@ export default async function LogsPage({ searchParams }: PageProps) {
 
         {data.length === 0 && (
           <div className="text-muted-foreground py-10 text-center">
-            Tidak ada data log aktivitas yang ditemukan.
+            {query
+              ? `Tidak ditemukan log dengan kata kunci "${query}".`
+              : 'Belum ada riwayat aktivitas.'}
           </div>
         )}
       </div>

@@ -1,5 +1,4 @@
 import {
-  ArrowDownToLine,
   Boxes,
   Building,
   Building2,
@@ -7,7 +6,6 @@ import {
   FileClock,
   FileText,
   FlaskConical,
-  History,
   Layers,
   LayoutDashboard,
   type LucideIcon,
@@ -105,11 +103,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           url: '/dashboard/consumables',
           icon: FlaskConical,
         },
-        {
-          title: 'Riwayat Transaksi',
-          url: '/dashboard/transactions',
-          icon: History,
-        },
+        { title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock },
       ],
     },
   ],
