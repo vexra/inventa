@@ -1,9 +1,8 @@
 'use server'
 
-import { randomUUID } from 'crypto'
 import { and, asc, eq, ilike, lte, or, sql } from 'drizzle-orm'
 
-import { auditLogs, categories, consumables, warehouseStocks } from '@/db/schema'
+import { categories, consumables, warehouseStocks } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
@@ -67,25 +66,6 @@ export async function getWarehouseStocks(
       .limit(limit)
       .offset(offset)
       .orderBy(asc(consumables.name))
-
-    try {
-      await db.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: 'VIEW_STOCKS',
-        tableName: 'warehouse_stocks',
-        recordId: session.user.warehouseId,
-        newValues: {
-          page,
-          limit,
-          query,
-          statusFilter,
-          resultCount: data.length,
-        },
-      })
-    } catch (logError) {
-      console.error('Audit Log Error:', logError)
-    }
 
     return {
       data,
