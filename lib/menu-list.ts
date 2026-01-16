@@ -1,13 +1,17 @@
 import {
+  Boxes,
   Building,
   Building2,
+  ClipboardList,
   FileClock,
+  FileText,
   FlaskConical,
   Layers,
   LayoutDashboard,
   type LucideIcon,
   MapPin,
   MonitorSmartphone,
+  PackageCheck,
   Tags,
   Users,
   Warehouse,
@@ -34,7 +38,6 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Utama',
       items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
     },
-
     {
       title: 'Organisasi & Lokasi',
       items: [
@@ -44,7 +47,6 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
         { title: 'Ruangan', url: '/dashboard/rooms', icon: MapPin },
       ],
     },
-
     {
       title: 'Katalog Barang',
       items: [
@@ -53,7 +55,6 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
         { title: 'Model Aset', url: '/dashboard/asset-models', icon: Layers },
       ],
     },
-
     {
       title: 'Sistem & Audit',
       items: [
@@ -64,7 +65,49 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
   ],
 
-  warehouse_staff: [],
+  warehouse_staff: [
+    {
+      title: 'Utama',
+      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+    },
+    {
+      title: 'Operasional Gudang',
+      items: [
+        {
+          title: 'Permintaan Unit',
+          url: '/dashboard/requests',
+          icon: ClipboardList,
+        },
+        {
+          title: 'Stock Opname',
+          url: '/dashboard/stock-opname',
+          icon: PackageCheck,
+        },
+        {
+          title: 'Permohonan Pengadaan',
+          url: '/dashboard/procurements',
+          icon: FileText,
+        },
+      ],
+    },
+    {
+      title: 'Data Inventaris',
+      items: [
+        {
+          title: 'Stok Gudang',
+          url: '/dashboard/warehouse-stocks',
+          icon: Boxes,
+        },
+        {
+          title: 'Katalog Barang',
+          url: '/dashboard/consumables',
+          icon: FlaskConical,
+        },
+        { title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock },
+      ],
+    },
+  ],
+
   faculty_admin: [],
   unit_admin: [],
   unit_staff: [],
