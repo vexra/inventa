@@ -1,7 +1,6 @@
 import { Metadata } from 'next'
 
 import { and, asc, eq, ilike, or, sql } from 'drizzle-orm'
-import { ClipboardList } from 'lucide-react'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'

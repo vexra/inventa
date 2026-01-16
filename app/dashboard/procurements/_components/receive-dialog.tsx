@@ -107,9 +107,9 @@ export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialog
         toast.error(res.error)
       } else {
         toast.success(res.message)
-        onOpenChange(false) // Menutup dialog via props
+        onOpenChange(false)
       }
-    } catch (error) {
+    } catch {
       toast.error('Terjadi kesalahan sistem saat memproses penerimaan.')
     } finally {
       setIsLoading(false)

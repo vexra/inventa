@@ -141,8 +141,8 @@ export async function WarehouseStaffDashboard({
                     <span className="text-foreground font-bold">
                       {pendingReceives[0].value} dokumen pengadaan
                     </span>{' '}
-                    yang statusnya "Disetujui". Silakan buka menu <b>Pengadaan</b> untuk melakukan
-                    penerimaan barang dan pencatatan stok.
+                    yang statusnya &quot;Disetujui&quot;. Silakan buka menu <b>Pengadaan</b> untuk
+                    melakukan penerimaan barang dan pencatatan stok.
                   </p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
