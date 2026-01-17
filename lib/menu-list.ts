@@ -4,6 +4,7 @@ import {
   Building2,
   ClipboardList,
   FileClock,
+  FilePenLine,
   FileText,
   FlaskConical,
   Layers,
@@ -12,6 +13,7 @@ import {
   MapPin,
   MonitorSmartphone,
   PackageCheck,
+  ShoppingCart,
   Tags,
   Users,
   Warehouse,
@@ -103,12 +105,50 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           url: '/dashboard/consumables',
           icon: FlaskConical,
         },
-        { title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock },
       ],
+    },
+    {
+      title: 'Akun',
+      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+    },
+  ],
+
+  unit_staff: [
+    {
+      title: 'Utama',
+      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+    },
+    {
+      title: 'Layanan Barang',
+      items: [
+        {
+          title: 'Permintaan Saya',
+          url: '/dashboard/my-requests',
+          icon: ShoppingCart,
+        },
+      ],
+    },
+    {
+      title: 'Inventaris Ruangan',
+      items: [
+        {
+          title: 'Stok Ruangan',
+          url: '/dashboard/room-stocks',
+          icon: Boxes,
+        },
+        {
+          title: 'Lapor Pemakaian',
+          url: '/dashboard/usage-reports',
+          icon: FilePenLine,
+        },
+      ],
+    },
+    {
+      title: 'Akun',
+      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
     },
   ],
 
   faculty_admin: [],
   unit_admin: [],
-  unit_staff: [],
 }
