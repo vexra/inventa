@@ -3,6 +3,7 @@ import {
   Building,
   Building2,
   ClipboardList,
+  FileCheck,
   FileClock,
   FilePenLine,
   FileText,
@@ -149,6 +150,50 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
   ],
 
+  unit_admin: [
+    {
+      title: 'Utama',
+      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+    },
+    {
+      title: 'Verifikasi & Approval',
+      items: [
+        {
+          // Halaman untuk melihat request status 'PENDING_UNIT'
+          title: 'Persetujuan Request',
+          url: '/dashboard/approvals',
+          icon: FileCheck,
+        },
+        {
+          // History request semua staff di unit ini
+          title: 'Riwayat Permintaan',
+          url: '/dashboard/unit-requests',
+          icon: ClipboardList,
+        },
+      ],
+    },
+    {
+      title: 'Monitoring Inventaris',
+      items: [
+        {
+          // Melihat stok gabungan seluruh ruangan di unit ini
+          title: 'Stok per Ruangan',
+          url: '/dashboard/unit-stocks',
+          icon: Boxes,
+        },
+        {
+          // Manajemen ruangan (jika admin boleh edit nama/QR ruangan)
+          title: 'Daftar Ruangan',
+          url: '/dashboard/rooms',
+          icon: MapPin,
+        },
+      ],
+    },
+    {
+      title: 'Akun',
+      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+    },
+  ],
+
   faculty_admin: [],
-  unit_admin: [],
 }
