@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useFieldArray, useForm, useWatch } from 'react-hook-form'
+import { useState } from 'react'
+import { useFieldArray, useForm } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FileText, Loader2, Plus, ShoppingCart, Trash2, Warehouse } from 'lucide-react'
@@ -58,19 +58,20 @@ export type WarehouseOption = {
   name: string
 }
 
-export type StockOption = {
-  consumableId: string
-  warehouseId: string
+export type CatalogItemOption = {
+  id: string
   name: string
   unit: string
+  category?: string
 }
 
 interface RequestDialogProps {
   warehouses: WarehouseOption[]
-  availableStocks: StockOption[]
+  items: CatalogItemOption[]
+  children?: React.ReactNode
 }
 
-export function RequestDialog({ warehouses, availableStocks }: RequestDialogProps) {
+export function RequestDialog({ warehouses = [], items = [], children }: RequestDialogProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -83,20 +84,10 @@ export function RequestDialog({ warehouses, availableStocks }: RequestDialogProp
     },
   })
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'items',
   })
-
-  const selectedWarehouseId = useWatch({
-    control: form.control,
-    name: 'targetWarehouseId',
-  })
-
-  const filteredItems = useMemo(() => {
-    if (!selectedWarehouseId) return []
-    return availableStocks.filter((stock) => stock.warehouseId === selectedWarehouseId)
-  }, [selectedWarehouseId, availableStocks])
 
   async function onSubmit(values: RequestFormValues) {
     setIsLoading(true)
@@ -115,22 +106,24 @@ export function RequestDialog({ warehouses, availableStocks }: RequestDialogProp
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 text-white shadow-sm hover:bg-blue-700">
-          <ShoppingCart className="mr-2 h-4 w-4" /> Buat Permintaan
-        </Button>
+        {children ? (
+          children
+        ) : (
+          <Button className="bg-blue-600 text-white shadow-sm hover:bg-blue-700">
+            <ShoppingCart className="mr-2 h-4 w-4" /> Buat Permintaan
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="bg-background flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="bg-background z-20 border-b px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-blue-100 p-2 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                <ShoppingCart className="h-5 w-5" />
-              </div>
-              <div>
-                <DialogTitle>Form Permintaan Barang</DialogTitle>
-                <DialogDescription>Ajukan permintaan stok barang ke gudang.</DialogDescription>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-blue-100 p-2 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+              <ShoppingCart className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle>Form Permintaan Barang</DialogTitle>
+              <DialogDescription>Ajukan permintaan stok barang ke gudang.</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -151,13 +144,7 @@ export function RequestDialog({ warehouses, availableStocks }: RequestDialogProp
                         <Warehouse className="h-4 w-4" />
                         Pilih Gudang Tujuan
                       </FormLabel>
-                      <Select
-                        onValueChange={(val) => {
-                          field.onChange(val)
-                          replace([{ consumableId: '', quantity: 1 }])
-                        }}
-                        defaultValue={field.value}
-                      >
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-background border-blue-200 dark:border-blue-800">
                             <SelectValue placeholder="Pilih Gudang..." />
@@ -205,8 +192,7 @@ export function RequestDialog({ warehouses, availableStocks }: RequestDialogProp
                   variant="outline"
                   size="sm"
                   onClick={() => append({ consumableId: '', quantity: 1 })}
-                  disabled={!selectedWarehouseId}
-                  className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950"
+                  className="border-blue-200 text-blue-600 hover:bg-blue-50"
                 >
                   <Plus className="mr-2 h-3.5 w-3.5" /> Tambah Baris
                 </Button>
@@ -214,100 +200,85 @@ export function RequestDialog({ warehouses, availableStocks }: RequestDialogProp
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {!selectedWarehouseId && (
-                <div className="text-muted-foreground flex h-32 flex-col items-center justify-center rounded-lg border border-dashed text-sm italic">
-                  <Warehouse className="mb-2 h-8 w-8 opacity-50" />
-                  Silakan pilih <strong>Gudang Tujuan</strong> terlebih dahulu.
-                </div>
-              )}
-
               <div className="flex flex-col gap-3">
-                {selectedWarehouseId &&
-                  fields.map((fieldItem, index) => (
-                    <div
-                      key={fieldItem.id}
-                      className="group bg-card text-card-foreground relative flex flex-col items-start gap-4 rounded-lg border p-4 shadow-sm transition-colors hover:border-blue-400 sm:flex-row sm:items-start dark:hover:border-blue-700"
-                    >
-                      <div className="bg-muted text-muted-foreground absolute top-4 -left-2 hidden h-5 w-5 -translate-x-1 items-center justify-center rounded-full text-[10px] font-bold shadow-sm sm:flex">
-                        {index + 1}
-                      </div>
-
-                      <div className="w-full flex-1 space-y-4">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.consumableId`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                                Nama Barang
-                              </FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger className="bg-background">
-                                    <SelectValue placeholder="Pilih item..." />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {filteredItems.length === 0 ? (
-                                    <div className="text-muted-foreground p-2 text-center text-xs">
-                                      Gudang Kosong
-                                    </div>
-                                  ) : (
-                                    filteredItems.map((item) => (
-                                      <SelectItem key={item.consumableId} value={item.consumableId}>
-                                        <span className="font-medium">{item.name}</span>
-                                        <span className="text-muted-foreground ml-2 text-xs">
-                                          ({item.unit})
-                                        </span>
-                                      </SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="flex w-full items-end gap-2 sm:w-auto">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.quantity`}
-                          render={({ field }) => (
-                            <FormItem className="w-full sm:w-28">
-                              <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                                Jumlah
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  className="bg-background text-center font-medium"
-                                  {...field}
-                                  value={(field.value as number) || ''}
-                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground mb-0.5 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-                          onClick={() => remove(index)}
-                          disabled={fields.length === 1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                {fields.map((fieldItem, index) => (
+                  <div
+                    key={fieldItem.id}
+                    className="group bg-card text-card-foreground relative flex flex-col items-start gap-4 rounded-lg border p-4 shadow-sm transition-colors hover:border-blue-400 sm:flex-row sm:items-start"
+                  >
+                    <div className="bg-muted text-muted-foreground absolute top-4 -left-2 hidden h-5 w-5 -translate-x-1 items-center justify-center rounded-full text-[10px] font-bold shadow-sm sm:flex">
+                      {index + 1}
                     </div>
-                  ))}
-                <div className="h-4" />
+
+                    <div className="w-full flex-1 space-y-4">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.consumableId`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
+                              Nama Barang
+                            </FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="bg-background">
+                                  <SelectValue placeholder="Pilih item..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {items.map((item) => (
+                                  <SelectItem key={item.id} value={item.id}>
+                                    <span className="font-medium">{item.name}</span>
+                                    <span className="text-muted-foreground ml-2 text-xs">
+                                      ({item.unit})
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex w-full items-end gap-2 sm:w-auto">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem className="w-full sm:w-28">
+                            <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
+                              Jumlah
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={1}
+                                className="bg-background text-center font-medium"
+                                {...field}
+                                value={(field.value as number) || ''}
+                                onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground mb-0.5 hover:bg-red-50 hover:text-red-600"
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -323,7 +294,7 @@ export function RequestDialog({ warehouses, availableStocks }: RequestDialogProp
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="bg-blue-600 text-white shadow-sm hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700"
+                className="bg-blue-600 text-white shadow-sm hover:bg-blue-700"
               >
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

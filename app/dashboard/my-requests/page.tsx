@@ -1,8 +1,8 @@
-import { asc, eq } from 'drizzle-orm'
+import { asc, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'
-import { consumables, warehouseStocks, warehouses } from '@/db/schema'
+import { consumables, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
@@ -25,7 +25,7 @@ export default async function MyRequestsPage({ searchParams }: PageProps) {
   const page = Number(params.page) || 1
   const limit = 10
 
-  const [requestsData, warehousesList, availableStocks] = await Promise.all([
+  const [requestsData, warehousesList, catalogItems] = await Promise.all([
     getMyRequests(page, limit, query),
 
     db
@@ -38,13 +38,12 @@ export default async function MyRequestsPage({ searchParams }: PageProps) {
 
     db
       .select({
-        consumableId: consumables.id,
-        warehouseId: warehouseStocks.warehouseId,
+        id: consumables.id,
         name: consumables.name,
         unit: consumables.baseUnit,
+        category: sql<string>`'Umum'`,
       })
-      .from(warehouseStocks)
-      .innerJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
+      .from(consumables)
       .orderBy(asc(consumables.name)),
   ])
 
@@ -61,7 +60,7 @@ export default async function MyRequestsPage({ searchParams }: PageProps) {
           </p>
         </div>
 
-        <RequestDialog warehouses={warehousesList} availableStocks={availableStocks} />
+        <RequestDialog warehouses={warehousesList} items={catalogItems} />
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">

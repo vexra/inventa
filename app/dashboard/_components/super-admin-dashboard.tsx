@@ -209,7 +209,6 @@ export async function SuperAdminDashboard({
           </div>
         </TabsContent>
 
-        {/* Tab Consumables & Assets dipertahankan sama seperti kode asli, diringkas di sini */}
         <TabsContent value="consumables" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
