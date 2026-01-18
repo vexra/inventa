@@ -173,7 +173,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Boxes,
         },
         {
-          title: 'Daftar Ruangan',
+          title: 'Ruangan',
           url: '/dashboard/rooms',
           icon: MapPin,
         },
@@ -185,5 +185,64 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
   ],
 
-  faculty_admin: [],
+  faculty_admin: [
+    {
+      title: 'Utama',
+      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+    },
+    {
+      title: 'Otorisasi & Pengadaan',
+      items: [
+        {
+          title: 'Verifikasi Permintaan',
+          url: '/dashboard/requests',
+          icon: ClipboardList,
+        },
+        {
+          title: 'Pengadaan Barang',
+          url: '/dashboard/procurements',
+          icon: ShoppingCart,
+        },
+      ],
+    },
+    {
+      title: 'Aset & Inventaris',
+      items: [
+        {
+          title: 'Aset Tetap',
+          url: '/dashboard/fixed-assets',
+          icon: Layers,
+        },
+        {
+          title: 'Stok Gudang Pusat',
+          url: '/dashboard/warehouse-stocks',
+          icon: Warehouse,
+        },
+        {
+          title: 'Monitoring Unit',
+          url: '/dashboard/unit-stocks',
+          icon: Building2,
+        },
+      ],
+    },
+    {
+      title: 'Organisasi & Lokasi',
+      items: [
+        {
+          title: 'Unit Kerja',
+          url: '/dashboard/units',
+          icon: Users,
+        },
+        {
+          title: 'Ruangan',
+          url: '/dashboard/rooms',
+          icon: MapPin,
+        },
+      ],
+    },
+    {
+      title: 'Akun',
+      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+    },
+  ],
 }

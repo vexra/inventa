@@ -61,16 +61,23 @@ interface RoomData {
 interface UnitOption {
   id: string
   name: string
+  facultyId?: string | null
+}
+
+interface FacultyOption {
+  id: string
+  name: string
 }
 
 interface RoomListProps {
   data: RoomData[]
   units: UnitOption[]
-  isSuperAdmin: boolean // Tambahkan prop ini
+  faculties?: FacultyOption[]
+  showUnitColumn: boolean
+  fixedUnitId?: string
 }
 
 const getTypeBadge = (type: RoomType) => {
-  // ... (kode badge tetap sama seperti sebelumnya)
   switch (type) {
     case 'LABORATORY':
       return (
@@ -99,7 +106,13 @@ const getTypeBadge = (type: RoomType) => {
   }
 }
 
-export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
+export function RoomList({
+  data,
+  units,
+  faculties = [],
+  showUnitColumn,
+  fixedUnitId,
+}: RoomListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -122,7 +135,7 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
               <TableHead>Nama Ruangan</TableHead>
               <TableHead>Tipe</TableHead>
 
-              {isSuperAdmin && <TableHead>Unit / Jurusan</TableHead>}
+              {showUnitColumn && <TableHead>Unit / Jurusan</TableHead>}
 
               <TableHead>QR Token</TableHead>
               <TableHead className="w-20 text-right">Aksi</TableHead>
@@ -131,7 +144,7 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isSuperAdmin ? 5 : 4} className="h-24 text-center">
+                <TableCell colSpan={showUnitColumn ? 5 : 4} className="h-24 text-center">
                   Tidak ada data ruangan.
                 </TableCell>
               </TableRow>
@@ -148,8 +161,7 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
                   </TableCell>
                   <TableCell>{getTypeBadge(item.type)}</TableCell>
 
-                  {/* KONDISIONAL CELL */}
-                  {isSuperAdmin && (
+                  {showUnitColumn && (
                     <TableCell>
                       <div className="text-sm">{item.unitName || '-'}</div>
                     </TableCell>
@@ -207,6 +219,8 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
           onOpenChange={(open) => !open && setEditingId(null)}
           initialData={roomToEdit}
           units={units}
+          faculties={faculties}
+          fixedUnitId={fixedUnitId}
         />
       )}
 
