@@ -10,7 +10,7 @@ import {
   PackageSearch,
 } from 'lucide-react'
 
-import { RequestDialog } from '@/app/dashboard/my-requests/_components/request-dialog'
+import { RequestDialog } from '@/app/dashboard/consumable-requests/_components/request-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {

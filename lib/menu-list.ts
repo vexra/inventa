@@ -3,7 +3,6 @@ import {
   Building,
   Building2,
   ClipboardList,
-  FileCheck,
   FileClock,
   FilePenLine,
   FileText,
@@ -123,8 +122,8 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Layanan Barang',
       items: [
         {
-          title: 'Permintaan Saya',
-          url: '/dashboard/my-requests',
+          title: 'Permintaan Barang',
+          url: '/dashboard/consumable-requests',
           icon: ShoppingCart,
         },
       ],
@@ -156,18 +155,11 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
     },
     {
-      title: 'Verifikasi & Approval',
+      title: 'Manajemen Permintaan',
       items: [
         {
-          // Halaman untuk melihat request status 'PENDING_UNIT'
-          title: 'Persetujuan Request',
-          url: '/dashboard/approvals',
-          icon: FileCheck,
-        },
-        {
-          // History request semua staff di unit ini
-          title: 'Riwayat Permintaan',
-          url: '/dashboard/unit-requests',
+          title: 'Permintaan Barang',
+          url: '/dashboard/consumable-requests',
           icon: ClipboardList,
         },
       ],
@@ -176,13 +168,11 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Monitoring Inventaris',
       items: [
         {
-          // Melihat stok gabungan seluruh ruangan di unit ini
           title: 'Stok per Ruangan',
           url: '/dashboard/unit-stocks',
           icon: Boxes,
         },
         {
-          // Manajemen ruangan (jika admin boleh edit nama/QR ruangan)
           title: 'Daftar Ruangan',
           url: '/dashboard/rooms',
           icon: MapPin,

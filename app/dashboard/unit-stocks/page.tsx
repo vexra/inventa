@@ -64,11 +64,9 @@ export default async function UnitStocksPage({ searchParams }: PageProps) {
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 
-        {data.length === 0 && (
-          <div className="text-muted-foreground py-4 text-center text-sm">
-            {query
-              ? `Tidak ditemukan barang dengan kata kunci "${query}"`
-              : 'Belum ada data stok di unit ini.'}
+        {data.length === 0 && query && (
+          <div className="text-muted-foreground py-10 text-center">
+            Tidak ditemukan barang dengan kata kunci <strong>&quot;{query}&quot;</strong>.
           </div>
         )}
       </div>
