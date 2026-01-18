@@ -17,6 +17,7 @@ const itemSchema = z.object({
 
 const requestSchema = z.object({
   targetWarehouseId: z.string().min(1, 'Pilih gudang tujuan'),
+  roomId: z.string().min(1, 'Pilih ruangan tujuan'),
   notes: z.string().optional(),
   items: z.array(itemSchema).min(1, 'Minimal satu barang harus dipilih'),
 })
@@ -37,19 +38,21 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
   const parsed = requestSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid.' }
 
-  const { targetWarehouseId, notes, items } = parsed.data
+  const { targetWarehouseId, roomId, notes, items } = parsed.data
 
   const initialStatus = session.user.role === 'unit_admin' ? 'PENDING_FACULTY' : 'PENDING_UNIT'
 
   try {
     await db.transaction(async (tx) => {
-      const [userRoom] = await tx
+      const [selectedRoom] = await tx
         .select()
         .from(rooms)
-        .where(eq(rooms.unitId, session.user.unitId!))
+        .where(and(eq(rooms.id, roomId), eq(rooms.unitId, session.user.unitId!)))
         .limit(1)
 
-      if (!userRoom) throw new Error('Ruangan unit belum dikonfigurasi.')
+      if (!selectedRoom) {
+        throw new Error('Ruangan tidak valid atau bukan milik unit Anda.')
+      }
 
       const requestId = randomUUID()
       const code = generateRequestCode()
@@ -81,7 +84,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         id: requestId,
         requestCode: code,
         requesterId: session.user.id,
-        roomId: userRoom.id,
+        roomId: selectedRoom.id,
         targetWarehouseId: targetWarehouseId,
         status: initialStatus,
       })
@@ -101,17 +104,15 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         action: 'CREATE',
         tableName: 'requests',
         recordId: requestId,
-        newValues: { code, items, notes, initialStatus },
+        newValues: { code, items, notes, initialStatus, roomId: selectedRoom.id },
       })
     })
 
-    revalidatePath('/dashboard/request-consumables')
+    revalidatePath('/dashboard/consumable-requests')
     return { success: true, message: 'Permintaan berhasil dikirim.' }
   } catch (error) {
     console.error('Create Request Error:', error)
-
     const errorMessage = error instanceof Error ? error.message : 'Gagal membuat permintaan.'
-
     return { error: errorMessage }
   }
 }
@@ -136,7 +137,7 @@ export async function cancelRequest(requestId: string) {
     }
 
     await db.delete(requests).where(eq(requests.id, requestId))
-    revalidatePath('/dashboard/request-consumables')
+    revalidatePath('/dashboard/consumable-requests')
 
     return { success: true, message: 'Permintaan berhasil dibatalkan.' }
   } catch {

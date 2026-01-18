@@ -2,7 +2,7 @@ import { asc, eq, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'
-import { consumables, warehouseStocks, warehouses } from '@/db/schema'
+import { consumables, rooms, warehouseStocks, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
@@ -21,12 +21,16 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
   const session = await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
   const userRole = session.user.role
 
+  if (!session.user.unitId) {
+    return <div>Error: Akun Anda tidak terhubung dengan Unit Kerja.</div>
+  }
+
   const params = await searchParams
   const query = params.q || ''
   const page = Number(params.page) || 1
   const limit = 10
 
-  const [requestsData, warehousesList, rawStocks] = await Promise.all([
+  const [requestsData, warehousesList, rawStocks, unitRooms] = await Promise.all([
     getConsumableRequests(page, limit, query),
 
     db
@@ -49,6 +53,15 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
       .innerJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
       .where(sql`${warehouseStocks.quantity} > 0`)
       .orderBy(asc(consumables.name)),
+
+    db
+      .select({
+        id: rooms.id,
+        name: rooms.name,
+      })
+      .from(rooms)
+      .where(eq(rooms.unitId, session.user.unitId))
+      .orderBy(asc(rooms.name)),
   ])
 
   const availableStocks = rawStocks.map((stock) => ({
@@ -73,7 +86,7 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
           <p className="text-muted-foreground">{pageDescription}</p>
         </div>
 
-        <RequestDialog warehouses={warehousesList} stocks={availableStocks} />
+        <RequestDialog warehouses={warehousesList} stocks={availableStocks} rooms={unitRooms} />
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">

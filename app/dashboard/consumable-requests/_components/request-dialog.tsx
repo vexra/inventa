@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Control, useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { FileText, Loader2, Plus, ShoppingCart, Trash2, Warehouse } from 'lucide-react'
+import { Building2, FileText, Loader2, Plus, ShoppingCart, Trash2, Warehouse } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -40,6 +40,7 @@ import { createRequest } from '../actions'
 
 const formSchema = z.object({
   targetWarehouseId: z.string().min(1, 'Pilih gudang tujuan'),
+  roomId: z.string().min(1, 'Pilih ruangan tujuan'),
   notes: z.string().optional(),
   items: z
     .array(
@@ -58,6 +59,11 @@ export type WarehouseOption = {
   name: string
 }
 
+export type RoomOption = {
+  id: string
+  name: string
+}
+
 export type StockOption = {
   warehouseId: string
   consumableId: string
@@ -68,6 +74,7 @@ export type StockOption = {
 
 interface RequestDialogProps {
   warehouses: WarehouseOption[]
+  rooms: RoomOption[]
   stocks: StockOption[]
   children?: React.ReactNode
 }
@@ -191,7 +198,12 @@ function RequestItemRow({
   )
 }
 
-export function RequestDialog({ warehouses = [], stocks = [], children }: RequestDialogProps) {
+export function RequestDialog({
+  warehouses = [],
+  stocks = [],
+  rooms = [],
+  children,
+}: RequestDialogProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -199,6 +211,7 @@ export function RequestDialog({ warehouses = [], stocks = [], children }: Reques
     resolver: zodResolver(formSchema),
     defaultValues: {
       targetWarehouseId: '',
+      roomId: '',
       notes: '',
       items: [{ consumableId: '', quantity: 1 }],
     },
@@ -271,19 +284,53 @@ export function RequestDialog({ warehouses = [], stocks = [], children }: Reques
             className="flex flex-1 flex-col overflow-hidden"
           >
             <div className="bg-background z-10 shrink-0 space-y-4 px-6 pt-6 pb-2">
-              <div className="rounded-lg border bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="roomId"
+                  render={({ field }) => (
+                    <FormItem className="w-full">
+                      <FormLabel className="flex items-center gap-2">
+                        <Building2 className="text-muted-foreground h-4 w-4" />
+                        Untuk Ruangan
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Pilih Ruangan..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {rooms.length === 0 ? (
+                            <div className="text-muted-foreground p-2 text-center text-xs">
+                              Unit tidak memiliki ruangan
+                            </div>
+                          ) : (
+                            rooms.map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="targetWarehouseId"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2 font-semibold text-blue-900 dark:text-blue-100">
-                        <Warehouse className="h-4 w-4" />
-                        Pilih Gudang Sumber
+                    <FormItem className="w-full">
+                      <FormLabel className="flex items-center gap-2">
+                        <Warehouse className="text-muted-foreground h-4 w-4" />
+                        Ambil dari Gudang
                       </FormLabel>
                       <Select onValueChange={handleWarehouseChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger className="bg-background border-blue-200 dark:border-blue-800">
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Pilih Gudang..." />
                           </SelectTrigger>
                         </FormControl>
