@@ -19,8 +19,21 @@ interface PageProps {
   }>
 }
 
+type ProcurementItemDetail = {
+  id: string
+  consumableId: string
+  quantity: string
+  unit: string | null
+  consumableName: string | null
+  hasExpiry: boolean | null
+}
+
 export default async function ProcurementPage({ searchParams }: PageProps) {
-  await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
+  const session = await requireAuth({
+    roles: ['warehouse_staff', 'super_admin', 'faculty_admin'],
+  })
+
+  const userRole = session.user.role || ''
 
   const params = await searchParams
   const query = params.q || ''
@@ -35,9 +48,24 @@ export default async function ProcurementPage({ searchParams }: PageProps) {
       id: consumables.id,
       name: consumables.name,
       unit: consumables.baseUnit,
+      hasExpiry: consumables.hasExpiry,
     })
     .from(consumables)
     .orderBy(asc(consumables.name))
+
+  const formattedData = data.map((procurement) => ({
+    ...procurement,
+    items: procurement.items.map((item: ProcurementItemDetail) => ({
+      id: item.id,
+      consumableId: item.consumableId,
+      quantity: item.quantity,
+      unit: item.unit,
+      consumable: {
+        name: item.consumableName || 'Unknown Item',
+        hasExpiry: item.hasExpiry ?? false,
+      },
+    })),
+  }))
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -47,7 +75,9 @@ export default async function ProcurementPage({ searchParams }: PageProps) {
           <p className="text-muted-foreground">Kelola pengajuan restock barang habis pakai.</p>
         </div>
 
-        <ProcurementDialog consumables={consumablesList} />
+        {(userRole === 'warehouse_staff' || userRole === 'super_admin') && (
+          <ProcurementDialog consumables={consumablesList} />
+        )}
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
@@ -58,7 +88,7 @@ export default async function ProcurementPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <ProcurementTable data={data} consumables={consumablesList} />
+        <ProcurementTable data={formattedData} consumables={consumablesList} userRole={userRole} />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 

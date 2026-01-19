@@ -10,7 +10,14 @@ import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { unitSchema } from '@/lib/validations/unit'
 
-async function validateUnitAccess(user: any, targetFacultyId: string) {
+interface SessionUser {
+  id: string
+  role: string
+  facultyId?: string | null
+  [key: string]: unknown
+}
+
+async function validateUnitAccess(user: SessionUser, targetFacultyId: string) {
   if (user.role === 'super_admin') return true
   if (user.role === 'faculty_admin') {
     return user.facultyId === targetFacultyId
@@ -26,7 +33,8 @@ export async function createUnit(data: unknown) {
   const parsed = unitSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
-  const hasAccess = await validateUnitAccess(session.user, parsed.data.facultyId)
+  const hasAccess = await validateUnitAccess(session.user as SessionUser, parsed.data.facultyId)
+
   if (!hasAccess) {
     return { error: 'Anda tidak memiliki izin membuat unit di fakultas ini.' }
   }
@@ -79,7 +87,7 @@ export async function updateUnit(id: string, data: unknown) {
       }
 
       if (parsed.data.facultyId !== oldData.facultyId) {
-        const canMove = await validateUnitAccess(session.user, parsed.data.facultyId)
+        const canMove = await validateUnitAccess(session.user as SessionUser, parsed.data.facultyId)
         if (!canMove) throw new Error('Anda tidak bisa memindahkan unit ke fakultas lain.')
       }
 
@@ -105,9 +113,10 @@ export async function updateUnit(id: string, data: unknown) {
 
     revalidatePath('/dashboard/units')
     return { success: true, message: 'Data unit diperbarui' }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Update unit error:', error)
-    return { error: error.message || 'Gagal memperbarui unit' }
+    const errorMessage = error instanceof Error ? error.message : 'Gagal memperbarui unit'
+    return { error: errorMessage }
   }
 }
 

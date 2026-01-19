@@ -49,7 +49,7 @@ interface PageProps {
 }
 
 export default async function ProcurementDetailPage({ params }: PageProps) {
-  await requireAuth({ roles: ['warehouse_staff', 'super_admin'] })
+  await requireAuth({ roles: ['warehouse_staff', 'super_admin', 'faculty_admin'] })
 
   const { id } = await params
 
@@ -59,7 +59,10 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
       code: procurements.procurementCode,
       status: procurements.status,
       requestDate: procurements.createdAt,
+
+      description: procurements.description,
       notes: procurements.notes,
+
       requesterName: user.name,
       requesterEmail: user.email,
       requesterRole: user.role,
@@ -110,7 +113,9 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">Detail Pengajuan</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {procurement.description || 'Detail Pengajuan'}
+            </h1>
             <StatusBadge status={procurement.status as ProcurementStatus} />
           </div>
           <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
@@ -131,6 +136,18 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {procurement.status === 'REJECTED' && procurement.notes && (
+            <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-200">
+              <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+              <div>
+                <h4 className="text-sm font-semibold">Pengajuan Ditolak</h4>
+                <p className="mt-1 text-sm">
+                  Alasan: <span className="font-medium">{procurement.notes}</span>
+                </p>
+              </div>
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -162,13 +179,13 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
                 </div>
               </div>
 
-              <div className="space-y-1 rounded-md border border-dashed bg-slate-50 p-4 sm:col-span-2 dark:bg-slate-900">
+              <div className="space-y-1 rounded-md border bg-slate-50 p-4 sm:col-span-2 dark:bg-slate-900/50">
                 <div className="text-muted-foreground mb-1 text-sm font-medium">
-                  Catatan / Keperluan:
+                  Deskripsi / Keperluan:
                 </div>
                 <p className="text-sm">
-                  {procurement.notes || (
-                    <span className="text-muted-foreground italic">Tidak ada catatan.</span>
+                  {procurement.description || (
+                    <span className="text-muted-foreground italic">Tidak ada deskripsi.</span>
                   )}
                 </p>
               </div>
@@ -276,7 +293,7 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
                         </div>
 
                         {log.notes && (
-                          <p className="text-muted-foreground bg-muted/50 mt-1 rounded p-2 text-sm">
+                          <p className="text-muted-foreground bg-muted/50 mt-1 rounded p-2 text-sm italic">
                             &quot;{log.notes}&quot;
                           </p>
                         )}
