@@ -51,9 +51,10 @@ type FacultyOption = {
 interface UnitListProps {
   data: UnitWithFaculty[]
   faculties: FacultyOption[]
+  fixedFacultyId?: string
 }
 
-export function UnitList({ data, faculties }: UnitListProps) {
+export function UnitList({ data, faculties, fixedFacultyId }: UnitListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -74,7 +75,7 @@ export function UnitList({ data, faculties }: UnitListProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Nama Unit</TableHead>
-              <TableHead>Fakultas</TableHead>
+              {!fixedFacultyId && <TableHead>Fakultas</TableHead>}
               <TableHead>Deskripsi</TableHead>
               <TableHead className="w-25 text-right">Aksi</TableHead>
             </TableRow>
@@ -82,7 +83,7 @@ export function UnitList({ data, faculties }: UnitListProps) {
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">
+                <TableCell colSpan={!fixedFacultyId ? 4 : 3} className="h-24 text-center">
                   Tidak ada data unit.
                 </TableCell>
               </TableRow>
@@ -95,12 +96,14 @@ export function UnitList({ data, faculties }: UnitListProps) {
                       {item.name}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <GraduationCap className="text-muted-foreground h-4 w-4" />
-                      <span className="text-sm">{item.facultyName || '-'}</span>
-                    </div>
-                  </TableCell>
+                  {!fixedFacultyId && (
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="text-muted-foreground h-4 w-4" />
+                        <span className="text-sm">{item.facultyName || '-'}</span>
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell>
                     {item.description ? (
                       <div className="text-muted-foreground flex items-center gap-2">
@@ -146,6 +149,7 @@ export function UnitList({ data, faculties }: UnitListProps) {
           onOpenChange={(open) => !open && setEditingId(null)}
           initialData={unitToEdit}
           faculties={faculties}
+          fixedFacultyId={fixedFacultyId}
         />
       )}
 
