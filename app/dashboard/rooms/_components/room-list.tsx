@@ -81,25 +81,37 @@ const getTypeBadge = (type: RoomType) => {
   switch (type) {
     case 'LABORATORY':
       return (
-        <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
+        <Badge
+          variant="outline"
+          className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+        >
           <Beaker className="mr-1 h-3 w-3" /> Lab
         </Badge>
       )
     case 'ADMIN_OFFICE':
       return (
-        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+        <Badge
+          variant="outline"
+          className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+        >
           <Armchair className="mr-1 h-3 w-3" /> Kantor
         </Badge>
       )
     case 'WAREHOUSE_UNIT':
       return (
-        <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
+        <Badge
+          variant="outline"
+          className="border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
+        >
           <Package className="mr-1 h-3 w-3" /> Gudang Unit
         </Badge>
       )
     default:
       return (
-        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+        <Badge
+          variant="outline"
+          className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300"
+        >
           <Building2 className="mr-1 h-3 w-3" /> Kelas/Umum
         </Badge>
       )
