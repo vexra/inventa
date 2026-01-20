@@ -86,7 +86,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: PackageCheck,
         },
         {
-          title: 'Permohonan Pengadaan',
+          title: 'Pengadaan Barang',
           url: '/dashboard/procurements',
           icon: FileText,
         },
