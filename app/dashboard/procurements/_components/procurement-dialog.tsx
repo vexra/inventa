@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, FileText, Loader2, Pencil, Plus, ShoppingCart, Trash2 } from 'lucide-react'
@@ -101,7 +101,10 @@ export function ProcurementDialog({
     },
   })
 
-  const currentItems = form.watch('items')
+  const currentItems = useWatch({
+    control: form.control,
+    name: 'items',
+  })
 
   useEffect(() => {
     if (isOpen) {
@@ -235,7 +238,7 @@ export function ProcurementDialog({
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="flex flex-col gap-4">
                 {fields.map((fieldItem, index) => {
-                  const selectedIds = currentItems
+                  const selectedIds = (currentItems || [])
                     .map((item, idx) => (idx !== index ? item.consumableId : null))
                     .filter(Boolean)
 
