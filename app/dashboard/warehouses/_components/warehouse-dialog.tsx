@@ -111,7 +111,6 @@ export function WarehouseDialog({
         </DialogTrigger>
       )}
 
-      {/* Lebarkan dialog agar dropdown panjang muat */}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Tambah Gudang' : 'Edit Gudang'}</DialogTitle>
@@ -120,7 +119,6 @@ export function WarehouseDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* FIELD 1: NAMA */}
             <FormField
               control={form.control}
               name="name"
@@ -135,7 +133,6 @@ export function WarehouseDialog({
               )}
             />
 
-            {/* FIELD 2: TIPE GUDANG */}
             <FormField
               control={form.control}
               name="type"
@@ -144,7 +141,6 @@ export function WarehouseDialog({
                   <FormLabel>Jenis Gudang</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      {/* PERBAIKAN: Tambahkan className="w-full" disini */}
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pilih Jenis" />
                       </SelectTrigger>
@@ -159,7 +155,6 @@ export function WarehouseDialog({
               )}
             />
 
-            {/* FIELD 3: FAKULTAS */}
             <FormField
               control={form.control}
               name="facultyId"
@@ -168,7 +163,6 @@ export function WarehouseDialog({
                   <FormLabel>Milik Fakultas</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                     <FormControl>
-                      {/* PERBAIKAN: Tambahkan className="w-full" disini juga */}
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pilih Fakultas" />
                       </SelectTrigger>
@@ -186,7 +180,6 @@ export function WarehouseDialog({
               )}
             />
 
-            {/* FIELD 4: DESKRIPSI */}
             <FormField
               control={form.control}
               name="description"

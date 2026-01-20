@@ -61,45 +61,70 @@ interface RoomData {
 interface UnitOption {
   id: string
   name: string
+  facultyId?: string | null
+}
+
+interface FacultyOption {
+  id: string
+  name: string
 }
 
 interface RoomListProps {
   data: RoomData[]
   units: UnitOption[]
-  isSuperAdmin: boolean // Tambahkan prop ini
+  faculties?: FacultyOption[]
+  showUnitColumn: boolean
+  fixedUnitId?: string
 }
 
 const getTypeBadge = (type: RoomType) => {
-  // ... (kode badge tetap sama seperti sebelumnya)
   switch (type) {
     case 'LABORATORY':
       return (
-        <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
+        <Badge
+          variant="outline"
+          className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+        >
           <Beaker className="mr-1 h-3 w-3" /> Lab
         </Badge>
       )
     case 'ADMIN_OFFICE':
       return (
-        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+        <Badge
+          variant="outline"
+          className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+        >
           <Armchair className="mr-1 h-3 w-3" /> Kantor
         </Badge>
       )
     case 'WAREHOUSE_UNIT':
       return (
-        <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
+        <Badge
+          variant="outline"
+          className="border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
+        >
           <Package className="mr-1 h-3 w-3" /> Gudang Unit
         </Badge>
       )
     default:
       return (
-        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+        <Badge
+          variant="outline"
+          className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300"
+        >
           <Building2 className="mr-1 h-3 w-3" /> Kelas/Umum
         </Badge>
       )
   }
 }
 
-export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
+export function RoomList({
+  data,
+  units,
+  faculties = [],
+  showUnitColumn,
+  fixedUnitId,
+}: RoomListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -122,7 +147,7 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
               <TableHead>Nama Ruangan</TableHead>
               <TableHead>Tipe</TableHead>
 
-              {isSuperAdmin && <TableHead>Unit / Jurusan</TableHead>}
+              {showUnitColumn && <TableHead>Unit / Jurusan</TableHead>}
 
               <TableHead>QR Token</TableHead>
               <TableHead className="w-20 text-right">Aksi</TableHead>
@@ -131,7 +156,7 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isSuperAdmin ? 5 : 4} className="h-24 text-center">
+                <TableCell colSpan={showUnitColumn ? 5 : 4} className="h-24 text-center">
                   Tidak ada data ruangan.
                 </TableCell>
               </TableRow>
@@ -148,8 +173,7 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
                   </TableCell>
                   <TableCell>{getTypeBadge(item.type)}</TableCell>
 
-                  {/* KONDISIONAL CELL */}
-                  {isSuperAdmin && (
+                  {showUnitColumn && (
                     <TableCell>
                       <div className="text-sm">{item.unitName || '-'}</div>
                     </TableCell>
@@ -207,6 +231,8 @@ export function RoomList({ data, units, isSuperAdmin }: RoomListProps) {
           onOpenChange={(open) => !open && setEditingId(null)}
           initialData={roomToEdit}
           units={units}
+          faculties={faculties}
+          fixedUnitId={fixedUnitId}
         />
       )}
 

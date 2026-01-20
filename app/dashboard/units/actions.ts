@@ -10,13 +10,34 @@ import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { unitSchema } from '@/lib/validations/unit'
 
+interface SessionUser {
+  id: string
+  role: string
+  facultyId?: string | null
+  [key: string]: unknown
+}
+
+async function validateUnitAccess(user: SessionUser, targetFacultyId: string) {
+  if (user.role === 'super_admin') return true
+  if (user.role === 'faculty_admin') {
+    return user.facultyId === targetFacultyId
+  }
+  return false
+}
+
 export async function createUnit(data: unknown) {
   const session = await requireAuth({
-    roles: ['super_admin'],
+    roles: ['super_admin', 'faculty_admin'],
   })
 
   const parsed = unitSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
+
+  const hasAccess = await validateUnitAccess(session.user as SessionUser, parsed.data.facultyId)
+
+  if (!hasAccess) {
+    return { error: 'Anda tidak memiliki izin membuat unit di fakultas ini.' }
+  }
 
   const newUnitId = randomUUID()
 
@@ -49,7 +70,7 @@ export async function createUnit(data: unknown) {
 
 export async function updateUnit(id: string, data: unknown) {
   const session = await requireAuth({
-    roles: ['super_admin'],
+    roles: ['super_admin', 'faculty_admin'],
   })
 
   const parsed = unitSchema.safeParse(data)
@@ -60,6 +81,15 @@ export async function updateUnit(id: string, data: unknown) {
       const [oldData] = await tx.select().from(units).where(eq(units.id, id)).limit(1)
 
       if (!oldData) throw new Error('Unit not found')
+
+      if (session.user.role === 'faculty_admin' && oldData.facultyId !== session.user.facultyId) {
+        throw new Error('Unauthorized access')
+      }
+
+      if (parsed.data.facultyId !== oldData.facultyId) {
+        const canMove = await validateUnitAccess(session.user as SessionUser, parsed.data.facultyId)
+        if (!canMove) throw new Error('Anda tidak bisa memindahkan unit ke fakultas lain.')
+      }
 
       await tx
         .update(units)
@@ -85,13 +115,14 @@ export async function updateUnit(id: string, data: unknown) {
     return { success: true, message: 'Data unit diperbarui' }
   } catch (error) {
     console.error('Update unit error:', error)
-    return { error: 'Gagal memperbarui unit' }
+    const errorMessage = error instanceof Error ? error.message : 'Gagal memperbarui unit'
+    return { error: errorMessage }
   }
 }
 
 export async function deleteUnit(id: string) {
   const session = await requireAuth({
-    roles: ['super_admin'],
+    roles: ['super_admin', 'faculty_admin'],
   })
 
   try {
@@ -99,6 +130,10 @@ export async function deleteUnit(id: string) {
       const [oldData] = await tx.select().from(units).where(eq(units.id, id)).limit(1)
 
       if (!oldData) throw new Error('Unit not found')
+
+      if (session.user.role === 'faculty_admin' && oldData.facultyId !== session.user.facultyId) {
+        throw new Error('Unauthorized delete')
+      }
 
       await tx.delete(units).where(eq(units.id, id))
 
@@ -115,14 +150,13 @@ export async function deleteUnit(id: string) {
     revalidatePath('/dashboard/units')
     return { success: true, message: 'Unit dihapus' }
   } catch (error) {
-    const dbError = error as { code?: string }
+    const dbError = error as { code?: string; message?: string }
 
-    // Error handling spesifik database (Postgres Error Code 23503: Foreign Key Violation)
     if (dbError.code === '23503') {
       return {
         error: 'Gagal hapus: Unit ini masih memiliki User atau Aset aktif.',
       }
     }
-    return { error: 'Gagal menghapus unit' }
+    return { error: dbError.message || 'Gagal menghapus unit' }
   }
 }

@@ -10,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 
 /**
@@ -304,7 +305,9 @@ export const warehouseStocks = pgTable(
 
     quantity: decimal('quantity', { precision: 10, scale: 2 }).default('0'),
 
-    // Tracking Batch & Kadaluarsa (Critical untuk Gudang Kimia)
+    // Tracking Batch & Kadaluarsa
+    // Batch number tetap boleh NULL (secara database),
+    // tapi logic aplikasi (Action) akan mengisinya dengan '-' jika kosong.
     batchNumber: text('batch_number'),
     expiryDate: timestamp('expiry_date'),
 
@@ -313,7 +316,11 @@ export const warehouseStocks = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    index('ws_wh_item_idx').on(table.warehouseId, table.consumableId),
+    uniqueIndex('unique_stock_batch_idx').on(
+      table.warehouseId,
+      table.consumableId,
+      table.batchNumber,
+    ),
     index('ws_expiry_idx').on(table.expiryDate),
   ],
 )
@@ -462,10 +469,12 @@ export const procurements = pgTable('procurements', {
     .notNull()
     .references(() => user.id), // Admin pembuat PO
 
+  warehouseId: text('warehouse_id').references(() => warehouses.id),
   status: procurementStatusEnum('status').default('PENDING'),
+  description: text('description'), // Diisi User: "Pengadaan Semester Ganjil"
   supplier: text('supplier'), // Nama Vendor
   proofDocument: text('proof_document'), // URL Faktur/Surat Jalan
-  notes: text('notes'),
+  notes: text('notes'), // Diisi Admin: Alasan Penolakan
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at')
@@ -758,6 +767,7 @@ export const requestItemsRelations = relations(requestItems, ({ one }) => ({
 // --- PROCUREMENT ---
 export const procurementsRelations = relations(procurements, ({ one, many }) => ({
   user: one(user, { fields: [procurements.userId], references: [user.id] }),
+  warehouse: one(warehouses, { fields: [procurements.warehouseId], references: [warehouses.id] }),
   consumables: many(procurementConsumables),
   assets: many(procurementAssets),
   timelines: many(procurementTimelines),

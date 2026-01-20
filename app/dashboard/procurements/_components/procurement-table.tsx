@@ -6,7 +6,17 @@ import Link from 'next/link'
 
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import { Calendar, Eye, MoreHorizontal, PackageCheck, Pencil, Trash2 } from 'lucide-react'
+import {
+  AlertCircle,
+  Calendar,
+  Check,
+  Eye,
+  MoreHorizontal,
+  PackageCheck,
+  Pencil,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -21,6 +31,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,9 +54,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { procurementStatusEnum } from '@/db/schema'
 
-import { deleteProcurement } from '../actions'
+import { deleteProcurement, verifyProcurement } from '../actions'
 import { ProcurementDialog } from './procurement-dialog'
 import { ReceiveDialog } from './receive-dialog'
 
@@ -50,14 +68,18 @@ interface ProcurementData {
   code: string
   status: string | null
   requestDate: Date | null
+  description: string | null
   notes: string | null
   requester: { name: string | null } | null
   items: {
     id: string
     consumableId: string
-    consumableName: string | null
     unit: string | null
     quantity: string | number
+    consumable: {
+      name: string
+      hasExpiry: boolean
+    }
   }[]
 }
 
@@ -65,27 +87,30 @@ interface ConsumableOption {
   id: string
   name: string
   unit: string
+  hasExpiry: boolean
 }
 
 interface ProcurementTableProps {
   data: ProcurementData[]
   consumables: ConsumableOption[]
+  userRole: string
 }
 
-export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
+export function ProcurementTable({ data, consumables, userRole }: ProcurementTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-
   const [receivingId, setReceivingId] = useState<string | null>(null)
+  const [rejectId, setRejectId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [isRejectLoading, setIsRejectLoading] = useState(false)
 
   const itemToEdit = data.find((item) => item.id === editingId)
-
   const itemToReceive = data.find((item) => item.id === receivingId)
+  const showRequesterColumn = userRole === 'faculty_admin' || userRole === 'super_admin'
 
   const handleDelete = async () => {
     if (!deletingId) return
     const toastId = toast.loading('Membatalkan pengajuan...')
-
     try {
       const result = await deleteProcurement(deletingId)
       if (result.success) {
@@ -100,37 +125,89 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
     }
   }
 
+  const handleApprove = async (id: string) => {
+    const toastId = toast.loading('Memproses persetujuan...')
+    try {
+      const res = await verifyProcurement(id, 'APPROVED')
+      if (res.error) toast.error(res.error, { id: toastId })
+      else toast.success(res.message, { id: toastId })
+    } catch {
+      toast.error('Gagal memproses', { id: toastId })
+    }
+  }
+
+  const handleRejectSubmit = async () => {
+    if (!rejectId) return
+    if (!rejectReason.trim()) {
+      toast.error('Alasan penolakan wajib diisi')
+      return
+    }
+    setIsRejectLoading(true)
+    const toastId = toast.loading('Menolak pengajuan...')
+    try {
+      const res = await verifyProcurement(rejectId, 'REJECTED', rejectReason)
+      if (res.error) {
+        toast.error(res.error, { id: toastId })
+      } else {
+        toast.success(res.message, { id: toastId })
+        setRejectId(null)
+        setRejectReason('')
+      }
+    } catch {
+      toast.error('Gagal memproses', { id: toastId })
+    } finally {
+      setIsRejectLoading(false)
+    }
+  }
+
   return (
     <>
       <div className="bg-card text-card-foreground rounded-md border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12.5">#</TableHead>
-              <TableHead>Kode & Status</TableHead>
-              <TableHead>Tanggal Pengajuan</TableHead>
-              <TableHead>Diajukan Oleh</TableHead>
+              <TableHead className="w-10 text-center">#</TableHead>
+              <TableHead className="min-w-50">Pengajuan</TableHead>
+              <TableHead className="w-45">Status</TableHead>
+              <TableHead>Tanggal</TableHead>
+              {showRequesterColumn && <TableHead>Diajukan Oleh</TableHead>}
               <TableHead className="text-center">Total Item</TableHead>
-              <TableHead className="w-12.5"></TableHead>
+              <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground h-24 text-center">
+                <TableCell
+                  colSpan={showRequesterColumn ? 7 : 6}
+                  className="text-muted-foreground h-24 text-center"
+                >
                   Belum ada pengajuan pengadaan.
                 </TableCell>
               </TableRow>
             ) : (
               data.map((item, index) => (
                 <TableRow key={item.id}>
-                  <TableCell>{index + 1}</TableCell>
+                  <TableCell className="text-center">{index + 1}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
-                      <span className="font-mono font-medium">{item.code}</span>
-                      <div className="flex">
-                        <StatusBadge status={item.status as ProcurementStatus} />
-                      </div>
+                      <span className="line-clamp-2 text-sm font-semibold">
+                        {item.description || 'Tanpa Judul'}
+                      </span>
+                      <span className="text-muted-foreground font-mono text-xs">{item.code}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col items-start gap-1.5">
+                      <StatusBadge status={item.status as ProcurementStatus} />
+                      {item.status === 'REJECTED' && item.notes && (
+                        <div className="flex items-center gap-1.5 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700 dark:bg-red-900/20 dark:text-red-300">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          <span className="max-w-37.5 truncate" title={item.notes}>
+                            {item.notes}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -145,23 +222,26 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{item.requester?.name || '-'}</span>
-                      <span className="text-muted-foreground text-xs">Staff Gudang</span>
-                    </div>
-                  </TableCell>
+                  {showRequesterColumn && (
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{item.requester?.name || '-'}</span>
+                        <span className="text-muted-foreground text-xs">Staff Gudang</span>
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell className="text-center">
                     <Badge variant="secondary" className="font-mono">
                       {item.items.length} Barang
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="text-muted-foreground hover:text-primary h-8 w-8 p-0"
+                          size="icon"
+                          className="text-muted-foreground hover:text-primary h-8 w-8"
                         >
                           <span className="sr-only">Open menu</span>
                           <MoreHorizontal className="h-4 w-4" />
@@ -177,14 +257,37 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
                             <Eye className="mr-2 h-4 w-4" /> Lihat Detail
                           </Link>
                         </DropdownMenuItem>
-
-                        {item.status === 'APPROVED' && (
-                          <DropdownMenuItem onClick={() => setReceivingId(item.id)}>
-                            <PackageCheck className="mr-2 h-4 w-4" /> Terima Barang
-                          </DropdownMenuItem>
-                        )}
-
-                        {item.status === 'PENDING' && (
+                        {(userRole === 'faculty_admin' || userRole === 'super_admin') &&
+                          item.status === 'PENDING' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleApprove(item.id)}
+                                className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:focus:bg-green-900/20"
+                              >
+                                <Check className="mr-2 h-4 w-4" /> Setujui
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setRejectId(item.id)}
+                                className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
+                              >
+                                <X className="mr-2 h-4 w-4" /> Tolak
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        {(userRole === 'warehouse_staff' || userRole === 'super_admin') &&
+                          item.status === 'APPROVED' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setReceivingId(item.id)}
+                                className="text-blue-600 focus:bg-blue-50 focus:text-blue-700 dark:focus:bg-blue-900/20"
+                              >
+                                <PackageCheck className="mr-2 h-4 w-4" /> Terima Barang
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        {item.status === 'PENDING' && userRole === 'warehouse_staff' && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => setEditingId(item.id)}>
@@ -192,13 +295,25 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => setDeletingId(item.id)}
-                              className="text-red-600 focus:text-red-600"
+                              className="text-red-600 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-900/20"
                             >
                               <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" />{' '}
-                              Batalkan
+                              Hapus
                             </DropdownMenuItem>
                           </>
                         )}
+                        {(userRole === 'warehouse_staff' || userRole === 'super_admin') &&
+                          item.status === 'REJECTED' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setEditingId(item.id)}
+                                className="text-orange-600 focus:bg-orange-50 focus:text-orange-700 dark:focus:bg-orange-900/20"
+                              >
+                                <Pencil className="mr-2 h-4 w-4" /> Perbaiki Pengajuan
+                              </DropdownMenuItem>
+                            </>
+                          )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -224,6 +339,9 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
           onOpenChange={(open) => !open && setEditingId(null)}
           initialData={{
             ...itemToEdit,
+            description: itemToEdit.description,
+            notes: itemToEdit.notes,
+            status: itemToEdit.status || 'PENDING',
             items: itemToEdit.items.map((i) => ({
               consumableId: i.consumableId,
               quantity: Number(i.quantity),
@@ -232,6 +350,37 @@ export function ProcurementTable({ data, consumables }: ProcurementTableProps) {
           trigger={<span className="hidden"></span>}
         />
       )}
+
+      <Dialog open={!!rejectId} onOpenChange={(open) => !open && setRejectId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tolak Pengajuan</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-muted-foreground mb-2 block text-sm">
+              Alasan Penolakan (Wajib diisi):
+            </label>
+            <Textarea
+              placeholder="Contoh: Anggaran tidak mencukupi, harap kurangi jumlah barang..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="min-h-25"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectId(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectSubmit}
+              disabled={!rejectReason.trim() || isRejectLoading}
+            >
+              {isRejectLoading ? 'Memproses...' : 'Tolak Pengajuan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
@@ -275,7 +424,7 @@ const STATUS_CONFIG: Record<ProcurementStatus, { label: string; className: strin
   COMPLETED: {
     label: 'Selesai',
     className:
-      'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+      'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
   },
 }
 

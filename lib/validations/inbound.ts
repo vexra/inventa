@@ -2,26 +2,40 @@ import { z } from 'zod'
 
 import { receiptConditionEnum } from '@/db/schema'
 
-export const receiptItemSchema = z.object({
-  itemId: z.string().min(1, 'ID Item diperlukan'),
-  consumableId: z.string().min(1, 'ID Barang diperlukan'),
-
-  quantity: z.coerce
-    .number({ error: 'Jumlah harus berupa angka' })
-    .min(0.01, 'Jumlah diterima harus lebih dari 0'),
-
-  condition: z.enum(receiptConditionEnum.enumValues, {
-    error: 'Pilih kondisi barang',
-  }),
-
+const goodsReceiptItemSchema = z.object({
+  itemId: z.string(),
+  consumableId: z.string(),
+  quantity: z.number().min(0.1, 'Jumlah diterima harus lebih dari 0'),
+  hasExpiry: z.boolean(),
   batchNumber: z.string().optional(),
-  expiryDate: z.string().optional(),
+  expiryDate: z.string().optional().nullable(),
+  condition: z.enum(receiptConditionEnum.enumValues),
   notes: z.string().optional(),
 })
 
 export const goodsReceiptSchema = z.object({
-  procurementId: z.string().min(1, 'ID Pengadaan tidak valid'),
-  items: z.array(receiptItemSchema).min(1, 'Minimal satu barang harus diproses'),
+  procurementId: z.string(),
+  items: z.array(goodsReceiptItemSchema).superRefine((items, ctx) => {
+    items.forEach((item, index) => {
+      if (item.hasExpiry) {
+        if (!item.expiryDate) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Tanggal kadaluarsa wajib diisi',
+            path: [index, 'expiryDate'],
+          })
+        }
+
+        if (!item.batchNumber || item.batchNumber.trim() === '') {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'No. Batch wajib diisi untuk barang ini',
+            path: [index, 'batchNumber'],
+          })
+        }
+      }
+    })
+  }),
 })
 
 export type GoodsReceiptFormValues = z.infer<typeof goodsReceiptSchema>

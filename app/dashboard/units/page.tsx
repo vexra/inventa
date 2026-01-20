@@ -1,4 +1,4 @@
-import { asc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, asc, eq, ilike, or, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'
@@ -19,16 +19,25 @@ interface PageProps {
 }
 
 export default async function UnitsPage({ searchParams }: PageProps) {
-  await requireAuth({ roles: ['super_admin'] })
+  const session = await requireAuth({ roles: ['super_admin', 'faculty_admin'] })
+
+  const { role, facultyId } = session.user
+  const isSuperAdmin = role === 'super_admin'
+
+  const fixedFacultyId = role === 'faculty_admin' ? facultyId! : undefined
 
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
 
-  const searchCondition = query
+  const textSearch = query
     ? or(ilike(units.name, `%${query}%`), ilike(units.description, `%${query}%`))
     : undefined
+
+  const roleFilter = !isSuperAdmin ? eq(units.facultyId, facultyId!) : undefined
+
+  const searchCondition = and(textSearch, roleFilter)
 
   const dataPromise = db
     .select({
@@ -50,13 +59,15 @@ export default async function UnitsPage({ searchParams }: PageProps) {
     .from(units)
     .where(searchCondition)
 
-  const facultiesPromise = db
-    .select({
-      id: faculties.id,
-      name: faculties.name,
-    })
-    .from(faculties)
-    .orderBy(asc(faculties.name))
+  const facultiesPromise = isSuperAdmin
+    ? db
+        .select({
+          id: faculties.id,
+          name: faculties.name,
+        })
+        .from(faculties)
+        .orderBy(asc(faculties.name))
+    : Promise.resolve([])
 
   const [data, countResult, facultiesList] = await Promise.all([
     dataPromise,
@@ -75,7 +86,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
           <p className="text-muted-foreground">Kelola daftar unit kerja dan departemen</p>
         </div>
 
-        <UnitDialog mode="create" faculties={facultiesList} />
+        <UnitDialog mode="create" faculties={facultiesList} fixedFacultyId={fixedFacultyId} />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
@@ -83,7 +94,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <UnitList data={data} faculties={facultiesList} />
+        <UnitList data={data} faculties={facultiesList} fixedFacultyId={fixedFacultyId} />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
 

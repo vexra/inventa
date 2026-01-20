@@ -2,7 +2,7 @@ import { and, asc, eq, ilike, or, sql } from 'drizzle-orm'
 
 import { PaginationControls } from '@/components/shared/pagination-controls'
 import { SearchInput } from '@/components/shared/search-input'
-import { rooms, units } from '@/db/schema'
+import { faculties, rooms, units } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
@@ -20,12 +20,15 @@ interface PageProps {
 
 export default async function RoomsPage({ searchParams }: PageProps) {
   const session = await requireAuth({
-    roles: ['super_admin', 'unit_admin'],
+    roles: ['super_admin', 'unit_admin', 'faculty_admin'],
   })
 
-  const userRole = session.user.role
-  const userUnitId = session.user.unitId
-  const isSuperAdmin = userRole === 'super_admin'
+  const { role, unitId, facultyId } = session.user
+
+  const isUnitAdmin = role === 'unit_admin'
+  const isSuperAdmin = role === 'super_admin'
+
+  const fixedUnitId = isUnitAdmin ? unitId! : undefined
 
   const params = await searchParams
   const query = params.q || ''
@@ -40,8 +43,16 @@ export default async function RoomsPage({ searchParams }: PageProps) {
       )
     : undefined
 
-  // Jika bukan Super Admin, WAJIB filter berdasarkan unitId user tersebut
-  const roleFilter = !isSuperAdmin && userUnitId ? eq(rooms.unitId, userUnitId) : undefined
+  let roleFilter
+  let unitsCondition
+
+  if (role === 'unit_admin') {
+    roleFilter = eq(rooms.unitId, unitId!)
+    unitsCondition = eq(units.id, unitId!)
+  } else if (role === 'faculty_admin') {
+    roleFilter = eq(units.facultyId, facultyId!)
+    unitsCondition = eq(units.facultyId, facultyId!)
+  }
 
   const finalCondition = and(textSearch, roleFilter)
 
@@ -68,26 +79,33 @@ export default async function RoomsPage({ searchParams }: PageProps) {
     .leftJoin(units, eq(rooms.unitId, units.id))
     .where(finalCondition)
 
-  // Jika Unit Admin, opsi unit di dropdown create/edit HANYA unit dia sendiri
-  const unitsCondition = !isSuperAdmin && userUnitId ? eq(units.id, userUnitId) : undefined
-
   const unitsPromise = db
     .select({
       id: units.id,
       name: units.name,
+      facultyId: units.facultyId,
     })
     .from(units)
     .where(unitsCondition)
     .orderBy(asc(units.name))
 
-  const [data, countResult, unitsList] = await Promise.all([
+  const facultiesPromise = isSuperAdmin
+    ? db
+        .select({ id: faculties.id, name: faculties.name })
+        .from(faculties)
+        .orderBy(asc(faculties.name))
+    : Promise.resolve([])
+
+  const [data, countResult, unitsList, facultiesList] = await Promise.all([
     dataPromise,
     countPromise,
     unitsPromise,
+    facultiesPromise,
   ])
 
   const totalItems = Number(countResult[0]?.count || 0)
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+  const showUnitColumn = role === 'super_admin' || role === 'faculty_admin'
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -99,7 +117,12 @@ export default async function RoomsPage({ searchParams }: PageProps) {
           </p>
         </div>
 
-        <RoomDialog mode="create" units={unitsList} />
+        <RoomDialog
+          mode="create"
+          units={unitsList}
+          faculties={facultiesList}
+          fixedUnitId={fixedUnitId}
+        />
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
@@ -107,15 +130,15 @@ export default async function RoomsPage({ searchParams }: PageProps) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <RoomList data={data} units={unitsList} isSuperAdmin={isSuperAdmin} />
+        <RoomList
+          data={data}
+          units={unitsList}
+          faculties={facultiesList}
+          showUnitColumn={showUnitColumn}
+          fixedUnitId={fixedUnitId}
+        />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-
-        {data.length === 0 && query && (
-          <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan ruangan dengan kata kunci <strong>&quot;{query}&quot;</strong>.
-          </div>
-        )}
       </div>
     </div>
   )

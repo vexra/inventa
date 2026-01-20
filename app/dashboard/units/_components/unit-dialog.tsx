@@ -53,6 +53,7 @@ interface UnitDialogProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   faculties: FacultyOption[]
+  fixedFacultyId?: string
 }
 
 export function UnitDialog({
@@ -61,6 +62,7 @@ export function UnitDialog({
   open,
   onOpenChange,
   faculties = [],
+  fixedFacultyId,
 }: UnitDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const isControlled = open !== undefined
@@ -72,7 +74,7 @@ export function UnitDialog({
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
-      facultyId: initialData?.facultyId || '',
+      facultyId: initialData?.facultyId || fixedFacultyId || '',
     },
   })
 
@@ -80,11 +82,16 @@ export function UnitDialog({
 
   async function onSubmit(data: UnitFormValues) {
     try {
+      const payload = {
+        ...data,
+        facultyId: fixedFacultyId || data.facultyId,
+      }
+
       let result
       if (mode === 'create') {
-        result = await createUnit(data)
+        result = await createUnit(payload)
       } else if (initialData?.id) {
-        result = await updateUnit(initialData.id, data)
+        result = await updateUnit(initialData.id, payload)
       }
 
       if (result?.error) {
@@ -117,34 +124,38 @@ export function UnitDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="facultyId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fakultas Induk</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={mode === 'edit'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih Fakultas..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {faculties.map((faculty) => (
-                        <SelectItem key={faculty.id} value={faculty.id}>
-                          {faculty.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {fixedFacultyId ? (
+              <input type="hidden" {...form.register('facultyId')} value={fixedFacultyId} />
+            ) : (
+              <FormField
+                control={form.control}
+                name="facultyId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fakultas Induk</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      disabled={mode === 'edit'}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Pilih Fakultas..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {faculties.map((faculty) => (
+                          <SelectItem key={faculty.id} value={faculty.id}>
+                            {faculty.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

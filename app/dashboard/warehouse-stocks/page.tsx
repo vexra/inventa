@@ -5,14 +5,14 @@ import { SearchInput } from '@/components/shared/search-input'
 import { requireAuth } from '@/lib/auth-guard'
 
 import { StockFilter } from './_components/stock-filter'
-import { StockTable } from './_components/stock-table'
+import { StockTable } from './_components/stok-table'
 import { getWarehouseStocks } from './actions'
 
 interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
-    status?: 'all' | 'low' | 'out'
+    status?: string
   }>
 }
 
@@ -37,7 +37,12 @@ export default async function WarehouseStocksPage({ searchParams }: PageProps) {
   const params = await searchParams
   const query = params.q || ''
   const page = Number(params.page) || 1
-  const statusFilter = params.status || 'all'
+
+  const rawStatus = params.status
+  const statusFilter = (['all', 'low', 'out'].includes(rawStatus || '') ? rawStatus : 'all') as
+    | 'all'
+    | 'low'
+    | 'out'
 
   const result = await getWarehouseStocks(page, 10, query, statusFilter)
 
@@ -53,14 +58,6 @@ export default async function WarehouseStocksPage({ searchParams }: PageProps) {
 
   const { data, metadata } = result
 
-  const formattedData = data.map((item) => ({
-    ...item,
-    sku: item.sku || '-',
-    category: item.category || '-',
-    minimumStock: item.minimumStock,
-    updatedAt: item.updatedAt ? item.updatedAt.toISOString() : null,
-  }))
-
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -75,7 +72,7 @@ export default async function WarehouseStocksPage({ searchParams }: PageProps) {
         <StockFilter currentFilter={statusFilter} />
       </div>
 
-      <StockTable data={formattedData} />
+      <StockTable data={data} />
 
       {metadata.totalPages > 1 && <PaginationControls totalPages={metadata.totalPages} />}
     </div>

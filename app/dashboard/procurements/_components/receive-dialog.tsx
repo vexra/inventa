@@ -4,11 +4,14 @@ import { useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CalendarIcon, Loader2 } from 'lucide-react'
+import { format } from 'date-fns'
+import { id as idLocale } from 'date-fns/locale'
+import { CalendarIcon, Loader2, PackageCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +29,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -34,33 +38,32 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { receiptConditionEnum } from '@/db/schema'
+import { cn } from '@/lib/utils'
 import { type GoodsReceiptFormValues, goodsReceiptSchema } from '@/lib/validations/inbound'
 
 import { processGoodsReceipt } from '../actions'
 
-const CONDITION_LABELS: Record<(typeof receiptConditionEnum.enumValues)[number], string> = {
+const CONDITION_LABELS: Record<string, string> = {
   GOOD: '✅ Baik / Lengkap',
   DAMAGED: '❌ Rusak / Cacat',
   INCOMPLETE: '⚠️ Tidak Lengkap',
 }
 
-const CONDITION_COLORS: Record<
-  (typeof receiptConditionEnum.enumValues)[number],
-  'default' | 'destructive' | 'secondary'
-> = {
-  GOOD: 'default',
-  DAMAGED: 'destructive',
-  INCOMPLETE: 'secondary',
+const CONDITION_STYLES: Record<string, string> = {
+  GOOD: 'bg-green-600 hover:bg-green-700 text-white border-transparent',
+  DAMAGED: 'bg-red-600 hover:bg-red-700 text-white border-transparent',
+  INCOMPLETE: 'bg-orange-500 hover:bg-orange-600 text-white border-transparent',
 }
 
-// --- PERBAIKAN TIPE DATA DI SINI ---
 interface ProcurementItem {
   id: string
   consumableId: string
-  consumableName: string | null
-  unit: string | null
   quantity: string | number
+  unit: string | null
+  consumable: {
+    name: string
+    hasExpiry: boolean
+  }
 }
 
 interface ReceiveDialogProps {
@@ -69,7 +72,6 @@ interface ReceiveDialogProps {
     code: string
     items: ProcurementItem[]
   }
-  // Props wajib untuk Controlled Component
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -77,7 +79,7 @@ interface ReceiveDialogProps {
 export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
 
-  const form = useForm({
+  const form = useForm<GoodsReceiptFormValues>({
     resolver: zodResolver(goodsReceiptSchema),
     defaultValues: {
       procurementId: procurement.id,
@@ -85,7 +87,8 @@ export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialog
         itemId: item.id,
         consumableId: item.consumableId,
         quantity: Number(item.quantity),
-        condition: receiptConditionEnum.enumValues[0],
+        hasExpiry: item.consumable.hasExpiry,
+        condition: 'GOOD',
         batchNumber: '',
         expiryDate: '',
         notes: '',
@@ -102,7 +105,6 @@ export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialog
     setIsLoading(true)
     try {
       const res = await processGoodsReceipt(values)
-
       if (res.error) {
         toast.error(res.error)
       } else {
@@ -110,77 +112,94 @@ export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialog
         onOpenChange(false)
       }
     } catch {
-      toast.error('Terjadi kesalahan sistem saat memproses penerimaan.')
+      toast.error('Terjadi kesalahan sistem')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    // Menggunakan open & onOpenChange dari props, bukan state internal
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Penerimaan Barang: {procurement.code}</DialogTitle>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader className="bg-background z-10 border-b px-6 py-4">
+          <DialogTitle className="flex items-center gap-2">
+            <PackageCheck className="h-5 w-5 text-blue-600" />
+            Penerimaan Barang: {procurement.code}
+          </DialogTitle>
           <DialogDescription>
-            Lakukan pengecekan fisik (QC). Input No. Batch dan Tanggal Kadaluarsa (jika ada).
+            Lakukan pengecekan fisik. Item bertanda (<span className="text-red-500">*</span>) wajib
+            memiliki data lengkap.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-4">
-              {fields.map((field, index) => {
-                const originalItem = procurement.items.find((i) => i.id === field.itemId)
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex flex-1 flex-col overflow-hidden"
+          >
+            <div className="flex-1 overflow-y-auto bg-slate-50/50 px-6 py-6 dark:bg-slate-900/10">
+              <div className="space-y-6">
+                {fields.map((field, index) => {
+                  const originalItem = procurement.items.find((i) => i.id === field.itemId)
+                  const currentCondition = form.watch(`items.${index}.condition`) as string
 
-                // Watch nilai kondisi untuk update badge warna secara realtime
-                const currentCondition = form.watch(`items.${index}.condition`)
+                  const isExpiryRequired = form.watch(`items.${index}.hasExpiry`)
 
-                return (
-                  <div
-                    key={field.id}
-                    className="rounded-lg border bg-slate-50 p-4 dark:bg-slate-900/50"
-                  >
-                    {/* Header Card Item */}
-                    <div className="mb-3 flex items-start justify-between">
-                      <div>
-                        <h4 className="text-foreground text-sm font-bold">
-                          {index + 1}. {originalItem?.consumableName || 'Unknown Item'}
-                        </h4>
-                        <span className="text-muted-foreground text-xs">
-                          Order Qty:{' '}
-                          <span className="font-mono font-medium">{originalItem?.quantity}</span>{' '}
-                          {originalItem?.unit}
-                        </span>
+                  const expiryError = form.formState.errors.items?.[index]?.expiryDate
+                  const batchError = form.formState.errors.items?.[index]?.batchNumber
+
+                  return (
+                    <div
+                      key={field.id}
+                      className="bg-background rounded-lg border p-4 shadow-sm transition-all hover:border-blue-300"
+                    >
+                      <div className="mb-4 flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              {index + 1}
+                            </span>
+                            <h4 className="text-foreground text-sm font-bold">
+                              {originalItem?.consumable.name || 'Unknown Item'}
+                            </h4>
+                          </div>
+                          <div className="text-muted-foreground mt-1 ml-8 text-xs">
+                            Pesanan:{' '}
+                            <span className="text-foreground font-mono font-medium">
+                              {originalItem?.quantity}
+                            </span>{' '}
+                            {originalItem?.unit}
+                          </div>
+                        </div>
+
+                        <Badge
+                          className={`px-3 py-1 text-xs font-medium ${CONDITION_STYLES[currentCondition]}`}
+                        >
+                          {CONDITION_LABELS[currentCondition]}
+                        </Badge>
                       </div>
-                      <Badge variant={CONDITION_COLORS[currentCondition] ?? 'outline'}>
-                        {currentCondition}
-                      </Badge>
-                    </div>
 
-                    <Separator className="mb-4" />
+                      <Separator className="mb-4 opacity-50" />
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-                      {/* 1. Kondisi Fisik (Dynamic Select) */}
-                      <div className="md:col-span-3">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <FormField
                           control={form.control}
                           name={`items.${index}.condition`}
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-muted-foreground text-[10px] font-bold uppercase">
-                                Kondisi (QC)
+                                Kondisi Fisik
                               </FormLabel>
                               <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
-                                  <SelectTrigger className="bg-background h-9">
-                                    <SelectValue placeholder="Pilih" />
+                                  <SelectTrigger className="bg-background h-9 w-full">
+                                    <SelectValue placeholder="Pilih Kondisi" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  {receiptConditionEnum.enumValues.map((condition) => (
-                                    <SelectItem key={condition} value={condition}>
-                                      {CONDITION_LABELS[condition]}
+                                  {Object.keys(CONDITION_LABELS).map((c) => (
+                                    <SelectItem key={c} value={c}>
+                                      {CONDITION_LABELS[c]}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -189,90 +208,119 @@ export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialog
                             </FormItem>
                           )}
                         />
-                      </div>
 
-                      {/* 2. Jumlah Diterima */}
-                      <div className="md:col-span-2">
                         <FormField
                           control={form.control}
                           name={`items.${index}.quantity`}
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-muted-foreground text-[10px] font-bold uppercase">
-                                Jml Masuk
+                                Jml Diterima
                               </FormLabel>
                               <FormControl>
                                 <Input
                                   {...field}
                                   type="number"
+                                  step="0.01"
                                   className="bg-background h-9 font-mono"
-                                  value={(field.value as number) ?? ''}
-                                  onChange={(e) => field.onChange(e.target.value)}
+                                  onChange={(e) => {
+                                    const val = e.target.valueAsNumber
+                                    field.onChange(isNaN(val) ? 0 : val)
+                                  }}
                                 />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
 
-                      {/* 3. Batch Number */}
-                      <div className="md:col-span-3">
                         <FormField
                           control={form.control}
                           name={`items.${index}.batchNumber`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-muted-foreground text-[10px] font-bold uppercase">
+                              <FormLabel className="text-muted-foreground flex items-center gap-1 text-[10px] font-bold uppercase">
                                 No. Batch / Lot
+                                {isExpiryRequired && (
+                                  <span className="text-sm text-red-600">*</span>
+                                )}
                               </FormLabel>
                               <FormControl>
                                 <Input
                                   {...field}
-                                  placeholder="Contoh: B-2024"
-                                  className="bg-background h-9"
-                                  value={(field.value as string) ?? ''}
+                                  placeholder={isExpiryRequired ? 'Wajib diisi...' : 'Opsional'}
+                                  className={`bg-background h-9 ${
+                                    batchError
+                                      ? 'border-red-500 ring-red-500 focus-visible:ring-red-500'
+                                      : ''
+                                  }`}
+                                  value={field.value ?? ''}
                                 />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
 
-                      {/* 4. Expired Date */}
-                      <div className="md:col-span-4">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.expiryDate`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-muted-foreground text-[10px] font-bold uppercase">
-                                Tanggal Kadaluarsa
-                              </FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    {...field}
-                                    type="date"
-                                    className="bg-background block h-9 pl-9"
-                                    value={(field.value as string) ?? ''}
-                                  />
-                                  <CalendarIcon className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {isExpiryRequired ? (
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.expiryDate`}
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel className="text-muted-foreground flex items-center gap-1 text-[10px] font-bold uppercase">
+                                  Kadaluarsa
+                                  <span className="text-sm text-red-600">*</span>
+                                </FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant={'outline'}
+                                        className={cn(
+                                          'bg-background h-9 w-full pl-3 text-left font-normal',
+                                          !field.value && 'text-muted-foreground',
+                                          expiryError &&
+                                            'border-red-500 text-red-500 ring-red-500 focus-visible:ring-red-500',
+                                        )}
+                                      >
+                                        {field.value ? (
+                                          format(new Date(field.value), 'P', { locale: idLocale })
+                                        ) : (
+                                          <span>Pilih tanggal</span>
+                                        )}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={field.value ? new Date(field.value) : undefined}
+                                      onSelect={(date) => {
+                                        const formatted = date ? format(date, 'yyyy-MM-dd') : ''
+                                        field.onChange(formatted)
+                                      }}
+                                      disabled={(date) => date < new Date('1900-01-01')}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        ) : (
+                          <div className="hidden lg:block"></div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
 
-            <DialogFooter className="bg-background sticky bottom-0 z-10 -mx-6 mt-6 border-t px-6 py-4">
+            <DialogFooter className="bg-background border-t px-6 py-4">
               <Button
                 type="button"
                 variant="outline"
