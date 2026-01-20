@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 
-import { format } from 'date-fns'
-import { Scale } from 'lucide-react'
+import { PackageOpen, Scale } from 'lucide-react'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -17,94 +17,82 @@ import {
 
 import { AdjustmentDialog } from './adjustment-dialog'
 
-interface StockData {
-  id: string
+// Interface Data yang sudah di-Group per Item
+interface AggregatedStock {
   consumableId: string
   consumableName: string
   categoryName: string | null
   unit: string
-  quantity: number
-  batchNumber: string | null
-  expiryDate: Date | null
+  totalQuantity: number
+  batchCount: number
+  batches: {
+    id: string
+    batchNumber: string | null
+    quantity: number
+    expiryDate: Date | null
+  }[]
 }
 
 interface StockTableProps {
-  data: StockData[]
+  data: AggregatedStock[]
 }
 
 export function StockTable({ data }: StockTableProps) {
-  const [selectedItem, setSelectedItem] = useState<StockData | null>(null)
+  const [selectedItem, setSelectedItem] = useState<AggregatedStock | null>(null)
 
   return (
     <>
-      <div className="bg-card rounded-md border shadow-sm">
+      <div className="bg-card overflow-hidden rounded-md border shadow-sm">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="w-12">#</TableHead>
-              <TableHead>Barang</TableHead>
-              <TableHead>Batch / Expired</TableHead>
-              <TableHead className="text-right">Stok Sistem</TableHead>
-              <TableHead className="text-right">Aksi</TableHead>
+              <TableHead className="w-12 text-center">#</TableHead>
+              <TableHead>Nama Barang</TableHead>
+              <TableHead>Kategori</TableHead>
+              <TableHead className="text-center">Jml. Batch</TableHead>
+              <TableHead className="text-right">Total Stok</TableHead>
+              <TableHead className="w-35 text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground h-32 text-center">
-                  Belum ada data stok di gudang.
+                <TableCell colSpan={6} className="text-muted-foreground h-40 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <PackageOpen className="h-8 w-8 opacity-50" />
+                    <p>Belum ada stok barang di gudang ini.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               data.map((item, index) => (
-                <TableRow key={item.id}>
-                  <TableCell>{index + 1}</TableCell>
+                <TableRow key={item.consumableId} className="hover:bg-muted/5">
+                  <TableCell className="text-muted-foreground text-center">{index + 1}</TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{item.consumableName}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {item.categoryName || 'Tanpa Kategori'}
-                      </span>
-                    </div>
+                    <span className="text-base font-medium">{item.consumableName}</span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground w-10 text-xs font-bold uppercase">
-                          Batch
-                        </span>
-                        <span className="bg-muted rounded px-1 font-mono">
-                          {item.batchNumber || '-'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground w-10 text-xs font-bold uppercase">
-                          Exp
-                        </span>
-                        <span
-                          className={
-                            item.expiryDate && new Date(item.expiryDate) < new Date()
-                              ? 'font-bold text-red-600'
-                              : ''
-                          }
-                        >
-                          {item.expiryDate ? format(new Date(item.expiryDate), 'dd/MM/yyyy') : '-'}
-                        </span>
-                      </div>
-                    </div>
+                    <Badge variant="outline" className="font-normal">
+                      {item.categoryName || 'Uncategorized'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="text-muted-foreground bg-muted rounded-full px-2 py-1 text-xs">
+                      {item.batchCount} Batch
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex flex-col items-end">
-                      <span className="font-mono text-lg font-bold">{item.quantity}</span>
+                    <div className="flex items-baseline justify-end gap-1">
+                      <span className="font-mono text-lg font-bold">{item.totalQuantity}</span>
                       <span className="text-muted-foreground text-xs">{item.unit}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => setSelectedItem(item)}
-                      className="gap-2"
+                      className="gap-2 border shadow-sm"
                     >
                       <Scale className="h-4 w-4" />
                       Opname
@@ -121,14 +109,10 @@ export function StockTable({ data }: StockTableProps) {
         <AdjustmentDialog
           open={!!selectedItem}
           onOpenChange={(open) => !open && setSelectedItem(null)}
-          data={{
-            id: selectedItem.id,
-            consumableId: selectedItem.consumableId,
-            consumableName: selectedItem.consumableName,
-            currentQty: selectedItem.quantity,
-            unit: selectedItem.unit,
-            batchNumber: selectedItem.batchNumber,
-          }}
+          consumableId={selectedItem.consumableId}
+          consumableName={selectedItem.consumableName}
+          unit={selectedItem.unit}
+          batches={selectedItem.batches}
         />
       )}
     </>

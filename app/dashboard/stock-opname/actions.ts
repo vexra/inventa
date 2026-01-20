@@ -15,36 +15,33 @@ export async function submitStockOpname(values: z.infer<typeof stockOpnameSchema
   const session = await requireAuth({ roles: ['warehouse_staff'] })
 
   const validated = stockOpnameSchema.safeParse(values)
+  if (!validated.success) return { error: 'Data tidak valid' }
 
-  if (!validated.success) {
-    return { error: 'Data tidak valid' }
-  }
-
-  const { warehouseStockId, physicalQty, reason, consumableId } = validated.data
+  const { warehouseStockId, physicalQty, reason, consumableId, type } = validated.data
 
   try {
+    // Ambil data stok spesifik (per batch)
     const [currentStock] = await db
       .select()
       .from(warehouseStocks)
-      .where(eq(warehouseStocks.id, warehouseStockId))
+      .where(eq(warehouseStocks.id, warehouseStockId)) // ID ini unik per batch di gudang
       .limit(1)
 
-    if (!currentStock) {
-      return { error: 'Data stok tidak ditemukan' }
-    }
+    if (!currentStock) return { error: 'Data batch tidak ditemukan' }
 
     if (session.user.warehouseId && currentStock.warehouseId !== session.user.warehouseId) {
-      return { error: 'Anda tidak memiliki akses ke gudang ini' }
+      return { error: 'Akses ditolak ke gudang ini' }
     }
 
     const systemQty = Number(currentStock.quantity)
     const delta = physicalQty - systemQty
 
     if (delta === 0) {
-      return { success: true, message: 'Jumlah fisik sesuai dengan sistem. Tidak ada perubahan.' }
+      return { success: true, message: 'Jumlah sesuai, tidak ada perubahan.' }
     }
 
     await db.transaction(async (tx) => {
+      // 1. Catat Adjustment History
       await tx.insert(consumableAdjustments).values({
         id: randomUUID(),
         userId: session.user.id,
@@ -52,10 +49,11 @@ export async function submitStockOpname(values: z.infer<typeof stockOpnameSchema
         warehouseId: currentStock.warehouseId,
         batchNumber: currentStock.batchNumber,
         deltaQuantity: String(delta),
-        type: 'STOCK_OPNAME',
+        type: type, // Menggunakan tipe yang dipilih user
         reason: reason,
       })
 
+      // 2. Update Stok Gudang
       await tx
         .update(warehouseStocks)
         .set({
@@ -64,28 +62,22 @@ export async function submitStockOpname(values: z.infer<typeof stockOpnameSchema
         })
         .where(eq(warehouseStocks.id, warehouseStockId))
 
+      // 3. Audit Log
       await tx.insert(auditLogs).values({
         id: randomUUID(),
         userId: session.user.id,
-        action: 'STOCK_OPNAME',
+        action: type, // Gunakan tipe sebagai action name agar jelas
         tableName: 'warehouse_stocks',
         recordId: warehouseStockId,
-        oldValues: {
-          quantity: systemQty,
-          batchNumber: currentStock.batchNumber,
-        },
-        newValues: {
-          quantity: physicalQty,
-          reason: reason,
-          delta: delta,
-        },
+        oldValues: { quantity: systemQty, batch: currentStock.batchNumber },
+        newValues: { quantity: physicalQty, type, reason, delta },
       })
     })
 
     revalidatePath('/dashboard/stock-opname')
-    return { success: true, message: 'Stock opname berhasil disimpan' }
+    return { success: true, message: 'Stok berhasil diperbarui' }
   } catch (error) {
     console.error('Stock Opname Error:', error)
-    return { error: 'Gagal menyimpan data stock opname' }
+    return { error: 'Gagal menyimpan perubahan' }
   }
 }
