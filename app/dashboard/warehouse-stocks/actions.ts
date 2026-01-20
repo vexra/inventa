@@ -6,6 +6,13 @@ import { categories, consumables, warehouseStocks } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
+type BatchItem = {
+  id: string
+  batch: string
+  qty: number
+  exp: string | null
+}
+
 export async function getWarehouseStocks(
   page: number = 1,
   limit: number = 10,
@@ -19,56 +26,146 @@ export async function getWarehouseStocks(
   }
 
   const offset = (page - 1) * limit
-  let baseCondition = eq(warehouseStocks.warehouseId, session.user.warehouseId)
 
+  let searchCondition = undefined
   if (query) {
-    baseCondition = and(
-      baseCondition,
-      or(ilike(consumables.name, `%${query}%`), ilike(consumables.sku, `%${query}%`)),
-    )!
-  }
-
-  if (statusFilter === 'out') {
-    baseCondition = and(baseCondition, lte(warehouseStocks.quantity, '0'))!
-  } else if (statusFilter === 'low') {
-    baseCondition = and(
-      baseCondition,
-      sql`${warehouseStocks.quantity} <= ${consumables.minimumStock}`,
-    )!
+    searchCondition = or(
+      ilike(consumables.name, `%${query}%`),
+      ilike(consumables.sku, `%${query}%`),
+    )
   }
 
   try {
-    const countRes = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(warehouseStocks)
-      .innerJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
-      .where(baseCondition)
-
-    const totalItems = Number(countRes[0]?.count || 0)
-    const totalPages = Math.ceil(totalItems / limit)
-
-    const data = await db
+    const sq = db
       .select({
-        id: warehouseStocks.id,
-        consumableId: consumables.id,
+        warehouseId: warehouseStocks.warehouseId,
+        consumableId: warehouseStocks.consumableId,
+        totalQty: sql<number>`sum(${warehouseStocks.quantity})`.as('total_qty'),
+      })
+      .from(warehouseStocks)
+      .where(eq(warehouseStocks.warehouseId, session.user.warehouseId))
+      .groupBy(warehouseStocks.warehouseId, warehouseStocks.consumableId)
+      .as('sq')
+
+    let mainQuery = db
+      .select({
+        id: consumables.id,
         name: consumables.name,
         sku: consumables.sku,
         category: categories.name,
-        quantity: sql<number>`${warehouseStocks.quantity}::float`.mapWith(Number),
         unit: consumables.baseUnit,
         minimumStock: consumables.minimumStock,
-        updatedAt: warehouseStocks.updatedAt,
+        totalQty: sq.totalQty,
+        batches: sql<BatchItem[]>`json_agg(
+            json_build_object(
+              'id', ${warehouseStocks.id},
+              'batch', ${warehouseStocks.batchNumber},
+              'qty', ${warehouseStocks.quantity},
+              'exp', ${warehouseStocks.expiryDate}
+            ) ORDER BY ${warehouseStocks.expiryDate} ASC
+          )`.as('batches'),
+      })
+      .from(sq)
+      .innerJoin(consumables, eq(sq.consumableId, consumables.id))
+      .leftJoin(categories, eq(consumables.categoryId, categories.id))
+      .innerJoin(
+        warehouseStocks,
+        and(
+          eq(warehouseStocks.consumableId, consumables.id),
+          eq(warehouseStocks.warehouseId, session.user.warehouseId),
+        ),
+      )
+      .groupBy(
+        consumables.id,
+        consumables.name,
+        consumables.sku,
+        categories.name,
+        consumables.baseUnit,
+        consumables.minimumStock,
+        sq.totalQty,
+      )
+      .$dynamic()
+
+    if (searchCondition) {
+      mainQuery = mainQuery.where(searchCondition)
+    }
+
+    if (statusFilter === 'out') {
+      mainQuery = mainQuery.having(lte(sq.totalQty, 0))
+    } else if (statusFilter === 'low') {
+      mainQuery = mainQuery.having(
+        and(sql`${sq.totalQty} > 0`, sql`${sq.totalQty} <= ${consumables.minimumStock}`),
+      )
+    }
+
+    const rows = await mainQuery.limit(limit).offset(offset).orderBy(asc(consumables.name))
+
+    const countQuery = db
+      .select({
+        consumableId: warehouseStocks.consumableId,
+        totalQty: sql<number>`sum(${warehouseStocks.quantity})`.as('total_qty'),
       })
       .from(warehouseStocks)
       .innerJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
-      .leftJoin(categories, eq(consumables.categoryId, categories.id))
-      .where(baseCondition)
-      .limit(limit)
-      .offset(offset)
-      .orderBy(asc(consumables.name))
+      .where(and(eq(warehouseStocks.warehouseId, session.user.warehouseId), searchCondition))
+      .groupBy(warehouseStocks.consumableId, consumables.minimumStock)
+
+    if (statusFilter === 'out') {
+      countQuery.having(lte(sql`sum(${warehouseStocks.quantity})`, 0))
+    } else if (statusFilter === 'low') {
+      countQuery.having(
+        and(
+          sql`sum(${warehouseStocks.quantity}) > 0`,
+          sql`sum(${warehouseStocks.quantity}) <= ${consumables.minimumStock}`,
+        ),
+      )
+    }
+
+    const allMatchingRows = await countQuery
+    const totalItems = allMatchingRows.length
+    const totalPages = Math.ceil(totalItems / limit)
+
+    const formattedData = rows.map((row) => {
+      const now = new Date()
+      const batches = row.batches || []
+
+      let hasExpired = false
+      let hasNearExpiry = false
+
+      const activeBatches = batches.filter((b) => Number(b.qty) > 0)
+
+      activeBatches.forEach((b) => {
+        if (b.exp) {
+          const expDate = new Date(b.exp)
+          const diffTime = expDate.getTime() - now.getTime()
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+          if (diffDays <= 0) hasExpired = true
+          else if (diffDays <= 30) hasNearExpiry = true
+        }
+      })
+
+      return {
+        id: row.id,
+        name: row.name,
+        sku: row.sku,
+        category: row.category,
+        totalQuantity: Number(row.totalQty),
+        unit: row.unit,
+        minimumStock: row.minimumStock,
+        status: (Number(row.totalQty) <= 0
+          ? 'OUT'
+          : row.minimumStock !== null && Number(row.totalQty) <= row.minimumStock
+            ? 'LOW'
+            : 'SAFE') as 'OUT' | 'LOW' | 'SAFE',
+        hasExpired,
+        hasNearExpiry,
+        batches: activeBatches,
+      }
+    })
 
     return {
-      data,
+      data: formattedData,
       metadata: {
         totalItems,
         totalPages,
@@ -76,7 +173,7 @@ export async function getWarehouseStocks(
       },
     }
   } catch (error) {
-    console.error('Error fetching stocks:', error)
+    console.error('Error fetching aggregated stocks:', error)
     return { error: 'Gagal mengambil data stok' }
   }
 }
