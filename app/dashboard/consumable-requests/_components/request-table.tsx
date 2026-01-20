@@ -119,7 +119,7 @@ export function RequestTable({ data, isUnitAdmin }: RequestTableProps) {
             {isUnitAdmin && <TableHead>Pemohon</TableHead>}
             <TableHead>Ruangan</TableHead>
             <TableHead>Tanggal</TableHead>
-            <TableHead>Jml Item</TableHead>
+            <TableHead>Jumlah Item</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Aksi</TableHead>
           </TableRow>

@@ -101,6 +101,8 @@ export function ProcurementDialog({
     },
   })
 
+  const currentItems = form.watch('items')
+
   useEffect(() => {
     if (isOpen) {
       form.reset({
@@ -231,14 +233,37 @@ export function ProcurementDialog({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {fields.map((fieldItem, index) => {
+                  const selectedIds = currentItems
+                    .map((item, idx) => (idx !== index ? item.consumableId : null))
+                    .filter(Boolean)
+
                   return (
                     <div
                       key={fieldItem.id}
-                      className="group bg-card text-card-foreground relative flex flex-col items-start gap-3 rounded-lg border p-4 shadow-sm transition-colors hover:border-blue-400 sm:flex-row sm:items-start"
+                      className="group bg-card text-card-foreground relative flex flex-col gap-4 rounded-lg border p-4 shadow-sm transition-colors hover:border-blue-400 sm:flex-row sm:items-start sm:gap-3"
                     >
-                      <div className="bg-muted text-muted-foreground mt-2 hidden h-6 w-6 items-center justify-center rounded-full text-xs font-bold lg:flex lg:shrink-0">
+                      <div className="flex items-center justify-between sm:hidden">
+                        <span className="flex items-center gap-2 text-sm font-bold text-blue-600">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs dark:bg-blue-900">
+                            {index + 1}
+                          </span>
+                          Barang ke-{index + 1}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => remove(index)}
+                          disabled={fields.length === 1}
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" /> Hapus
+                        </Button>
+                      </div>
+
+                      <div className="bg-muted text-muted-foreground mt-9 hidden h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold sm:flex">
                         {index + 1}
                       </div>
 
@@ -248,23 +273,27 @@ export function ProcurementDialog({
                         render={({ field }) => (
                           <FormItem className="w-full flex-3">
                             <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                              Barang
+                              Pilih Barang
                             </FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih item..." />
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Cari item..." />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {consumables.map((c) => (
-                                  <SelectItem key={c.id} value={c.id}>
-                                    <span className="font-medium">{c.name}</span>
-                                    <span className="text-muted-foreground ml-2 text-xs">
-                                      ({c.unit})
-                                    </span>
-                                  </SelectItem>
-                                ))}
+                                {consumables.map((c) => {
+                                  if (selectedIds.includes(c.id)) return null
+
+                                  return (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      <span className="font-medium">{c.name}</span>
+                                      <span className="text-muted-foreground ml-2 text-xs">
+                                        ({c.unit})
+                                      </span>
+                                    </SelectItem>
+                                  )
+                                })}
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -299,7 +328,7 @@ export function ProcurementDialog({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-muted-foreground mt-7 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                        className="text-muted-foreground mt-7 hidden hover:bg-red-50 hover:text-red-600 sm:flex dark:hover:bg-red-900/20"
                         onClick={() => remove(index)}
                         disabled={fields.length === 1}
                       >

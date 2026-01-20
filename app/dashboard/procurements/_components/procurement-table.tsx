@@ -297,7 +297,8 @@ export function ProcurementTable({ data, consumables, userRole }: ProcurementTab
                               onClick={() => setDeletingId(item.id)}
                               className="text-red-600 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-900/20"
                             >
-                              <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                              <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" />{' '}
+                              Hapus
                             </DropdownMenuItem>
                           </>
                         )}

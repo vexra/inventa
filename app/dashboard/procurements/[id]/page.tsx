@@ -205,7 +205,7 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
                   <TableRow>
                     <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Nama Barang</TableHead>
-                    <TableHead className="text-center">Jml</TableHead>
+                    <TableHead className="text-center">Jumlah</TableHead>
                     <TableHead>Kondisi (QC)</TableHead>
                     <TableHead>No. Batch</TableHead>
                     <TableHead>Expired</TableHead>
@@ -360,9 +360,11 @@ function ConditionBadge({ condition }: { condition: ReceiptCondition | null }) {
   if (!condition) return null
 
   const styles: Record<ReceiptCondition, string> = {
-    GOOD: 'bg-green-100 text-green-700 border-green-200',
-    DAMAGED: 'bg-red-100 text-red-700 border-red-200',
-    INCOMPLETE: 'bg-orange-100 text-orange-700 border-orange-200',
+    GOOD: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+    DAMAGED:
+      'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+    INCOMPLETE:
+      'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
   }
 
   const labels: Record<ReceiptCondition, string> = {
@@ -372,7 +374,7 @@ function ConditionBadge({ condition }: { condition: ReceiptCondition | null }) {
   }
 
   return (
-    <Badge variant="outline" className={`text-[10px] font-normal ${styles[condition]}`}>
+    <Badge variant="outline" className={`border text-[10px] font-medium ${styles[condition]}`}>
       {labels[condition]}
     </Badge>
   )

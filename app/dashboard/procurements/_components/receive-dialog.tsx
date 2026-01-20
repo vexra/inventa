@@ -127,8 +127,8 @@ export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialog
             Penerimaan Barang: {procurement.code}
           </DialogTitle>
           <DialogDescription>
-            Lakukan pengecekan fisik (QC). Item bertanda (<span className="text-red-500">*</span>)
-            wajib memiliki data lengkap.
+            Lakukan pengecekan fisik. Item bertanda (<span className="text-red-500">*</span>) wajib
+            memiliki data lengkap.
           </DialogDescription>
         </DialogHeader>
 
@@ -192,7 +192,7 @@ export function ReceiveDialog({ procurement, open, onOpenChange }: ReceiveDialog
                               </FormLabel>
                               <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
-                                  <SelectTrigger className="bg-background h-9">
+                                  <SelectTrigger className="bg-background h-9 w-full">
                                     <SelectValue placeholder="Pilih Kondisi" />
                                   </SelectTrigger>
                                 </FormControl>
