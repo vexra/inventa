@@ -2,7 +2,7 @@
 
 import { and, asc, eq, ilike, lte, or, sql } from 'drizzle-orm'
 
-import { categories, consumables, warehouseStocks } from '@/db/schema'
+import { categories, consumables, warehouseStocks, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
@@ -13,16 +13,44 @@ type BatchItem = {
   exp: string | null
 }
 
+export async function getAllWarehouses() {
+  await requireAuth({ roles: ['faculty_admin'] })
+  try {
+    const data = await db
+      .select({
+        id: warehouses.id,
+        name: warehouses.name,
+      })
+      .from(warehouses)
+      .orderBy(asc(warehouses.name))
+
+    return data
+  } catch (error) {
+    console.error('Error fetching warehouses:', error)
+    return []
+  }
+}
+
 export async function getWarehouseStocks(
   page: number = 1,
   limit: number = 10,
   query: string = '',
   statusFilter: 'all' | 'low' | 'out' = 'all',
+  targetWarehouseId?: string,
 ) {
-  const session = await requireAuth({ roles: ['warehouse_staff'] })
+  const session = await requireAuth({ roles: ['warehouse_staff', 'faculty_admin'] })
 
-  if (!session.user.warehouseId) {
-    return { error: 'Anda tidak terdaftar di gudang manapun.' }
+  let activeWarehouseId = session.user.warehouseId
+
+  if (session.user.role === 'faculty_admin') {
+    if (!targetWarehouseId) {
+      return { error: 'Silakan pilih gudang terlebih dahulu.' }
+    }
+    activeWarehouseId = targetWarehouseId
+  } else {
+    if (!activeWarehouseId) {
+      return { error: 'Anda tidak terdaftar di gudang manapun.' }
+    }
   }
 
   const offset = (page - 1) * limit
@@ -43,7 +71,7 @@ export async function getWarehouseStocks(
         totalQty: sql<number>`sum(${warehouseStocks.quantity})`.as('total_qty'),
       })
       .from(warehouseStocks)
-      .where(eq(warehouseStocks.warehouseId, session.user.warehouseId))
+      .where(eq(warehouseStocks.warehouseId, activeWarehouseId))
       .groupBy(warehouseStocks.warehouseId, warehouseStocks.consumableId)
       .as('sq')
 
@@ -72,7 +100,7 @@ export async function getWarehouseStocks(
         warehouseStocks,
         and(
           eq(warehouseStocks.consumableId, consumables.id),
-          eq(warehouseStocks.warehouseId, session.user.warehouseId),
+          eq(warehouseStocks.warehouseId, activeWarehouseId),
         ),
       )
       .groupBy(
@@ -107,7 +135,7 @@ export async function getWarehouseStocks(
       })
       .from(warehouseStocks)
       .innerJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
-      .where(and(eq(warehouseStocks.warehouseId, session.user.warehouseId), searchCondition))
+      .where(and(eq(warehouseStocks.warehouseId, activeWarehouseId), searchCondition))
       .groupBy(warehouseStocks.consumableId, consumables.minimumStock)
 
     if (statusFilter === 'out') {
