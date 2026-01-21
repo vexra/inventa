@@ -29,20 +29,22 @@ export async function WarehouseStaffDashboard({
   const [totalItems, lowStockItems, pendingReceives, pendingRequests, recentWarehouseActivity] =
     await Promise.all([
       db
-        .select({ value: count() })
+        .select({ value: sql<number>`count(distinct ${warehouseStocks.consumableId})` })
         .from(warehouseStocks)
         .where(eq(warehouseStocks.warehouseId, myWarehouseId)),
 
-      db
-        .select({ value: count() })
-        .from(warehouseStocks)
-        .leftJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
-        .where(
-          and(
-            eq(warehouseStocks.warehouseId, myWarehouseId),
-            sql`${warehouseStocks.quantity} < ${consumables.minimumStock}`,
-          ),
-        ),
+      db.select({ value: count() }).from(
+        db
+          .select({
+            consumableId: warehouseStocks.consumableId,
+          })
+          .from(warehouseStocks)
+          .leftJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
+          .where(eq(warehouseStocks.warehouseId, myWarehouseId))
+          .groupBy(warehouseStocks.consumableId, consumables.minimumStock)
+          .having(sql`sum(${warehouseStocks.quantity}) < ${consumables.minimumStock}`)
+          .as('low_stock_subquery'),
+      ),
 
       db.select({ value: count() }).from(procurements).where(eq(procurements.status, 'APPROVED')),
 
