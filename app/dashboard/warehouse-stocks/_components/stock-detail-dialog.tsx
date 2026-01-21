@@ -1,5 +1,7 @@
 'use client'
 
+import { useMemo } from 'react'
+
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { Package } from 'lucide-react'
@@ -37,10 +39,26 @@ interface StockDetailDialogProps {
 }
 
 export function StockDetailDialog({ itemName, unit, batches, children }: StockDetailDialogProps) {
+  const sortedBatches = useMemo(() => {
+    return [...batches].sort((a, b) => {
+      const isZeroA = a.qty <= 0
+      const isZeroB = b.qty <= 0
+
+      if (isZeroA !== isZeroB) {
+        return isZeroA ? 1 : -1
+      }
+
+      const dateA = a.exp ? new Date(a.exp).getTime() : Infinity
+      const dateB = b.exp ? new Date(b.exp).getTime() : Infinity
+
+      return dateA - dateB
+    })
+  }, [batches])
+
   return (
     <Dialog>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
@@ -51,9 +69,9 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-4 rounded-md border">
+        <div className="relative mt-4 max-h-[60vh] overflow-y-auto rounded-md border">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-background sticky top-0 z-10 shadow-sm">
               <TableRow>
                 <TableHead>No. Batch</TableHead>
                 <TableHead className="text-center">Kadaluarsa</TableHead>
@@ -62,23 +80,29 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
               </TableRow>
             </TableHeader>
             <TableBody>
-              {batches.length === 0 ? (
+              {sortedBatches.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-muted-foreground h-24 text-center">
-                    Tidak ada data batch aktif.
+                    Tidak ada data batch.
                   </TableCell>
                 </TableRow>
               ) : (
-                batches.map((batch, index) => {
+                sortedBatches.map((batch, index) => {
                   const expDate = batch.exp ? new Date(batch.exp) : null
                   const now = new Date()
-                  let status: 'expired' | 'warning' | 'ok' | 'no-exp' = 'no-exp'
+                  const isZero = batch.qty <= 0 // Cek apakah stok habis
+                  let status: 'expired' | 'warning' | 'ok' | 'empty' | 'no-exp' = 'no-exp'
 
-                  if (expDate) {
-                    const diffTime = expDate.getTime() - now.getTime()
+                  if (isZero) {
+                    status = 'empty'
+                  } else if (expDate) {
+                    const cleanExp = new Date(expDate.setHours(0, 0, 0, 0))
+                    const cleanNow = new Date(now.setHours(0, 0, 0, 0))
+
+                    const diffTime = cleanExp.getTime() - cleanNow.getTime()
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-                    if (diffDays <= 0) status = 'expired'
+                    if (diffTime < 0) status = 'expired'
                     else if (diffDays <= 90) status = 'warning'
                     else status = 'ok'
                   }
@@ -86,9 +110,14 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
                   return (
                     <TableRow
                       key={index}
-                      className={status === 'expired' ? 'bg-red-50 dark:bg-red-900/10' : ''}
+                      className={` ${status === 'expired' ? 'bg-red-50 dark:bg-red-900/10' : ''} ${status === 'empty' ? 'bg-muted/50 text-muted-foreground opacity-60' : ''} `}
                     >
-                      <TableCell className="font-mono font-medium">{batch.batch || '-'}</TableCell>
+                      <TableCell className="font-mono font-medium">
+                        {batch.batch || '-'}
+                        {status === 'empty' && (
+                          <span className="ml-2 text-[10px] italic">(Habis)</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center">
                         {expDate ? format(expDate, 'd MMM yyyy', { locale: idLocale }) : '-'}
                       </TableCell>
@@ -96,6 +125,11 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
                         {batch.qty} {unit}
                       </TableCell>
                       <TableCell className="text-center">
+                        {status === 'empty' && (
+                          <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                            Habis
+                          </Badge>
+                        )}
                         {status === 'expired' && (
                           <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
                             Expired
@@ -117,7 +151,7 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
                             Oke
                           </Badge>
                         )}
-                        {status === 'no-exp' && (
+                        {status === 'no-exp' && !isZero && (
                           <span className="text-muted-foreground text-xs">-</span>
                         )}
                       </TableCell>
