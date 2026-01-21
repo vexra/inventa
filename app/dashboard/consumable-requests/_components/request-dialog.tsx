@@ -1,10 +1,19 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Control, useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Building2, FileText, Loader2, Plus, ShoppingCart, Trash2, Warehouse } from 'lucide-react'
+import {
+  Building2,
+  FileText,
+  Loader2,
+  Pencil,
+  Plus,
+  ShoppingCart,
+  Trash2,
+  Warehouse,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -36,7 +45,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
-import { createRequest } from '../actions'
+import { createRequest, updateRequest } from '../actions'
 
 const formSchema = z.object({
   targetWarehouseId: z.string().min(1, 'Pilih gudang tujuan'),
@@ -46,7 +55,7 @@ const formSchema = z.object({
     .array(
       z.object({
         consumableId: z.string().min(1, 'Pilih barang'),
-        quantity: z.coerce.number().min(1, 'Wajib diisi'),
+        quantity: z.coerce.number().min(1, 'Jumlah minimal 1'),
       }),
     )
     .min(1, 'Minimal satu barang'),
@@ -77,6 +86,11 @@ interface RequestDialogProps {
   rooms: RoomOption[]
   stocks: StockOption[]
   children?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  trigger?: React.ReactNode
+  initialData?: RequestFormValues & { id: string }
+  mode?: 'create' | 'edit'
 }
 
 interface RequestItemRowProps {
@@ -85,6 +99,7 @@ interface RequestItemRowProps {
   remove: (index: number) => void
   isRemovable: boolean
   availableItems: StockOption[]
+  watchedItems: { consumableId: string; quantity: number }[]
 }
 
 function RequestItemRow({
@@ -93,11 +108,18 @@ function RequestItemRow({
   remove,
   isRemovable,
   availableItems,
+  watchedItems,
 }: RequestItemRowProps) {
-  const currentConsumableId = useWatch({
-    control,
-    name: `items.${index}.consumableId`,
-  })
+  const currentConsumableId = watchedItems[index]?.consumableId
+
+  const filteredOptions = useMemo(() => {
+    return availableItems.filter((item) => {
+      const isSelectedElsewhere = watchedItems.some(
+        (wItem, wIndex) => wItem.consumableId === item.consumableId && wIndex !== index,
+      )
+      return !isSelectedElsewhere
+    })
+  }, [availableItems, watchedItems, index])
 
   const selectedStock = availableItems.find((i) => i.consumableId === currentConsumableId)
   const maxQty = selectedStock ? Number(selectedStock.quantity) : 1
@@ -117,19 +139,21 @@ function RequestItemRow({
               <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
                 Nama Barang
               </FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="bg-background">
+                  <SelectTrigger className="bg-background w-full">
                     <SelectValue placeholder="Pilih item..." />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {availableItems.length === 0 ? (
+                  {filteredOptions.length === 0 ? (
                     <div className="text-muted-foreground p-2 text-center text-xs">
-                      Stok Kosong di Gudang Ini
+                      {availableItems.length === 0
+                        ? 'Stok Kosong di Gudang Ini'
+                        : 'Semua jenis barang sudah dipilih'}
                     </div>
                   ) : (
-                    availableItems.map((item) => (
+                    filteredOptions.map((item) => (
                       <SelectItem key={item.consumableId} value={item.consumableId}>
                         <div className="flex w-full items-center justify-between gap-4">
                           <span className="font-medium">{item.name}</span>
@@ -155,7 +179,7 @@ function RequestItemRow({
           render={({ field }) => (
             <FormItem className="w-full sm:w-28">
               <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                Jumlah
+                Jumlah {selectedStock && `(Max: ${maxQty})`}
               </FormLabel>
               <FormControl>
                 <Input
@@ -164,16 +188,24 @@ function RequestItemRow({
                   max={maxQty}
                   className="bg-background text-center font-medium"
                   {...field}
-                  value={(field.value as number) ?? ''}
+                  value={field.value === 0 ? '' : field.value}
                   onChange={(e) => {
-                    const val = e.target.valueAsNumber
-                    if (val > maxQty) {
+                    const val = e.target.value
+                    if (val === '') {
+                      field.onChange('')
+                      return
+                    }
+                    const parsedVal = parseInt(val)
+                    if (parsedVal > maxQty) {
                       toast.warning(`Stok tersedia hanya ${maxQty}`)
                       field.onChange(maxQty)
-                    } else if (isNaN(val)) {
-                      field.onChange(0)
                     } else {
-                      field.onChange(val)
+                      field.onChange(parsedVal)
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!field.value || Number(field.value) < 1) {
+                      field.onChange(1)
                     }
                   }}
                 />
@@ -202,9 +234,26 @@ export function RequestDialog({
   warehouses = [],
   stocks = [],
   rooms = [],
-  children,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+  trigger,
+  initialData,
+  mode = 'create',
 }: RequestDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  const isControlled = controlledOpen !== undefined
+
+  const open = isControlled ? controlledOpen : internalOpen
+
+  const setOpen = (value: boolean) => {
+    if (isControlled) {
+      setControlledOpen?.(value)
+    } else {
+      setInternalOpen(value)
+    }
+  }
+
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm({
@@ -215,6 +264,31 @@ export function RequestDialog({
       notes: '',
       items: [{ consumableId: '', quantity: 1 }],
     },
+  })
+
+  useEffect(() => {
+    if (open) {
+      if (mode === 'edit' && initialData) {
+        form.reset({
+          targetWarehouseId: initialData.targetWarehouseId,
+          roomId: initialData.roomId,
+          notes: initialData.notes || '',
+          items: initialData.items,
+        })
+      } else if (mode === 'create') {
+        form.reset({
+          targetWarehouseId: '',
+          roomId: '',
+          notes: '',
+          items: [{ consumableId: '', quantity: 1 }],
+        })
+      }
+    }
+  }, [initialData, open, form, mode])
+
+  const watchedItems = useWatch({
+    control: form.control,
+    name: 'items',
   })
 
   const { fields, append, remove, replace } = useFieldArray({
@@ -229,12 +303,27 @@ export function RequestDialog({
 
   const availableItems = useMemo(() => {
     if (!selectedWarehouseId) return []
-    return stocks.filter((s) => s.warehouseId === selectedWarehouseId)
+    return stocks.filter((s) => s.warehouseId === selectedWarehouseId && Number(s.quantity) > 0)
   }, [selectedWarehouseId, stocks])
 
   async function onSubmit(values: RequestFormValues) {
+    for (const item of values.items) {
+      const stock = availableItems.find((s) => s.consumableId === item.consumableId)
+      if (stock && item.quantity > Number(stock.quantity)) {
+        toast.error(`Stok ${stock.name} tidak mencukupi (Tersedia: ${stock.quantity}).`)
+        return
+      }
+    }
+
     setIsLoading(true)
-    const res = await createRequest(values)
+
+    let res
+    if (mode === 'edit' && initialData?.id) {
+      res = await updateRequest(initialData.id, values)
+    } else {
+      res = await createRequest(values)
+    }
+
     setIsLoading(false)
 
     if (res.error) {
@@ -242,20 +331,31 @@ export function RequestDialog({
     } else {
       toast.success(res.message)
       setOpen(false)
-      form.reset()
+      if (mode === 'create') form.reset()
     }
   }
 
   const handleWarehouseChange = (value: string) => {
+    const currentWarehouse = form.getValues('targetWarehouseId')
     form.setValue('targetWarehouseId', value)
-    replace([{ consumableId: '', quantity: 1 }])
+
+    if (value !== currentWarehouse) {
+      replace([{ consumableId: '', quantity: 1 }])
+    }
   }
+
+  const dialogTitle = mode === 'edit' ? 'Edit Permintaan' : 'Buat Permintaan Barang'
+  const dialogDescription =
+    mode === 'edit'
+      ? 'Ubah detail permintaan barang.'
+      : 'Isi form untuk mengajukan permintaan baru.'
+  const submitText = mode === 'edit' ? 'Simpan Perubahan' : 'Ajukan Permintaan'
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {children ? (
-          children
+        {trigger ? (
+          trigger
         ) : (
           <Button className="bg-blue-600 text-white shadow-sm hover:bg-blue-700">
             <ShoppingCart className="mr-2 h-4 w-4" /> Buat Permintaan
@@ -267,13 +367,15 @@ export function RequestDialog({
         <DialogHeader className="bg-background z-20 border-b px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-blue-100 p-2 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-              <ShoppingCart className="h-5 w-5" />
+              {mode === 'edit' ? (
+                <Pencil className="h-5 w-5" />
+              ) : (
+                <ShoppingCart className="h-5 w-5" />
+              )}
             </div>
             <div>
-              <DialogTitle>Form Permintaan Barang</DialogTitle>
-              <DialogDescription>
-                Pilih gudang dan barang sesuai stok yang tersedia.
-              </DialogDescription>
+              <DialogTitle>{dialogTitle}</DialogTitle>
+              <DialogDescription>{dialogDescription}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -294,7 +396,7 @@ export function RequestDialog({
                         <Building2 className="text-muted-foreground h-4 w-4" />
                         Untuk Ruangan
                       </FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Pilih Ruangan..." />
@@ -328,7 +430,7 @@ export function RequestDialog({
                         <Warehouse className="text-muted-foreground h-4 w-4" />
                         Ambil dari Gudang
                       </FormLabel>
-                      <Select onValueChange={handleWarehouseChange} defaultValue={field.value}>
+                      <Select onValueChange={handleWarehouseChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Pilih Gudang..." />
@@ -402,6 +504,7 @@ export function RequestDialog({
                       remove={remove}
                       isRemovable={fields.length > 1}
                       availableItems={availableItems}
+                      watchedItems={watchedItems as { consumableId: string; quantity: number }[]}
                     />
                   ))}
               </div>
@@ -421,11 +524,7 @@ export function RequestDialog({
                 disabled={isLoading}
                 className="bg-blue-600 text-white shadow-sm hover:bg-blue-700"
               >
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  'Ajukan Permintaan'
-                )}
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : submitText}
               </Button>
             </DialogFooter>
           </form>

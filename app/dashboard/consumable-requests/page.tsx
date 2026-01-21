@@ -30,7 +30,7 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
   const page = Number(params.page) || 1
   const limit = 10
 
-  const [requestsData, warehousesList, rawStocks, unitRooms] = await Promise.all([
+  const [requestsData, warehousesList, aggregatedStocks, unitRooms] = await Promise.all([
     getConsumableRequests(page, limit, query),
 
     db
@@ -44,14 +44,20 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
     db
       .select({
         warehouseId: warehouseStocks.warehouseId,
-        consumableId: consumables.id,
+        consumableId: warehouseStocks.consumableId,
         name: consumables.name,
         unit: consumables.baseUnit,
-        quantity: warehouseStocks.quantity,
+        quantity: sql<number>`sum(${warehouseStocks.quantity})`.mapWith(Number),
       })
       .from(warehouseStocks)
       .innerJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
       .where(sql`${warehouseStocks.quantity} > 0`)
+      .groupBy(
+        warehouseStocks.warehouseId,
+        warehouseStocks.consumableId,
+        consumables.name,
+        consumables.baseUnit,
+      )
       .orderBy(asc(consumables.name)),
 
     db
@@ -64,7 +70,7 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
       .orderBy(asc(rooms.name)),
   ])
 
-  const availableStocks = rawStocks.map((stock) => ({
+  const availableStocks = aggregatedStocks.map((stock) => ({
     ...stock,
     quantity: stock.quantity ?? 0,
   }))
@@ -97,7 +103,13 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
       </div>
 
       <div className="flex flex-col gap-4">
-        <RequestTable data={data} isUnitAdmin={isUnitAdmin} />
+        <RequestTable
+          data={data}
+          isUnitAdmin={isUnitAdmin}
+          warehouses={warehousesList}
+          rooms={unitRooms}
+          stocks={availableStocks}
+        />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
       </div>
