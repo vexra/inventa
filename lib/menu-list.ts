@@ -214,7 +214,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Layers,
         },
         {
-          title: 'Stok Gudang Pusat',
+          title: 'Stok Gudang',
           url: '/dashboard/warehouse-stocks',
           icon: Warehouse,
         },

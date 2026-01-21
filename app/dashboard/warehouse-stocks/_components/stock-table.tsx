@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Eye,
   MoreHorizontal,
-  PackageX,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -57,20 +56,8 @@ interface StockTableProps {
 }
 
 export function StockTable({ data }: StockTableProps) {
-  if (data.length === 0) {
-    return (
-      <div className="animate-in fade-in-50 flex min-h-75 flex-col items-center justify-center rounded-md border border-dashed p-8 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-          <PackageX className="h-6 w-6 text-slate-400" />
-        </div>
-        <h3 className="mt-4 text-lg font-semibold">Data stok kosong</h3>
-        <p className="text-muted-foreground mb-4 text-sm">Tidak ada barang yang ditemukan.</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="bg-card text-card-foreground rounded-md border shadow-sm">
+    <div className="bg-card rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -84,8 +71,14 @@ export function StockTable({ data }: StockTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item) => {
-            return (
+          {data.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
+                Tidak ada barang yang ditemukan.
+              </TableCell>
+            </TableRow>
+          ) : (
+            data.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>
                   <div className="flex flex-col">
@@ -192,8 +185,8 @@ export function StockTable({ data }: StockTableProps) {
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            )
-          })}
+            ))
+          )}
         </TableBody>
       </Table>
     </div>
