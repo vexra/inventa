@@ -62,6 +62,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
       id: requests.id,
       code: requests.requestCode,
       status: requests.status,
+      description: requests.description,
       createdAt: requests.createdAt,
       rejectionReason: requests.rejectionReason,
 
@@ -122,7 +123,10 @@ export default async function RequestDetailPage({ params }: PageProps) {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">Detail Permintaan Barang</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {/* Tampilkan Deskripsi sebagai Judul Utama */}
+              {requestData.description || 'Detail Permintaan Barang'}
+            </h1>
             <StatusBadge status={requestData.status as RequestStatus} />
           </div>
           <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
@@ -192,6 +196,18 @@ export default async function RequestDetailPage({ params }: PageProps) {
                 </div>
                 <div className="font-medium">{requestData.warehouseName || '-'}</div>
               </div>
+
+              {/* TAMPILKAN DESKRIPSI DI SINI */}
+              <div className="space-y-1 rounded-md border bg-slate-50 p-4 sm:col-span-2 dark:bg-slate-900/50">
+                <div className="text-muted-foreground mb-1 text-sm font-medium">
+                  Keperluan / Deskripsi:
+                </div>
+                <p className="text-sm">
+                  {requestData.description || (
+                    <span className="text-muted-foreground italic">Tidak ada deskripsi.</span>
+                  )}
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -210,7 +226,6 @@ export default async function RequestDetailPage({ params }: PageProps) {
                     <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Nama Barang</TableHead>
                     <TableHead className="text-center">Jumlah Diminta</TableHead>
-                    {/* Tampilkan kolom disetujui jika status bukan pending awal */}
                     {requestData.status !== 'PENDING_UNIT' &&
                       requestData.status !== 'PENDING_FACULTY' && (
                         <TableHead className="text-center">Jumlah Disetujui</TableHead>

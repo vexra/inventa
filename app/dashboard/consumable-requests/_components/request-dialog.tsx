@@ -50,7 +50,7 @@ import { createRequest, updateRequest } from '../actions'
 const formSchema = z.object({
   targetWarehouseId: z.string().min(1, 'Pilih gudang tujuan'),
   roomId: z.string().min(1, 'Pilih ruangan tujuan'),
-  notes: z.string().optional(),
+  description: z.string().optional(),
   items: z
     .array(
       z.object({
@@ -261,7 +261,7 @@ export function RequestDialog({
     defaultValues: {
       targetWarehouseId: '',
       roomId: '',
-      notes: '',
+      description: '',
       items: [{ consumableId: '', quantity: 1 }],
     },
   })
@@ -272,14 +272,14 @@ export function RequestDialog({
         form.reset({
           targetWarehouseId: initialData.targetWarehouseId,
           roomId: initialData.roomId,
-          notes: initialData.notes || '',
+          description: initialData.description || '',
           items: initialData.items,
         })
       } else if (mode === 'create') {
         form.reset({
           targetWarehouseId: '',
           roomId: '',
-          notes: '',
+          description: '',
           items: [{ consumableId: '', quantity: 1 }],
         })
       }
@@ -450,18 +450,19 @@ export function RequestDialog({
                 />
               </div>
 
+              {/* FIELD DESCRIPTION */}
               <FormField
                 control={form.control}
-                name="notes"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <FileText className="text-muted-foreground h-3.5 w-3.5" />
-                      Keperluan / Catatan
+                      Keperluan / Deskripsi
                     </FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Contoh: Untuk keperluan Praktikum..."
+                        placeholder="Contoh: Untuk keperluan Praktikum Modul 1..."
                         className="h-20 resize-none"
                         {...field}
                       />

@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Ban,
   Calendar,
+  Check,
   CheckCircle2,
   Clock,
   Eye,
@@ -20,6 +21,7 @@ import {
   Trash2,
   Truck,
   User,
+  X,
   XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,6 +39,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -52,9 +62,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { requestStatusEnum } from '@/db/schema'
 
-import { cancelRequest } from '../actions'
+import { cancelRequest, verifyRequest } from '../actions'
 import { RequestDialog, RoomOption, StockOption, WarehouseOption } from './request-dialog'
 
 type RequestStatus = (typeof requestStatusEnum.enumValues)[number]
@@ -74,8 +85,9 @@ interface RequestData {
   roomName: string | null
   targetWarehouseId: string | null
   roomId: string
-  notes: string | null
   items: RequestItemData[]
+  description: string | null
+  rejectionReason: string | null
 }
 
 interface RequestTableProps {
@@ -89,6 +101,10 @@ interface RequestTableProps {
 export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: RequestTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const [rejectId, setRejectId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const itemToEdit = data.find((item) => item.id === editingId)
 
@@ -106,6 +122,46 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
       toast.error('Gagal memproses permintaan', { id: toastId })
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleApprove = async (id: string) => {
+    const toastId = toast.loading('Memproses persetujuan...')
+    try {
+      const res = await verifyRequest(id, 'APPROVE')
+      if (res.error) {
+        toast.error(res.error, { id: toastId })
+      } else {
+        toast.success(res.message, { id: toastId })
+      }
+    } catch {
+      toast.error('Gagal memproses persetujuan', { id: toastId })
+    }
+  }
+
+  const handleRejectSubmit = async () => {
+    if (!rejectId) return
+    if (!rejectReason.trim()) {
+      toast.error('Mohon isi alasan penolakan.')
+      return
+    }
+
+    setIsProcessing(true)
+    const toastId = toast.loading('Menolak permintaan...')
+
+    try {
+      const res = await verifyRequest(rejectId, 'REJECT', rejectReason)
+      if (res.error) {
+        toast.error(res.error, { id: toastId })
+      } else {
+        toast.success(res.message, { id: toastId })
+        setRejectId(null)
+        setRejectReason('')
+      }
+    } catch {
+      toast.error('Gagal memproses penolakan', { id: toastId })
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -141,25 +197,25 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
 
                   <TableCell>
                     <div className="flex flex-col gap-1">
-                      <span className="text-sm font-semibold">Permintaan Barang</span>
-                      <span className="text-muted-foreground font-mono text-xs">
-                        {req.requestCode}
+                      <span className="line-clamp-2 text-sm font-semibold">
+                        {req.description || 'Permintaan Barang'}
                       </span>
-                      {req.roomName && (
-                        <span className="text-muted-foreground text-xs">Ruang: {req.roomName}</span>
-                      )}
+                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                        <span className="font-mono">{req.requestCode}</span>
+                        {req.roomName && <span>• Ruang: {req.roomName}</span>}
+                      </div>
                     </div>
                   </TableCell>
 
                   <TableCell>
                     <div className="flex flex-col items-start gap-1.5">
                       <StatusBadge status={req.status as RequestStatus} />
-                      {/* Tampilkan notes jika ditolak (opsional, jika backend kirim notes reject) */}
-                      {req.status === 'REJECTED' && req.notes && (
-                        <div className="flex items-center gap-1.5 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700 dark:bg-red-900/20 dark:text-red-300">
-                          <AlertCircle className="h-3 w-3 shrink-0" />
-                          <span className="max-w-37.5 truncate" title={req.notes}>
-                            {req.notes}
+                      {/* Tampilkan Rejection Reason jika REJECTED */}
+                      {req.status === 'REJECTED' && req.rejectionReason && (
+                        <div className="flex items-start gap-1.5 rounded bg-red-50 p-2 text-[11px] text-red-700 dark:bg-red-900/20 dark:text-red-300">
+                          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span className="line-clamp-2 max-w-45" title={req.rejectionReason}>
+                            {req.rejectionReason}
                           </span>
                         </div>
                       )}
@@ -209,6 +265,7 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Aksi</DropdownMenuLabel>
 
+                        {/* SEMUA USER BISA LIHAT DETAIL */}
                         <DropdownMenuItem asChild>
                           <Link
                             href={`/dashboard/consumable-requests/${req.id}`}
@@ -218,19 +275,53 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
                           </Link>
                         </DropdownMenuItem>
 
-                        {req.status === 'PENDING_UNIT' && (
+                        {/* MENU KHUSUS UNIT ADMIN (APPROVE/REJECT) - TIDAK ADA EDIT/DELETE */}
+                        {isUnitAdmin && req.status === 'PENDING_UNIT' && (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setEditingId(req.id)}>
-                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            <DropdownMenuItem
+                              onClick={() => handleApprove(req.id)}
+                              className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:focus:bg-green-900/20"
+                            >
+                              <Check className="mr-2 h-4 w-4" /> Setujui
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => setDeletingId(req.id)}
+                              onClick={() => setRejectId(req.id)}
                               className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
                             >
-                              <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" />{' '}
-                              Batalkan
+                              <X className="mr-2 h-4 w-4" /> Tolak
                             </DropdownMenuItem>
+                          </>
+                        )}
+
+                        {/* MENU STAFF (EDIT/DELETE) */}
+                        {!isUnitAdmin && (
+                          <>
+                            {/* Logic Edit: Pending & Rejected */}
+                            {(req.status === 'PENDING_UNIT' || req.status === 'REJECTED') && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setEditingId(req.id)}
+                                  className={
+                                    req.status === 'REJECTED'
+                                      ? 'text-orange-600 focus:bg-orange-50 focus:text-orange-700 dark:focus:bg-orange-900/20'
+                                      : ''
+                                  }
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  {req.status === 'REJECTED' ? 'Perbaiki & Ajukan Ulang' : 'Edit'}
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={() => setDeletingId(req.id)}
+                                  className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-700" />{' '}
+                                  Hapus
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </>
                         )}
                       </DropdownMenuContent>
@@ -243,8 +334,8 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
         </Table>
       </div>
 
-      {/* Dialog Edit */}
-      {editingId && itemToEdit && (
+      {/* Dialog Edit (Hanya render jika BUKAN Unit Admin) */}
+      {!isUnitAdmin && editingId && itemToEdit && (
         <RequestDialog
           mode="edit"
           open={!!editingId}
@@ -256,12 +347,45 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
             id: itemToEdit.id,
             targetWarehouseId: itemToEdit.targetWarehouseId || '',
             roomId: itemToEdit.roomId,
-            notes: itemToEdit.notes || '',
+            description: itemToEdit.description || '',
             items: itemToEdit.items,
           }}
           trigger={<span className="hidden"></span>}
         />
       )}
+
+      {/* Dialog Reject */}
+      <Dialog open={!!rejectId} onOpenChange={(open) => !open && setRejectId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tolak Permintaan</DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menolak permintaan ini? Silakan berikan alasannya.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="mb-2 block text-sm font-medium">Alasan Penolakan</label>
+            <Textarea
+              placeholder="Contoh: Stok menipis, atau bukan prioritas saat ini."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="min-h-25"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectId(null)} disabled={isProcessing}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectSubmit}
+              disabled={isProcessing || !rejectReason.trim()}
+            >
+              {isProcessing ? 'Memproses...' : 'Tolak Permintaan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog Konfirmasi Hapus */}
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>

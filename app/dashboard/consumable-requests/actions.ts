@@ -26,7 +26,7 @@ const itemSchema = z.object({
 const requestSchema = z.object({
   targetWarehouseId: z.string().min(1, 'Pilih gudang tujuan'),
   roomId: z.string().min(1, 'Pilih ruangan tujuan'),
-  notes: z.string().optional(),
+  description: z.string().optional(),
   items: z.array(itemSchema).min(1, 'Minimal satu barang harus dipilih'),
 })
 
@@ -46,7 +46,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
   const parsed = requestSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid.' }
 
-  const { targetWarehouseId, roomId, notes, items } = parsed.data
+  const { targetWarehouseId, roomId, description, items } = parsed.data
 
   const initialStatus = session.user.role === 'unit_admin' ? 'PENDING_FACULTY' : 'PENDING_UNIT'
 
@@ -98,6 +98,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         roomId: selectedRoom.id,
         targetWarehouseId: targetWarehouseId,
         status: initialStatus,
+        description: description,
       })
 
       for (const item of items) {
@@ -114,7 +115,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         requestId: requestId,
         status: initialStatus,
         actorId: session.user.id,
-        notes: notes || 'Permintaan dibuat baru.',
+        notes: 'Permintaan dibuat baru.',
       })
 
       await tx.insert(auditLogs).values({
@@ -123,7 +124,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         action: 'CREATE',
         tableName: 'requests',
         recordId: requestId,
-        newValues: { code, items, notes, initialStatus, roomId: selectedRoom.id },
+        newValues: { code, items, description, initialStatus, roomId: selectedRoom.id },
       })
     })
 
@@ -142,7 +143,7 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
   const parsed = requestSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid.' }
 
-  const { targetWarehouseId, roomId, notes, items } = parsed.data
+  const { targetWarehouseId, roomId, description, items } = parsed.data
 
   try {
     await db.transaction(async (tx) => {
@@ -163,7 +164,8 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         throw new Error('Anda tidak memiliki izin mengedit permintaan ini.')
       }
 
-      if (existingRequest.status !== 'PENDING_UNIT') {
+      const allowedStatuses = ['PENDING_UNIT', 'REJECTED']
+      if (!existingRequest.status || !allowedStatuses.includes(existingRequest.status)) {
         throw new Error('Permintaan sudah diproses, tidak bisa diedit.')
       }
 
@@ -191,6 +193,10 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         .set({
           roomId: roomId,
           targetWarehouseId: targetWarehouseId,
+          description: description,
+          status: 'PENDING_UNIT',
+          rejectionReason: null,
+          approvedByUnitId: null,
           updatedAt: new Date(),
         })
         .where(eq(requests.id, requestId))
@@ -206,12 +212,17 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         })
       }
 
+      const isResubmission = existingRequest.status === 'REJECTED'
+      const timelineNote = isResubmission
+        ? 'Permintaan diperbaiki dan diajukan ulang oleh pemohon.'
+        : 'Detail permintaan diperbarui oleh pemohon.'
+
       await tx.insert(requestTimelines).values({
         id: randomUUID(),
         requestId: requestId,
-        status: existingRequest.status!,
+        status: 'PENDING_UNIT',
         actorId: session.user.id,
-        notes: notes || 'Detail permintaan diperbarui oleh pemohon.',
+        notes: timelineNote,
       })
 
       await tx.insert(auditLogs).values({
@@ -220,7 +231,7 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         action: 'UPDATE',
         tableName: 'requests',
         recordId: requestId,
-        newValues: { items, notes, roomId, targetWarehouseId },
+        newValues: { items, description, roomId, targetWarehouseId, isResubmission },
       })
     })
 
@@ -248,8 +259,8 @@ export async function cancelRequest(requestId: string) {
       return { error: 'Anda tidak memiliki izin membatalkan permintaan ini.' }
     }
 
-    if (existing.status !== 'PENDING_UNIT') {
-      return { error: 'Permintaan sudah diproses oleh atasan atau gudang, tidak bisa dihapus.' }
+    if (existing.status !== 'PENDING_UNIT' && existing.status !== 'REJECTED') {
+      return { error: 'Permintaan sudah diproses atau selesai, tidak bisa dihapus.' }
     }
 
     await db.transaction(async (tx) => {
@@ -271,6 +282,95 @@ export async function cancelRequest(requestId: string) {
   } catch (error) {
     console.error('Delete Request Error:', error)
     return { error: 'Gagal menghapus permintaan.' }
+  }
+}
+
+export async function verifyRequest(
+  requestId: string,
+  action: 'APPROVE' | 'REJECT',
+  reason?: string,
+) {
+  const session = await requireAuth({ roles: ['unit_admin'] })
+
+  if (!session.user.unitId) {
+    return { error: 'Akun Anda tidak terhubung dengan Unit Kerja.' }
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      const [existingRequest] = await tx
+        .select()
+        .from(requests)
+        .where(eq(requests.id, requestId))
+        .limit(1)
+
+      if (!existingRequest) {
+        throw new Error('Permintaan tidak ditemukan.')
+      }
+
+      if (existingRequest.status !== 'PENDING_UNIT') {
+        throw new Error('Permintaan sudah diproses atau status tidak valid.')
+      }
+
+      const newStatus = action === 'APPROVE' ? 'APPROVED' : 'REJECTED'
+      const logMessage =
+        action === 'APPROVE'
+          ? 'Permintaan disetujui oleh Admin Unit.'
+          : `Permintaan ditolak. Alasan: ${reason}`
+
+      await tx
+        .update(requests)
+        .set({
+          status: newStatus,
+          approvedByUnitId: action === 'APPROVE' ? session.user.id : null,
+          rejectionReason: action === 'REJECT' ? reason : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(requests.id, requestId))
+
+      if (action === 'APPROVE') {
+        const items = await tx
+          .select()
+          .from(requestItems)
+          .where(eq(requestItems.requestId, requestId))
+
+        for (const item of items) {
+          await tx
+            .update(requestItems)
+            .set({
+              qtyApproved: item.qtyRequested,
+            })
+            .where(eq(requestItems.id, item.id))
+        }
+      }
+
+      await tx.insert(requestTimelines).values({
+        id: randomUUID(),
+        requestId: requestId,
+        status: newStatus,
+        actorId: session.user.id,
+        notes: logMessage,
+      })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: action,
+        tableName: 'requests',
+        recordId: requestId,
+        newValues: { status: newStatus, reason },
+      })
+    })
+
+    revalidatePath('/dashboard/consumable-requests')
+    return {
+      success: true,
+      message: action === 'APPROVE' ? 'Permintaan berhasil disetujui.' : 'Permintaan ditolak.',
+    }
+  } catch (error) {
+    console.error('Verify Request Error:', error)
+    const msg = error instanceof Error ? error.message : 'Gagal memproses permintaan.'
+    return { error: msg }
   }
 }
 
@@ -298,6 +398,10 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
       requestCode: requests.requestCode,
       status: requests.status,
       createdAt: requests.createdAt,
+
+      description: requests.description,
+      rejectionReason: requests.rejectionReason,
+
       requesterName: user.name,
       roomName: rooms.name,
       targetWarehouseId: requests.targetWarehouseId,

@@ -414,6 +414,7 @@ export const requests = pgTable('requests', {
   targetWarehouseId: text('target_warehouse_id').references(() => warehouses.id),
 
   status: requestStatusEnum('status').default('PENDING_UNIT'),
+  description: text('description'),
   rejectionReason: text('rejection_reason'),
 
   // Tracking Approval
