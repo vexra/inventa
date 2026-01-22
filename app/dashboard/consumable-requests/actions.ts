@@ -12,6 +12,7 @@ import {
   requestTimelines,
   requests,
   rooms,
+  units,
   user,
   warehouseStocks,
 } from '@/db/schema'
@@ -290,11 +291,8 @@ export async function verifyRequest(
   action: 'APPROVE' | 'REJECT',
   reason?: string,
 ) {
-  const session = await requireAuth({ roles: ['unit_admin'] })
-
-  if (!session.user.unitId) {
-    return { error: 'Akun Anda tidak terhubung dengan Unit Kerja.' }
-  }
+  const session = await requireAuth({ roles: ['unit_admin', 'faculty_admin'] })
+  const userRole = session.user.role
 
   try {
     await db.transaction(async (tx) => {
@@ -308,27 +306,44 @@ export async function verifyRequest(
         throw new Error('Permintaan tidak ditemukan.')
       }
 
-      if (existingRequest.status !== 'PENDING_UNIT') {
-        throw new Error('Permintaan sudah diproses atau status tidak valid.')
-      }
+      let newStatus: typeof requests.$inferSelect.status
+      let updateData: Partial<typeof requests.$inferSelect> = {}
+      let logMessage = ''
 
-      const newStatus = action === 'APPROVE' ? 'APPROVED' : 'REJECTED'
-      const logMessage =
-        action === 'APPROVE'
-          ? 'Permintaan disetujui oleh Admin Unit.'
-          : `Permintaan ditolak. Alasan: ${reason}`
+      if (action === 'REJECT') {
+        newStatus = 'REJECTED'
+        logMessage = `Permintaan ditolak oleh ${userRole === 'unit_admin' ? 'Unit' : 'Fakultas'}. Alasan: ${reason}`
+        updateData = { rejectionReason: reason }
+      } else {
+        if (userRole === 'unit_admin') {
+          if (existingRequest.status !== 'PENDING_UNIT') {
+            throw new Error('Unit Admin hanya dapat memproses status PENDING_UNIT.')
+          }
+          newStatus = 'PENDING_FACULTY'
+          logMessage = 'Disetujui Unit Admin. Menunggu persetujuan Fakultas.'
+          updateData = { approvedByUnitId: session.user.id }
+        } else if (userRole === 'faculty_admin') {
+          if (existingRequest.status !== 'PENDING_FACULTY') {
+            throw new Error('Faculty Admin hanya dapat memproses status PENDING_FACULTY.')
+          }
+          newStatus = 'APPROVED'
+          logMessage = 'Disetujui Fakultas. Masuk antrian gudang.'
+          updateData = { approvedByFacultyId: session.user.id }
+        } else {
+          throw new Error('Role tidak dikenali untuk approval.')
+        }
+      }
 
       await tx
         .update(requests)
         .set({
           status: newStatus,
-          approvedByUnitId: action === 'APPROVE' ? session.user.id : null,
-          rejectionReason: action === 'REJECT' ? reason : null,
           updatedAt: new Date(),
+          ...updateData,
         })
         .where(eq(requests.id, requestId))
 
-      if (action === 'APPROVE') {
+      if (newStatus === 'APPROVED') {
         const items = await tx
           .select()
           .from(requestItems)
@@ -337,9 +352,7 @@ export async function verifyRequest(
         for (const item of items) {
           await tx
             .update(requestItems)
-            .set({
-              qtyApproved: item.qtyRequested,
-            })
+            .set({ qtyApproved: item.qtyRequested })
             .where(eq(requestItems.id, item.id))
         }
       }
@@ -358,7 +371,7 @@ export async function verifyRequest(
         action: action,
         tableName: 'requests',
         recordId: requestId,
-        newValues: { status: newStatus, reason },
+        newValues: { status: newStatus, ...updateData },
       })
     })
 
@@ -375,18 +388,20 @@ export async function verifyRequest(
 }
 
 export async function getConsumableRequests(page: number = 1, limit: number = 10, query?: string) {
-  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
-  const { role, id: userId, unitId } = session.user
+  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin', 'faculty_admin'] })
+  const { role, id: userId, unitId, facultyId } = session.user
   const offset = (page - 1) * limit
 
   let searchCondition = query ? ilike(requests.requestCode, `%${query}%`) : undefined
 
-  if (role === 'unit_admin' && query) {
+  if ((role === 'unit_admin' || role === 'faculty_admin') && query) {
     searchCondition = or(ilike(requests.requestCode, `%${query}%`), ilike(user.name, `%${query}%`))
   }
 
   let whereCondition
-  if (role === 'unit_admin') {
+  if (role === 'faculty_admin') {
+    whereCondition = and(eq(units.facultyId, facultyId!), searchCondition)
+  } else if (role === 'unit_admin') {
     whereCondition = and(eq(user.unitId, unitId!), searchCondition)
   } else {
     whereCondition = and(eq(requests.requesterId, userId), searchCondition)
@@ -398,10 +413,8 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
       requestCode: requests.requestCode,
       status: requests.status,
       createdAt: requests.createdAt,
-
       description: requests.description,
       rejectionReason: requests.rejectionReason,
-
       requesterName: user.name,
       roomName: rooms.name,
       targetWarehouseId: requests.targetWarehouseId,
@@ -410,15 +423,14 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
     .from(requests)
     .innerJoin(user, eq(requests.requesterId, user.id))
     .innerJoin(rooms, eq(requests.roomId, rooms.id))
+    .leftJoin(units, eq(user.unitId, units.id))
     .where(whereCondition)
     .orderBy(desc(requests.createdAt))
     .limit(limit)
     .offset(offset)
 
   const requestIds = requestsData.map((r) => r.id)
-
   const itemsMap: Record<string, { consumableId: string; quantity: number }[]> = {}
-
   if (requestIds.length > 0) {
     const itemsData = await db
       .select({
@@ -428,11 +440,8 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
       })
       .from(requestItems)
       .where(inArray(requestItems.requestId, requestIds))
-
     itemsData.forEach((item) => {
-      if (!itemsMap[item.requestId!]) {
-        itemsMap[item.requestId!] = []
-      }
+      if (!itemsMap[item.requestId!]) itemsMap[item.requestId!] = []
       itemsMap[item.requestId!].push({
         consumableId: item.consumableId,
         quantity: Number(item.qtyRequested),
@@ -444,13 +453,13 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
     ...req,
     items: itemsMap[req.id] || [],
     itemCount: (itemsMap[req.id] || []).length,
-    notes: null,
   }))
 
   const countRes = await db
     .select({ count: sql<number>`count(DISTINCT ${requests.id})` })
     .from(requests)
     .innerJoin(user, eq(requests.requesterId, user.id))
+    .leftJoin(units, eq(user.unitId, units.id))
     .where(whereCondition)
 
   return {

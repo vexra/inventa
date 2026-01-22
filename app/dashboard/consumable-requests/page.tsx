@@ -18,10 +18,10 @@ interface PageProps {
 }
 
 export default async function RequestConsumablesPage({ searchParams }: PageProps) {
-  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
+  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin', 'faculty_admin'] })
   const userRole = session.user.role
 
-  if (!session.user.unitId) {
+  if (userRole !== 'faculty_admin' && !session.user.unitId) {
     return <div>Error: Akun Anda tidak terhubung dengan Unit Kerja.</div>
   }
 
@@ -60,14 +60,16 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
       )
       .orderBy(asc(consumables.name)),
 
-    db
-      .select({
-        id: rooms.id,
-        name: rooms.name,
-      })
-      .from(rooms)
-      .where(eq(rooms.unitId, session.user.unitId))
-      .orderBy(asc(rooms.name)),
+    session.user.unitId
+      ? db
+          .select({
+            id: rooms.id,
+            name: rooms.name,
+          })
+          .from(rooms)
+          .where(eq(rooms.unitId, session.user.unitId))
+          .orderBy(asc(rooms.name))
+      : Promise.resolve([]),
   ])
 
   const availableStocks = aggregatedStocks.map((stock) => ({
@@ -77,12 +79,17 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
 
   const { data, totalItems } = requestsData
   const totalPages = Math.ceil(totalItems / limit)
-  const isUnitAdmin = userRole === 'unit_admin'
 
-  const pageTitle = isUnitAdmin ? 'Permintaan Unit' : 'Permintaan Saya'
-  const pageDescription = isUnitAdmin
-    ? 'Pantau semua permintaan barang dari staff di Unit Kerja Anda.'
-    : 'Ajukan permintaan barang baru dan pantau statusnya di sini.'
+  let pageTitle = 'Permintaan Saya'
+  let pageDescription = 'Ajukan permintaan barang baru dan pantau statusnya di sini.'
+
+  if (userRole === 'unit_admin') {
+    pageTitle = 'Permintaan Unit'
+    pageDescription = 'Pantau dan setujui permintaan barang dari staff di Unit Kerja Anda.'
+  } else if (userRole === 'faculty_admin') {
+    pageTitle = 'Permintaan Fakultas'
+    pageDescription = 'Verifikasi akhir permintaan barang dari berbagai unit di fakultas.'
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -92,12 +99,19 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
           <p className="text-muted-foreground">{pageDescription}</p>
         </div>
 
-        <RequestDialog warehouses={warehousesList} stocks={availableStocks} rooms={unitRooms} />
+        {/* Hanya tampilkan Dialog Buat Request jika bukan Faculty Admin */}
+        {userRole !== 'faculty_admin' && (
+          <RequestDialog warehouses={warehousesList} stocks={availableStocks} rooms={unitRooms} />
+        )}
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
         <SearchInput
-          placeholder={isUnitAdmin ? 'Cari Kode / Nama Pemohon...' : 'Cari Kode Request...'}
+          placeholder={
+            userRole === 'unit_admin' || userRole === 'faculty_admin'
+              ? 'Cari Kode / Nama Pemohon...'
+              : 'Cari Kode Request...'
+          }
           className="w-full sm:max-w-xs"
         />
       </div>
@@ -105,7 +119,7 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
       <div className="flex flex-col gap-4">
         <RequestTable
           data={data}
-          isUnitAdmin={isUnitAdmin}
+          userRole={userRole}
           warehouses={warehousesList}
           rooms={unitRooms}
           stocks={availableStocks}

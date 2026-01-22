@@ -92,21 +92,26 @@ interface RequestData {
 
 interface RequestTableProps {
   data: RequestData[]
-  isUnitAdmin: boolean
+  userRole: string | null | undefined
   warehouses: WarehouseOption[]
   rooms: RoomOption[]
   stocks: StockOption[]
 }
 
-export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: RequestTableProps) {
+export function RequestTable({ data, userRole, warehouses, rooms, stocks }: RequestTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
 
   const itemToEdit = data.find((item) => item.id === editingId)
+
+  const currentRole = userRole || ''
+  const isUnitAdmin = currentRole === 'unit_admin'
+  const isFacultyAdmin = currentRole === 'faculty_admin'
+  const isStaff = currentRole === 'unit_staff'
+  const isAdmin = isUnitAdmin || isFacultyAdmin
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -175,7 +180,7 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
               <TableHead className="min-w-45">Request Info</TableHead>
               <TableHead className="w-50">Status</TableHead>
               <TableHead>Tanggal</TableHead>
-              {isUnitAdmin && <TableHead>Pemohon</TableHead>}
+              {isAdmin && <TableHead>Pemohon</TableHead>}
               <TableHead className="text-center">Total Item</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
@@ -184,7 +189,7 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
             {data.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isUnitAdmin ? 7 : 6}
+                  colSpan={isAdmin ? 7 : 6}
                   className="text-muted-foreground h-24 text-center"
                 >
                   Belum ada permintaan barang.
@@ -210,7 +215,6 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
                   <TableCell>
                     <div className="flex flex-col items-start gap-1.5">
                       <StatusBadge status={req.status as RequestStatus} />
-                      {/* Tampilkan Rejection Reason jika REJECTED */}
                       {req.status === 'REJECTED' && req.rejectionReason && (
                         <div className="flex items-start gap-1.5 rounded bg-red-50 p-2 text-[11px] text-red-700 dark:bg-red-900/20 dark:text-red-300">
                           <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
@@ -235,7 +239,7 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
                     </div>
                   </TableCell>
 
-                  {isUnitAdmin && (
+                  {isAdmin && (
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <User className="text-muted-foreground h-3.5 w-3.5" />
@@ -265,7 +269,6 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Aksi</DropdownMenuLabel>
 
-                        {/* SEMUA USER BISA LIHAT DETAIL */}
                         <DropdownMenuItem asChild>
                           <Link
                             href={`/dashboard/consumable-requests/${req.id}`}
@@ -275,7 +278,7 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
                           </Link>
                         </DropdownMenuItem>
 
-                        {/* MENU KHUSUS UNIT ADMIN (APPROVE/REJECT) - TIDAK ADA EDIT/DELETE */}
+                        {/* MENU UNIT ADMIN */}
                         {isUnitAdmin && req.status === 'PENDING_UNIT' && (
                           <>
                             <DropdownMenuSeparator />
@@ -294,36 +297,44 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
                           </>
                         )}
 
-                        {/* MENU STAFF (EDIT/DELETE) */}
-                        {!isUnitAdmin && (
+                        {/* MENU FACULTY ADMIN */}
+                        {isFacultyAdmin && req.status === 'PENDING_FACULTY' && (
                           <>
-                            {/* Logic Edit: Pending & Rejected */}
-                            {(req.status === 'PENDING_UNIT' || req.status === 'REJECTED') && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => setEditingId(req.id)}
-                                  className={
-                                    req.status === 'REJECTED'
-                                      ? 'text-orange-600 focus:bg-orange-50 focus:text-orange-700 dark:focus:bg-orange-900/20'
-                                      : ''
-                                  }
-                                >
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  {req.status === 'REJECTED' ? 'Perbaiki & Ajukan Ulang' : 'Edit'}
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem
-                                  onClick={() => setDeletingId(req.id)}
-                                  className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-700" />{' '}
-                                  Hapus
-                                </DropdownMenuItem>
-                              </>
-                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleApprove(req.id)}
+                              className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:focus:bg-green-900/20"
+                            >
+                              <Check className="mr-2 h-4 w-4" /> Setujui Final
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setRejectId(req.id)}
+                              className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
+                            >
+                              <X className="mr-2 h-4 w-4" /> Tolak
+                            </DropdownMenuItem>
                           </>
                         )}
+
+                        {/* MENU STAFF */}
+                        {isStaff &&
+                          (req.status === 'PENDING_UNIT' || req.status === 'REJECTED') && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setEditingId(req.id)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => setDeletingId(req.id)}
+                                className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-700" />{' '}
+                                Hapus
+                              </DropdownMenuItem>
+                            </>
+                          )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -334,8 +345,8 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
         </Table>
       </div>
 
-      {/* Dialog Edit (Hanya render jika BUKAN Unit Admin) */}
-      {!isUnitAdmin && editingId && itemToEdit && (
+      {/* Dialog Edit */}
+      {isStaff && editingId && itemToEdit && (
         <RequestDialog
           mode="edit"
           open={!!editingId}
@@ -415,7 +426,7 @@ export function RequestTable({ data, isUnitAdmin, warehouses, rooms, stocks }: R
 const STATUS_CONFIG: Record<RequestStatus, { label: string; className: string; icon: LucideIcon }> =
   {
     PENDING_UNIT: {
-      label: 'Menunggu Admin Unit',
+      label: 'Menunggu Unit',
       className:
         'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
       icon: Clock,

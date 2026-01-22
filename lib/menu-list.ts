@@ -194,8 +194,8 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Otorisasi & Pengadaan',
       items: [
         {
-          title: 'Verifikasi Permintaan',
-          url: '/dashboard/requests',
+          title: 'Permintaan Barang',
+          url: '/dashboard/consumable-requests',
           icon: ClipboardList,
         },
         {
