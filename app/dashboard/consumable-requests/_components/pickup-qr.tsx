@@ -70,13 +70,18 @@ export function PickupQR({ open, onOpenChange, requestId, requestCode }: PickupQ
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground w-full sm:w-auto"
+            className="text-muted-foreground w-full hover:text-blue-600 sm:w-auto dark:hover:text-blue-400"
             onClick={handleCopyId}
           >
             <Copy className="mr-2 h-3 w-3" />
             Salin ID
           </Button>
-          <Button type="button" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
+
+          <Button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="w-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
+          >
             Tutup
           </Button>
         </DialogFooter>
