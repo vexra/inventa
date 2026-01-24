@@ -395,14 +395,14 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => setDeletingId(req.id)}
-                                  className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40 dark:focus:text-red-300"
+                                  className="text-red-600 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-900/20"
                                 >
-                                  <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                  <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" />
+                                  Hapus
                                 </DropdownMenuItem>
                               </>
                             )}
 
-                            {/* UNIT: TUNJUKKAN QR KE PETUGAS */}
                             {req.status === 'READY_TO_PICKUP' && (
                               <>
                                 <DropdownMenuSeparator />
