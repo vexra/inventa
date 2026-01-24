@@ -512,6 +512,7 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
   const session = await requireAuth({
     roles: ['unit_staff', 'unit_admin', 'faculty_admin', 'warehouse_staff'],
   })
+
   const { role, id: userId, unitId, facultyId, warehouseId } = session.user
   const offset = (page - 1) * limit
 
@@ -522,16 +523,28 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
   }
 
   let whereCondition
+
   if (role === 'faculty_admin') {
-    whereCondition = and(eq(units.facultyId, facultyId!), searchCondition)
-  } else if (role === 'unit_admin') {
-    whereCondition = and(eq(user.unitId, unitId!), searchCondition)
+    whereCondition = and(
+      eq(units.facultyId, facultyId!),
+      inArray(requests.status, [
+        'PENDING_FACULTY',
+        'APPROVED',
+        'PROCESSING',
+        'READY_TO_PICKUP',
+        'COMPLETED',
+        'REJECTED',
+      ]),
+      searchCondition,
+    )
   } else if (role === 'warehouse_staff') {
     whereCondition = and(
       eq(requests.targetWarehouseId, warehouseId!),
       inArray(requests.status, ['APPROVED', 'PROCESSING', 'READY_TO_PICKUP', 'COMPLETED']),
       searchCondition,
     )
+  } else if (role === 'unit_admin') {
+    whereCondition = and(eq(user.unitId, unitId!), searchCondition)
   } else {
     whereCondition = and(eq(requests.requesterId, userId), searchCondition)
   }
@@ -573,8 +586,10 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
       .where(inArray(requestItems.requestId, requestIds))
 
     itemsData.forEach((item) => {
-      if (!itemsMap[item.requestId!]) itemsMap[item.requestId!] = []
-      itemsMap[item.requestId!].push({
+      if (!item.requestId) return
+      if (!itemsMap[item.requestId]) itemsMap[item.requestId] = []
+
+      itemsMap[item.requestId].push({
         consumableId: item.consumableId,
         quantity: Number(item.qtyApproved ?? item.qtyRequested),
       })
