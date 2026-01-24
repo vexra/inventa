@@ -7,7 +7,6 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import {
-  AlertCircle,
   Ban,
   Box,
   Calendar,
@@ -239,17 +238,7 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
                   </TableCell>
 
                   <TableCell>
-                    <div className="flex flex-col items-start gap-1.5">
-                      <StatusBadge status={req.status as RequestStatus} />
-                      {req.status === 'REJECTED' && req.rejectionReason && (
-                        <div className="flex items-start gap-1.5 rounded bg-red-50 p-2 text-[11px] text-red-700 dark:bg-red-900/20 dark:text-red-300">
-                          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-                          <span className="line-clamp-2 max-w-45" title={req.rejectionReason}>
-                            {req.rejectionReason}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <StatusBadge status={req.status as RequestStatus} />
                   </TableCell>
 
                   <TableCell>
