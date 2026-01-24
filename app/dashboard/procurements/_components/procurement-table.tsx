@@ -6,17 +6,7 @@ import Link from 'next/link'
 
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import {
-  AlertCircle,
-  Calendar,
-  Check,
-  Eye,
-  MoreHorizontal,
-  PackageCheck,
-  Pencil,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Calendar, Check, Eye, MoreHorizontal, PackageCheck, Pencil, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -198,17 +188,7 @@ export function ProcurementTable({ data, consumables, userRole }: ProcurementTab
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col items-start gap-1.5">
-                      <StatusBadge status={item.status as ProcurementStatus} />
-                      {item.status === 'REJECTED' && item.notes && (
-                        <div className="flex items-center gap-1.5 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700 dark:bg-red-900/20 dark:text-red-300">
-                          <AlertCircle className="h-3 w-3 shrink-0" />
-                          <span className="max-w-37.5 truncate" title={item.notes}>
-                            {item.notes}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <StatusBadge status={item.status as ProcurementStatus} />
                   </TableCell>
                   <TableCell>
                     <div className="text-muted-foreground flex items-center gap-2">
