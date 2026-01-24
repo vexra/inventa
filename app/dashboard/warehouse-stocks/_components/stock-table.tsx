@@ -146,6 +146,10 @@ export function StockTable({ data }: StockTableProps) {
         </Table>
       </div>
 
+      <div className="text-muted-foreground mt-2 text-right text-xs italic">
+        * Klik pada baris barang untuk melihat detail.
+      </div>
+
       <StockDetailDialog
         open={!!selectedItem}
         onOpenChange={(open) => !open && setSelectedItem(null)}
