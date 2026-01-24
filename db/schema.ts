@@ -414,6 +414,7 @@ export const requests = pgTable('requests', {
   targetWarehouseId: text('target_warehouse_id').references(() => warehouses.id),
 
   status: requestStatusEnum('status').default('PENDING_UNIT'),
+  description: text('description'),
   rejectionReason: text('rejection_reason'),
 
   // Tracking Approval
@@ -452,6 +453,31 @@ export const requestItems = pgTable('request_items', {
 
   qtyRequested: decimal('qty_requested', { precision: 10, scale: 2 }).notNull(),
   qtyApproved: decimal('qty_approved', { precision: 10, scale: 2 }), // Admin bisa menyetujui sebagian (partial)
+})
+
+// Alokasi Stok (FEFO Result)
+export const requestItemAllocations = pgTable('request_item_allocations', {
+  id: text('id').primaryKey(),
+
+  requestItemId: text('request_item_id')
+    .notNull()
+    .references(() => requestItems.id, { onDelete: 'cascade' }),
+
+  // Snapshot Data (Agar warehouse staff tau ambil barang di mana & batch apa)
+  warehouseId: text('warehouse_id')
+    .notNull()
+    .references(() => warehouses.id),
+
+  consumableId: text('consumable_id')
+    .notNull()
+    .references(() => consumables.id),
+
+  batchNumber: text('batch_number'), // Batch spesifik yang harus diambil
+  expiryDate: timestamp('expiry_date'), // Informasi expired date batch tersebut
+
+  quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(), // Jumlah yang diambil dari batch ini
+
+  createdAt: timestamp('created_at').defaultNow(),
 })
 
 /**
@@ -756,10 +782,26 @@ export const requestTimelinesRelations = relations(requestTimelines, ({ one }) =
   actor: one(user, { fields: [requestTimelines.actorId], references: [user.id] }),
 }))
 
-export const requestItemsRelations = relations(requestItems, ({ one }) => ({
+export const requestItemsRelations = relations(requestItems, ({ one, many }) => ({
   request: one(requests, { fields: [requestItems.requestId], references: [requests.id] }),
   consumable: one(consumables, {
     fields: [requestItems.consumableId],
+    references: [consumables.id],
+  }),
+  allocations: many(requestItemAllocations),
+}))
+
+export const requestItemAllocationsRelations = relations(requestItemAllocations, ({ one }) => ({
+  requestItem: one(requestItems, {
+    fields: [requestItemAllocations.requestItemId],
+    references: [requestItems.id],
+  }),
+  warehouse: one(warehouses, {
+    fields: [requestItemAllocations.warehouseId],
+    references: [warehouses.id],
+  }),
+  consumable: one(consumables, {
+    fields: [requestItemAllocations.consumableId],
     references: [consumables.id],
   }),
 }))

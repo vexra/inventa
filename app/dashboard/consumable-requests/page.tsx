@@ -18,11 +18,28 @@ interface PageProps {
 }
 
 export default async function RequestConsumablesPage({ searchParams }: PageProps) {
-  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
+  const session = await requireAuth({
+    roles: ['unit_staff', 'unit_admin', 'faculty_admin', 'warehouse_staff'],
+  })
   const userRole = session.user.role
 
-  if (!session.user.unitId) {
-    return <div>Error: Akun Anda tidak terhubung dengan Unit Kerja.</div>
+  const isUnitUser = userRole === 'unit_staff' || userRole === 'unit_admin'
+  const isWarehouseUser = userRole === 'warehouse_staff'
+
+  if (isUnitUser && !session.user.unitId) {
+    return (
+      <div className="p-6 text-red-500">
+        Error: Akun Unit Anda tidak terhubung dengan data Unit Kerja. Hubungi Administrator.
+      </div>
+    )
+  }
+
+  if (isWarehouseUser && !session.user.warehouseId) {
+    return (
+      <div className="p-6 text-red-500">
+        Error: Akun Gudang Anda tidak terhubung dengan data Gudang. Hubungi Administrator.
+      </div>
+    )
   }
 
   const params = await searchParams
@@ -30,7 +47,7 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
   const page = Number(params.page) || 1
   const limit = 10
 
-  const [requestsData, warehousesList, rawStocks, unitRooms] = await Promise.all([
+  const [requestsData, warehousesList, aggregatedStocks, unitRooms] = await Promise.all([
     getConsumableRequests(page, limit, query),
 
     db
@@ -44,39 +61,60 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
     db
       .select({
         warehouseId: warehouseStocks.warehouseId,
-        consumableId: consumables.id,
+        consumableId: warehouseStocks.consumableId,
         name: consumables.name,
         unit: consumables.baseUnit,
-        quantity: warehouseStocks.quantity,
+        quantity: sql<number>`sum(${warehouseStocks.quantity})`.mapWith(Number),
       })
       .from(warehouseStocks)
       .innerJoin(consumables, eq(warehouseStocks.consumableId, consumables.id))
       .where(sql`${warehouseStocks.quantity} > 0`)
+      .groupBy(
+        warehouseStocks.warehouseId,
+        warehouseStocks.consumableId,
+        consumables.name,
+        consumables.baseUnit,
+      )
       .orderBy(asc(consumables.name)),
 
-    db
-      .select({
-        id: rooms.id,
-        name: rooms.name,
-      })
-      .from(rooms)
-      .where(eq(rooms.unitId, session.user.unitId))
-      .orderBy(asc(rooms.name)),
+    session.user.unitId
+      ? db
+          .select({
+            id: rooms.id,
+            name: rooms.name,
+          })
+          .from(rooms)
+          .where(eq(rooms.unitId, session.user.unitId))
+          .orderBy(asc(rooms.name))
+      : Promise.resolve([]),
   ])
 
-  const availableStocks = rawStocks.map((stock) => ({
+  const availableStocks = aggregatedStocks.map((stock) => ({
     ...stock,
     quantity: stock.quantity ?? 0,
   }))
 
   const { data, totalItems } = requestsData
   const totalPages = Math.ceil(totalItems / limit)
-  const isUnitAdmin = userRole === 'unit_admin'
 
-  const pageTitle = isUnitAdmin ? 'Permintaan Unit' : 'Permintaan Saya'
-  const pageDescription = isUnitAdmin
-    ? 'Pantau semua permintaan barang dari staff di Unit Kerja Anda.'
-    : 'Ajukan permintaan barang baru dan pantau statusnya di sini.'
+  let pageTitle = 'Permintaan Saya'
+  let pageDescription = 'Ajukan permintaan barang baru dan pantau statusnya di sini.'
+
+  if (userRole === 'unit_admin') {
+    pageTitle = 'Permintaan Unit'
+    pageDescription = 'Pantau dan setujui permintaan barang dari staff di Unit Kerja Anda.'
+  } else if (userRole === 'faculty_admin') {
+    pageTitle = 'Permintaan Fakultas'
+    pageDescription = 'Verifikasi akhir permintaan barang dari berbagai unit di fakultas.'
+  } else if (userRole === 'warehouse_staff') {
+    pageTitle = 'Dashboard Gudang'
+    pageDescription = 'Kelola permintaan masuk, siapkan barang, dan proses pengambilan via QR.'
+  }
+
+  const canCreateRequest = userRole === 'unit_staff'
+
+  const canExtendedSearch =
+    userRole === 'unit_admin' || userRole === 'faculty_admin' || userRole === 'warehouse_staff'
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -86,18 +124,26 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
           <p className="text-muted-foreground">{pageDescription}</p>
         </div>
 
-        <RequestDialog warehouses={warehousesList} stocks={availableStocks} rooms={unitRooms} />
+        {canCreateRequest && (
+          <RequestDialog warehouses={warehousesList} stocks={availableStocks} rooms={unitRooms} />
+        )}
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
         <SearchInput
-          placeholder={isUnitAdmin ? 'Cari Kode / Nama Pemohon...' : 'Cari Kode Request...'}
+          placeholder={canExtendedSearch ? 'Cari Kode / Nama Pemohon...' : 'Cari Kode Request...'}
           className="w-full sm:max-w-xs"
         />
       </div>
 
       <div className="flex flex-col gap-4">
-        <RequestTable data={data} isUnitAdmin={isUnitAdmin} />
+        <RequestTable
+          data={data}
+          userRole={userRole}
+          warehouses={warehousesList}
+          rooms={unitRooms}
+          stocks={availableStocks}
+        />
 
         {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
       </div>
