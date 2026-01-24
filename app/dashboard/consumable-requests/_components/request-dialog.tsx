@@ -50,7 +50,7 @@ import { createRequest, updateRequest } from '../actions'
 const formSchema = z.object({
   targetWarehouseId: z.string().min(1, 'Pilih gudang tujuan'),
   roomId: z.string().min(1, 'Pilih ruangan tujuan'),
-  description: z.string().optional(),
+  description: z.string().min(3, 'Keperluan wajib diisi (Min. 3 karakter)'),
   items: z
     .array(
       z.object({
@@ -63,16 +63,8 @@ const formSchema = z.object({
 
 type RequestFormValues = z.infer<typeof formSchema>
 
-export type WarehouseOption = {
-  id: string
-  name: string
-}
-
-export type RoomOption = {
-  id: string
-  name: string
-}
-
+export type WarehouseOption = { id: string; name: string }
+export type RoomOption = { id: string; name: string }
 export type StockOption = {
   warehouseId: string
   consumableId: string
@@ -125,45 +117,35 @@ function RequestItemRow({
   const maxQty = selectedStock ? Number(selectedStock.quantity) : 1
 
   return (
-    <div className="group bg-card text-card-foreground relative flex flex-col items-start gap-4 rounded-lg border p-4 shadow-sm sm:flex-row sm:items-start">
-      <div className="bg-muted text-muted-foreground absolute top-4 -left-2 hidden h-5 w-5 -translate-x-1 items-center justify-center rounded-full text-[10px] font-bold shadow-sm sm:flex">
+    <div className="group bg-card text-card-foreground relative flex flex-col gap-4 rounded-lg border p-4 shadow-sm transition-colors hover:border-blue-400 sm:flex-row sm:items-start sm:gap-3">
+      <div className="bg-muted text-muted-foreground mt-9 hidden h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold sm:flex">
         {index + 1}
       </div>
 
-      <div className="w-full flex-1 space-y-4">
+      <div className="flex-1">
         <FormField
           control={control}
           name={`items.${index}.consumableId`}
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                Nama Barang
+                Pilih Barang
               </FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="bg-background w-full">
-                    <SelectValue placeholder="Pilih item..." />
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Cari item..." />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {filteredOptions.length === 0 ? (
-                    <div className="text-muted-foreground p-2 text-center text-xs">
-                      {availableItems.length === 0
-                        ? 'Stok Kosong di Gudang Ini'
-                        : 'Semua jenis barang sudah dipilih'}
-                    </div>
-                  ) : (
-                    filteredOptions.map((item) => (
-                      <SelectItem key={item.consumableId} value={item.consumableId}>
-                        <div className="flex w-full items-center justify-between gap-4">
-                          <span className="font-medium">{item.name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            (Stok: {Number(item.quantity)} {item.unit})
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))
-                  )}
+                  {filteredOptions.map((item) => (
+                    <SelectItem key={item.consumableId} value={item.consumableId}>
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">
+                        (Stok: {item.quantity} {item.unit})
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -172,41 +154,23 @@ function RequestItemRow({
         />
       </div>
 
-      <div className="flex w-full items-end gap-2 sm:w-auto">
+      <div className="flex items-end gap-2">
         <FormField
           control={control}
           name={`items.${index}.quantity`}
           render={({ field }) => (
-            <FormItem className="w-full sm:w-28">
+            <FormItem className="w-full sm:w-24">
               <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                Jumlah {selectedStock && `(Max: ${maxQty})`}
+                Jumlah
               </FormLabel>
               <FormControl>
                 <Input
                   type="number"
-                  min={1}
-                  max={maxQty}
-                  className="bg-background text-center font-medium"
+                  className="text-center font-medium"
                   {...field}
-                  value={field.value === 0 ? '' : field.value}
                   onChange={(e) => {
-                    const val = e.target.value
-                    if (val === '') {
-                      field.onChange('')
-                      return
-                    }
-                    const parsedVal = parseInt(val)
-                    if (parsedVal > maxQty) {
-                      toast.warning(`Stok tersedia hanya ${maxQty}`)
-                      field.onChange(maxQty)
-                    } else {
-                      field.onChange(parsedVal)
-                    }
-                  }}
-                  onBlur={() => {
-                    if (!field.value || Number(field.value) < 1) {
-                      field.onChange(1)
-                    }
+                    const val = e.target.valueAsNumber || 1
+                    field.onChange(val > maxQty ? maxQty : val)
                   }}
                 />
               </FormControl>
@@ -219,7 +183,7 @@ function RequestItemRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="text-muted-foreground mb-0.5 hover:bg-red-50 hover:text-red-600"
+          className="text-muted-foreground mt-7 hidden hover:bg-red-50 hover:text-red-600 sm:flex"
           onClick={() => remove(index)}
           disabled={!isRemovable}
         >
@@ -234,6 +198,7 @@ export function RequestDialog({
   warehouses = [],
   stocks = [],
   rooms = [],
+  children,
   open: controlledOpen,
   onOpenChange: setControlledOpen,
   trigger,
@@ -241,19 +206,8 @@ export function RequestDialog({
   mode = 'create',
 }: RequestDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
-
-  const isControlled = controlledOpen !== undefined
-
-  const open = isControlled ? controlledOpen : internalOpen
-
-  const setOpen = (value: boolean) => {
-    if (isControlled) {
-      setControlledOpen?.(value)
-    } else {
-      setInternalOpen(value)
-    }
-  }
-
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = setControlledOpen || setInternalOpen
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm({
@@ -266,16 +220,28 @@ export function RequestDialog({
     },
   })
 
+  const { fields, append, remove, replace } = useFieldArray({
+    control: form.control,
+    name: 'items',
+  })
+
+  const watchedItems = useWatch({ control: form.control, name: 'items' })
+  const selectedWarehouseId = useWatch({ control: form.control, name: 'targetWarehouseId' })
+
+  const availableItems = useMemo(() => {
+    if (!selectedWarehouseId) return []
+    return stocks.filter((s) => s.warehouseId === selectedWarehouseId && Number(s.quantity) > 0)
+  }, [selectedWarehouseId, stocks])
+
+  const isAllItemsSelected = useMemo(() => {
+    return availableItems.length > 0 && watchedItems.length >= availableItems.length
+  }, [availableItems, watchedItems])
+
   useEffect(() => {
     if (open) {
       if (mode === 'edit' && initialData) {
-        form.reset({
-          targetWarehouseId: initialData.targetWarehouseId,
-          roomId: initialData.roomId,
-          description: initialData.description || '',
-          items: initialData.items,
-        })
-      } else if (mode === 'create') {
+        form.reset(initialData)
+      } else {
         form.reset({
           targetWarehouseId: '',
           roomId: '',
@@ -284,81 +250,30 @@ export function RequestDialog({
         })
       }
     }
-  }, [initialData, open, form, mode])
-
-  const watchedItems = useWatch({
-    control: form.control,
-    name: 'items',
-  })
-
-  const { fields, append, remove, replace } = useFieldArray({
-    control: form.control,
-    name: 'items',
-  })
-
-  const selectedWarehouseId = useWatch({
-    control: form.control,
-    name: 'targetWarehouseId',
-  })
-
-  const availableItems = useMemo(() => {
-    if (!selectedWarehouseId) return []
-    return stocks.filter((s) => s.warehouseId === selectedWarehouseId && Number(s.quantity) > 0)
-  }, [selectedWarehouseId, stocks])
+  }, [open, mode, initialData, form])
 
   async function onSubmit(values: RequestFormValues) {
-    for (const item of values.items) {
-      const stock = availableItems.find((s) => s.consumableId === item.consumableId)
-      if (stock && item.quantity > Number(stock.quantity)) {
-        toast.error(`Stok ${stock.name} tidak mencukupi (Tersedia: ${stock.quantity}).`)
-        return
-      }
-    }
-
     setIsLoading(true)
-
-    let res
-    if (mode === 'edit' && initialData?.id) {
-      res = await updateRequest(initialData.id, values)
-    } else {
-      res = await createRequest(values)
-    }
+    const res =
+      mode === 'edit' && initialData?.id
+        ? await updateRequest(initialData.id, values)
+        : await createRequest(values)
 
     setIsLoading(false)
-
-    if (res.error) {
-      toast.error(res.error)
-    } else {
+    if (res.error) toast.error(res.error)
+    else {
       toast.success(res.message)
       setOpen(false)
-      if (mode === 'create') form.reset()
+      form.reset()
     }
   }
-
-  const handleWarehouseChange = (value: string) => {
-    const currentWarehouse = form.getValues('targetWarehouseId')
-    form.setValue('targetWarehouseId', value)
-
-    if (value !== currentWarehouse) {
-      replace([{ consumableId: '', quantity: 1 }])
-    }
-  }
-
-  const dialogTitle = mode === 'edit' ? 'Edit Permintaan' : 'Buat Permintaan Barang'
-  const dialogDescription =
-    mode === 'edit'
-      ? 'Ubah detail permintaan barang.'
-      : 'Isi form untuk mengajukan permintaan baru.'
-  const submitText = mode === 'edit' ? 'Simpan Perubahan' : 'Ajukan Permintaan'
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ? (
-          trigger
-        ) : (
+        {trigger || children || (
           <Button className="bg-blue-600 text-white shadow-sm hover:bg-blue-700">
-            <ShoppingCart className="mr-2 h-4 w-4" /> Buat Permintaan
+            <Plus className="mr-2 h-4 w-4" /> Buat Permintaan
           </Button>
         )}
       </DialogTrigger>
@@ -374,8 +289,12 @@ export function RequestDialog({
               )}
             </div>
             <div>
-              <DialogTitle>{dialogTitle}</DialogTitle>
-              <DialogDescription>{dialogDescription}</DialogDescription>
+              <DialogTitle>
+                {mode === 'edit' ? 'Edit Permintaan' : 'Buat Permintaan Barang'}
+              </DialogTitle>
+              <DialogDescription>
+                Formulir pengajuan pengambilan barang dari gudang.
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -391,10 +310,9 @@ export function RequestDialog({
                   control={form.control}
                   name="roomId"
                   render={({ field }) => (
-                    <FormItem className="w-full">
+                    <FormItem>
                       <FormLabel className="flex items-center gap-2">
-                        <Building2 className="text-muted-foreground h-4 w-4" />
-                        Untuk Ruangan
+                        <Building2 className="h-4 w-4" /> Ruangan
                       </FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
@@ -403,34 +321,32 @@ export function RequestDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {rooms.length === 0 ? (
-                            <div className="text-muted-foreground p-2 text-center text-xs">
-                              Unit tidak memiliki ruangan
-                            </div>
-                          ) : (
-                            rooms.map((r) => (
-                              <SelectItem key={r.id} value={r.id}>
-                                {r.name}
-                              </SelectItem>
-                            ))
-                          )}
+                          {rooms.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="targetWarehouseId"
                   render={({ field }) => (
-                    <FormItem className="w-full">
+                    <FormItem>
                       <FormLabel className="flex items-center gap-2">
-                        <Warehouse className="text-muted-foreground h-4 w-4" />
-                        Ambil dari Gudang
+                        <Warehouse className="h-4 w-4" /> Dari Gudang
                       </FormLabel>
-                      <Select onValueChange={handleWarehouseChange} value={field.value}>
+                      <Select
+                        onValueChange={(v) => {
+                          field.onChange(v)
+                          replace([{ consumableId: '', quantity: 1 }])
+                        }}
+                        value={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Pilih Gudang..." />
@@ -450,19 +366,17 @@ export function RequestDialog({
                 />
               </div>
 
-              {/* FIELD DESCRIPTION */}
               <FormField
                 control={form.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
-                      <FileText className="text-muted-foreground h-3.5 w-3.5" />
-                      Keperluan / Deskripsi
+                      <FileText className="h-3.5 w-3.5" /> Keperluan
                     </FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Contoh: Untuk keperluan Praktikum Modul 1..."
+                        placeholder="Alasan permintaan barang..."
                         className="h-20 resize-none"
                         {...field}
                       />
@@ -472,60 +386,60 @@ export function RequestDialog({
                 )}
               />
 
-              <div className="mt-2 flex items-center justify-between border-b pb-2">
+              <div className="mt-5 flex items-center justify-between border-b pb-2">
                 <h3 className="text-muted-foreground text-sm font-medium">Daftar Barang</h3>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
+                  disabled={isAllItemsSelected || !selectedWarehouseId}
                   onClick={() => append({ consumableId: '', quantity: 1 })}
-                  className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                  disabled={!selectedWarehouseId}
+                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                 >
-                  <Plus className="mr-2 h-3.5 w-3.5" /> Tambah Baris
+                  <Plus className="mr-2 h-3.5 w-3.5" />
+                  {isAllItemsSelected ? 'Semua Stok Dipilih' : 'Tambah Baris'}
                 </Button>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {!selectedWarehouseId && (
-                <div className="text-muted-foreground flex h-32 flex-col items-center justify-center text-sm italic">
-                  <Warehouse className="mb-2 h-8 w-8 opacity-20" />
-                  Pilih Gudang Sumber terlebih dahulu untuk melihat stok.
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3">
-                {selectedWarehouseId &&
+              <div className="flex flex-col gap-4">
+                {selectedWarehouseId ? (
                   fields.map((fieldItem, index) => (
                     <RequestItemRow
                       key={fieldItem.id}
                       index={index}
-                      control={form.control as unknown as Control<RequestFormValues>}
+                      control={form.control as any}
                       remove={remove}
                       isRemovable={fields.length > 1}
                       availableItems={availableItems}
-                      watchedItems={watchedItems as { consumableId: string; quantity: number }[]}
+                      watchedItems={watchedItems as any}
                     />
-                  ))}
+                  ))
+                ) : (
+                  <div className="text-muted-foreground flex h-32 flex-col items-center justify-center text-sm italic">
+                    Pilih Gudang Sumber terlebih dahulu.
+                  </div>
+                )}
               </div>
             </div>
 
-            <DialogFooter className="bg-background z-20 border-t px-6 py-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={isLoading}
-              >
+            <DialogFooter className="bg-background border-t px-6 py-4">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Batal
               </Button>
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="bg-blue-600 text-white shadow-sm hover:bg-blue-700"
+                className="bg-blue-600 text-white hover:bg-blue-700"
               >
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : submitText}
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : mode === 'edit' ? (
+                  'Simpan Perubahan'
+                ) : (
+                  'Kirim Permintaan'
+                )}
               </Button>
             </DialogFooter>
           </form>
