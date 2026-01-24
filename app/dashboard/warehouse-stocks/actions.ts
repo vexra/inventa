@@ -13,6 +13,17 @@ type BatchItem = {
   exp: string | null
 }
 
+function getDaysDifference(dateString: string) {
+  const targetDate = new Date(dateString)
+  const today = new Date()
+
+  targetDate.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+
+  const diffTime = targetDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
 export async function getAllWarehouses() {
   await requireAuth({ roles: ['faculty_admin'] })
   try {
@@ -154,7 +165,6 @@ export async function getWarehouseStocks(
     const totalPages = Math.ceil(totalItems / limit)
 
     const formattedData = rows.map((row) => {
-      const now = new Date()
       const batches = row.batches || []
 
       let hasExpired = false
@@ -164,12 +174,13 @@ export async function getWarehouseStocks(
 
       activeBatches.forEach((b) => {
         if (b.exp) {
-          const expDate = new Date(b.exp)
-          const diffTime = expDate.getTime() - now.getTime()
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          const diffDays = getDaysDifference(b.exp)
 
-          if (diffDays <= 0) hasExpired = true
-          else if (diffDays <= 30) hasNearExpiry = true
+          if (diffDays < 0) {
+            hasExpired = true
+          } else if (diffDays <= 90) {
+            hasNearExpiry = true
+          }
         }
       })
 

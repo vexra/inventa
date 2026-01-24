@@ -1,13 +1,6 @@
 'use client'
 
-import {
-  AlertCircle,
-  AlertTriangle,
-  CalendarClock,
-  CheckCircle2,
-  Eye,
-  MoreHorizontal,
-} from 'lucide-react'
+import { AlertCircle, AlertTriangle, CheckCircle2, Eye, MoreHorizontal } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,7 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { StockDetailDialog } from './stock-detail-dialog'
 
@@ -64,7 +56,7 @@ export function StockTable({ data }: StockTableProps) {
             <TableHead className="w-75">Barang</TableHead>
             <TableHead>Kategori</TableHead>
             <TableHead className="text-center">Status Stok</TableHead>
-            <TableHead className="text-center">Kondisi</TableHead>
+            <TableHead className="text-center">Kondisi (QC)</TableHead>
             <TableHead className="text-right">Total Stok</TableHead>
             <TableHead className="text-right">Min. Stok</TableHead>
             <TableHead className="w-12.5"></TableHead>
@@ -117,35 +109,23 @@ export function StockTable({ data }: StockTableProps) {
 
                 <TableCell className="text-center">
                   {item.hasExpired ? (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="inline-flex cursor-help items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                            <CalendarClock className="h-3.5 w-3.5" />
-                            <span>Expired</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Ada batch yang sudah kadaluarsa!</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Badge variant="destructive" className="h-5 px-2 text-[10px]">
+                      Expired
+                    </Badge>
                   ) : item.hasNearExpiry ? (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="inline-flex cursor-help items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            <span>Exp. Dekat</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Ada batch yang akan segera kadaluarsa (&#60; 30 hari)</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Badge
+                      variant="secondary"
+                      className="h-5 border border-orange-200 bg-orange-100 px-2 text-[10px] text-orange-800 hover:bg-orange-200 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                    >
+                      Exp. Dekat
+                    </Badge>
                   ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
+                    <Badge
+                      variant="outline"
+                      className="h-5 border-green-500 bg-green-50 px-2 text-[10px] text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-400"
+                    >
+                      Baik
+                    </Badge>
                   )}
                 </TableCell>
 
