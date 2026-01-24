@@ -9,6 +9,7 @@ import { id as idLocale } from 'date-fns/locale'
 import {
   AlertCircle,
   Ban,
+  Box,
   Calendar,
   Check,
   CheckCircle2,
@@ -17,7 +18,10 @@ import {
   type LucideIcon,
   MoreHorizontal,
   Package,
+  PackageCheck,
   Pencil,
+  QrCode,
+  ScanLine,
   Trash2,
   Truck,
   User,
@@ -65,7 +69,9 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { requestStatusEnum } from '@/db/schema'
 
-import { cancelRequest, verifyRequest } from '../actions'
+import { cancelRequest, updateRequestStatusByWarehouse, verifyRequest } from '../actions'
+import { PickupQR } from './pickup-qr'
+import { QRScannerDialog } from './qr-scanner-dialog'
 import { RequestDialog, RoomOption, StockOption, WarehouseOption } from './request-dialog'
 
 type RequestStatus = (typeof requestStatusEnum.enumValues)[number]
@@ -105,12 +111,16 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
   const [rejectReason, setRejectReason] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
 
+  const [pickupQrRequest, setPickupQrRequest] = useState<RequestData | null>(null)
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+
   const itemToEdit = data.find((item) => item.id === editingId)
 
   const currentRole = userRole || ''
   const isUnitAdmin = currentRole === 'unit_admin'
   const isFacultyAdmin = currentRole === 'faculty_admin'
   const isStaff = currentRole === 'unit_staff'
+  const isWarehouseStaff = currentRole === 'warehouse_staff'
   const isAdmin = isUnitAdmin || isFacultyAdmin
 
   const handleDelete = async () => {
@@ -131,11 +141,11 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
   }
 
   const handleApprove = async (id: string) => {
-    const toastId = toast.loading('Memproses persetujuan...')
+    const toastId = toast.loading('Memproses persetujuan (Cek Stok)...')
     try {
       const res = await verifyRequest(id, 'APPROVE')
       if (res.error) {
-        toast.error(res.error, { id: toastId })
+        toast.error(res.error, { id: toastId, duration: 4000 })
       } else {
         toast.success(res.message, { id: toastId })
       }
@@ -170,6 +180,22 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
     }
   }
 
+  const handleWarehouseUpdate = async (id: string, newStatus: 'PROCESSING' | 'READY_TO_PICKUP') => {
+    const label = newStatus === 'PROCESSING' ? 'Memproses pesanan...' : 'Menyiapkan pengambilan...'
+    const toastId = toast.loading(label)
+
+    try {
+      const res = await updateRequestStatusByWarehouse(id, newStatus)
+      if (res.error) {
+        toast.error(res.error, { id: toastId })
+      } else {
+        toast.success(res.message, { id: toastId })
+      }
+    } catch {
+      toast.error('Gagal update status gudang', { id: toastId })
+    }
+  }
+
   return (
     <>
       <div className="bg-card text-card-foreground rounded-md border shadow-sm">
@@ -180,7 +206,7 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
               <TableHead className="min-w-45">Request Info</TableHead>
               <TableHead className="w-50">Status</TableHead>
               <TableHead>Tanggal</TableHead>
-              {isAdmin && <TableHead>Pemohon</TableHead>}
+              {(isAdmin || isWarehouseStaff) && <TableHead>Pemohon</TableHead>}
               <TableHead className="text-center">Total Item</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
@@ -189,7 +215,7 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
             {data.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 7 : 6}
+                  colSpan={isAdmin || isWarehouseStaff ? 7 : 6}
                   className="text-muted-foreground h-24 text-center"
                 >
                   Belum ada permintaan barang.
@@ -239,7 +265,7 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
                     </div>
                   </TableCell>
 
-                  {isAdmin && (
+                  {(isAdmin || isWarehouseStaff) && (
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <User className="text-muted-foreground h-3.5 w-3.5" />
@@ -278,63 +304,118 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
                           </Link>
                         </DropdownMenuItem>
 
-                        {/* MENU UNIT ADMIN */}
+                        {/* ======================= */}
+                        {/* ROLE: UNIT ADMIN ACTIONS */}
+                        {/* ======================= */}
                         {isUnitAdmin && req.status === 'PENDING_UNIT' && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleApprove(req.id)}
-                              className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:focus:bg-green-900/20"
+                              className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:text-green-400 dark:focus:bg-green-900/40 dark:focus:text-green-300"
                             >
                               <Check className="mr-2 h-4 w-4" /> Setujui
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => setRejectId(req.id)}
-                              className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
+                              className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40 dark:focus:text-red-300"
                             >
                               <X className="mr-2 h-4 w-4" /> Tolak
                             </DropdownMenuItem>
                           </>
                         )}
 
-                        {/* MENU FACULTY ADMIN */}
+                        {/* ========================== */}
+                        {/* ROLE: FACULTY ADMIN ACTIONS */}
+                        {/* ========================== */}
                         {isFacultyAdmin && req.status === 'PENDING_FACULTY' && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleApprove(req.id)}
-                              className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:focus:bg-green-900/20"
+                              className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:text-green-400 dark:focus:bg-green-900/40 dark:focus:text-green-300"
                             >
                               <Check className="mr-2 h-4 w-4" /> Setujui Final
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => setRejectId(req.id)}
-                              className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
+                              className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40 dark:focus:text-red-300"
                             >
                               <X className="mr-2 h-4 w-4" /> Tolak
                             </DropdownMenuItem>
                           </>
                         )}
 
-                        {/* MENU STAFF */}
-                        {isStaff &&
-                          (req.status === 'PENDING_UNIT' || req.status === 'REJECTED') && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => setEditingId(req.id)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-
+                        {/* =========================== */}
+                        {/* ROLE: WAREHOUSE STAFF ACTIONS */}
+                        {/* =========================== */}
+                        {isWarehouseStaff && (
+                          <>
+                            {req.status === 'APPROVED' && (
                               <DropdownMenuItem
-                                onClick={() => setDeletingId(req.id)}
-                                className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
+                                onClick={() => handleWarehouseUpdate(req.id, 'PROCESSING')}
+                                className="text-indigo-600 focus:bg-indigo-50 dark:text-indigo-400 dark:focus:bg-indigo-900/40 dark:focus:text-indigo-300"
                               >
-                                <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-700" />{' '}
-                                Hapus
+                                <Box className="mr-2 h-4 w-4" /> Mulai Packing
                               </DropdownMenuItem>
-                            </>
-                          )}
+                            )}
+
+                            {req.status === 'PROCESSING' && (
+                              <DropdownMenuItem
+                                onClick={() => handleWarehouseUpdate(req.id, 'READY_TO_PICKUP')}
+                                className="text-emerald-600 focus:bg-emerald-50 dark:text-emerald-400 dark:focus:bg-emerald-900/40 dark:focus:text-emerald-300"
+                              >
+                                <PackageCheck className="mr-2 h-4 w-4" /> Siap Diambil
+                              </DropdownMenuItem>
+                            )}
+
+                            {/* WAREHOUSE: SCAN QR USER (VERIFIKASI) */}
+                            {req.status === 'READY_TO_PICKUP' && (
+                              <DropdownMenuItem
+                                onClick={() => setIsScannerOpen(true)}
+                                className="text-blue-600 focus:bg-blue-50 dark:text-blue-400 dark:focus:bg-blue-900/40 dark:focus:text-blue-300"
+                              >
+                                <ScanLine className="mr-2 h-4 w-4" /> Scan QR User
+                              </DropdownMenuItem>
+                            )}
+                          </>
+                        )}
+
+                        {/* ======================= */}
+                        {/* ROLE: UNIT STAFF (REQUESTER) ACTIONS */}
+                        {/* ======================= */}
+                        {/* Perbaikan: Menggunakan isStaff, BUKAN isUnitUser (yg juga include Admin) */}
+                        {isStaff && (
+                          <>
+                            {(req.status === 'PENDING_UNIT' || req.status === 'REJECTED') && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setEditingId(req.id)}>
+                                  <Pencil className="mr-2 h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setDeletingId(req.id)}
+                                  className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40 dark:focus:text-red-300"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            {/* UNIT: TUNJUKKAN QR KE PETUGAS */}
+                            {req.status === 'READY_TO_PICKUP' && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setPickupQrRequest(req)}
+                                  className="text-blue-600 focus:bg-blue-50 dark:text-blue-400 dark:focus:bg-blue-900/40 dark:focus:text-blue-300"
+                                >
+                                  <QrCode className="mr-2 h-4 w-4" /> Tunjukkan QR
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -345,7 +426,9 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
         </Table>
       </div>
 
-      {/* Dialog Edit */}
+      {/* --- DIALOGS --- */}
+
+      {/* Dialog Edit (Staff) */}
       {isStaff && editingId && itemToEdit && (
         <RequestDialog
           mode="edit"
@@ -365,7 +448,7 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
         />
       )}
 
-      {/* Dialog Reject */}
+      {/* Dialog Reject (Admin) */}
       <Dialog open={!!rejectId} onOpenChange={(open) => !open && setRejectId(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -398,14 +481,13 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Konfirmasi Hapus */}
+      {/* Dialog Delete (Staff) */}
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Batalkan Permintaan?</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin membatalkan permintaan ini? Data akan dihapus permanen dan
-              tidak dapat dikembalikan.
+              Apakah Anda yakin ingin membatalkan permintaan ini? Data akan dihapus permanen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -419,6 +501,22 @@ export function RequestTable({ data, userRole, warehouses, rooms, stocks }: Requ
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* [NEW] Dialog QR Code untuk Unit Staff */}
+      {pickupQrRequest && (
+        <PickupQR
+          open={!!pickupQrRequest}
+          onOpenChange={(open) => !open && setPickupQrRequest(null)}
+          requestId={pickupQrRequest.id}
+          requestCode={pickupQrRequest.requestCode}
+        />
+      )}
+
+      <QRScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScanSuccess={() => {}}
+      />
     </>
   )
 }

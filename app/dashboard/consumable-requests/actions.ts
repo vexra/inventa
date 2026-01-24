@@ -3,14 +3,16 @@
 import { revalidatePath } from 'next/cache'
 
 import { randomUUID } from 'crypto'
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
   auditLogs,
+  requestItemAllocations,
   requestItems,
   requestTimelines,
   requests,
+  roomConsumables,
   rooms,
   units,
   user,
@@ -48,7 +50,6 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
   if (!parsed.success) return { error: 'Data tidak valid.' }
 
   const { targetWarehouseId, roomId, description, items } = parsed.data
-
   const initialStatus = session.user.role === 'unit_admin' ? 'PENDING_FACULTY' : 'PENDING_UNIT'
 
   try {
@@ -59,9 +60,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         .where(and(eq(rooms.id, roomId), eq(rooms.unitId, session.user.unitId!)))
         .limit(1)
 
-      if (!selectedRoom) {
-        throw new Error('Ruangan tidak valid atau bukan milik unit Anda.')
-      }
+      if (!selectedRoom) throw new Error('Ruangan tidak valid.')
 
       for (const item of items) {
         const [stockResult] = await tx
@@ -77,14 +76,9 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
           )
 
         const currentTotalStock = stockResult?.totalQuantity ?? 0
-
-        if (currentTotalStock === 0) {
-          throw new Error(`Barang (ID: ${item.consumableId}) tidak ditemukan di gudang ini.`)
-        }
-
         if (currentTotalStock < item.quantity) {
           throw new Error(
-            `Stok tidak mencukupi untuk salah satu item. Diminta: ${item.quantity}, Tersedia Total: ${currentTotalStock}`,
+            `Estimasi stok tidak cukup untuk item ID: ${item.consumableId}. Tersedia: ${currentTotalStock}`,
           )
         }
       }
@@ -100,6 +94,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         targetWarehouseId: targetWarehouseId,
         status: initialStatus,
         description: description,
+        approvedByUnitId: session.user.role === 'unit_admin' ? session.user.id : null,
       })
 
       for (const item of items) {
@@ -108,6 +103,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
           requestId: requestId,
           consumableId: item.consumableId,
           qtyRequested: item.quantity.toString(),
+          qtyApproved: item.quantity.toString(),
         })
       }
 
@@ -125,7 +121,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         action: 'CREATE',
         tableName: 'requests',
         recordId: requestId,
-        newValues: { code, items, description, initialStatus, roomId: selectedRoom.id },
+        newValues: { code, items },
       })
     })
 
@@ -133,8 +129,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
     return { success: true, message: 'Permintaan berhasil dikirim.' }
   } catch (error) {
     console.error('Create Request Error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Gagal membuat permintaan.'
-    return { error: errorMessage }
+    return { error: error instanceof Error ? error.message : 'Gagal membuat permintaan.' }
   }
 }
 
@@ -143,7 +138,6 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
 
   const parsed = requestSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid.' }
-
   const { targetWarehouseId, roomId, description, items } = parsed.data
 
   try {
@@ -154,94 +148,54 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         .where(eq(requests.id, requestId))
         .limit(1)
 
-      if (!existingRequest) {
-        throw new Error('Permintaan tidak ditemukan.')
-      }
+      if (!existingRequest) throw new Error('Permintaan tidak ditemukan.')
 
       const isOwner = existingRequest.requesterId === session.user.id
       const isAdmin = session.user.role === 'unit_admin'
+      if (!isOwner && !isAdmin) throw new Error('Akses ditolak.')
 
-      if (!isOwner && !isAdmin) {
-        throw new Error('Anda tidak memiliki izin mengedit permintaan ini.')
-      }
-
-      const allowedStatuses = ['PENDING_UNIT', 'REJECTED']
-      if (!existingRequest.status || !allowedStatuses.includes(existingRequest.status)) {
+      if (!['PENDING_UNIT', 'REJECTED'].includes(existingRequest.status || '')) {
         throw new Error('Permintaan sudah diproses, tidak bisa diedit.')
-      }
-
-      for (const item of items) {
-        const [stockResult] = await tx
-          .select({
-            totalQuantity: sql<number>`sum(${warehouseStocks.quantity})`.mapWith(Number),
-          })
-          .from(warehouseStocks)
-          .where(
-            and(
-              eq(warehouseStocks.warehouseId, targetWarehouseId),
-              eq(warehouseStocks.consumableId, item.consumableId),
-            ),
-          )
-
-        const currentTotalStock = stockResult?.totalQuantity ?? 0
-        if (currentTotalStock === 0 || currentTotalStock < item.quantity) {
-          throw new Error(`Stok tidak mencukupi untuk item ID: ${item.consumableId}`)
-        }
       }
 
       await tx
         .update(requests)
         .set({
-          roomId: roomId,
-          targetWarehouseId: targetWarehouseId,
-          description: description,
+          roomId,
+          targetWarehouseId,
+          description,
           status: 'PENDING_UNIT',
           rejectionReason: null,
           approvedByUnitId: null,
+          approvedByFacultyId: null,
           updatedAt: new Date(),
         })
         .where(eq(requests.id, requestId))
 
       await tx.delete(requestItems).where(eq(requestItems.requestId, requestId))
-
       for (const item of items) {
         await tx.insert(requestItems).values({
           id: randomUUID(),
           requestId: requestId,
           consumableId: item.consumableId,
           qtyRequested: item.quantity.toString(),
+          qtyApproved: item.quantity.toString(),
         })
       }
-
-      const isResubmission = existingRequest.status === 'REJECTED'
-      const timelineNote = isResubmission
-        ? 'Permintaan diperbaiki dan diajukan ulang oleh pemohon.'
-        : 'Detail permintaan diperbarui oleh pemohon.'
 
       await tx.insert(requestTimelines).values({
         id: randomUUID(),
         requestId: requestId,
         status: 'PENDING_UNIT',
         actorId: session.user.id,
-        notes: timelineNote,
-      })
-
-      await tx.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: 'UPDATE',
-        tableName: 'requests',
-        recordId: requestId,
-        newValues: { items, description, roomId, targetWarehouseId, isResubmission },
+        notes: 'Detail permintaan diperbarui.',
       })
     })
 
     revalidatePath('/dashboard/consumable-requests')
     return { success: true, message: 'Permintaan berhasil diperbarui.' }
   } catch (error) {
-    console.error('Update Request Error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Gagal memperbarui permintaan.'
-    return { error: errorMessage }
+    return { error: error instanceof Error ? error.message : 'Gagal update.' }
   }
 }
 
@@ -250,39 +204,23 @@ export async function cancelRequest(requestId: string) {
 
   try {
     const [existing] = await db.select().from(requests).where(eq(requests.id, requestId)).limit(1)
+    if (!existing) return { error: 'Not found.' }
 
-    if (!existing) return { error: 'Permintaan tidak ditemukan.' }
-
-    const isOwner = existing.requesterId === session.user.id
-    const isAdmin = session.user.role === 'unit_admin'
-
-    if (!isOwner && !isAdmin) {
-      return { error: 'Anda tidak memiliki izin membatalkan permintaan ini.' }
+    if (existing.requesterId !== session.user.id && session.user.role !== 'unit_admin') {
+      return { error: 'Unauthorized.' }
     }
-
-    if (existing.status !== 'PENDING_UNIT' && existing.status !== 'REJECTED') {
-      return { error: 'Permintaan sudah diproses atau selesai, tidak bisa dihapus.' }
+    if (!['PENDING_UNIT', 'REJECTED'].includes(existing.status || '')) {
+      return { error: 'Status invalid untuk pembatalan.' }
     }
 
     await db.transaction(async (tx) => {
-      await tx.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: 'DELETE',
-        tableName: 'requests',
-        recordId: requestId,
-        oldValues: existing,
-      })
-
       await tx.delete(requests).where(eq(requests.id, requestId))
     })
 
     revalidatePath('/dashboard/consumable-requests')
-
-    return { success: true, message: 'Permintaan berhasil dihapus.' }
-  } catch (error) {
-    console.error('Delete Request Error:', error)
-    return { error: 'Gagal menghapus permintaan.' }
+    return { success: true, message: 'Berhasil dihapus.' }
+  } catch {
+    return { error: 'Gagal menghapus.' }
   }
 }
 
@@ -302,59 +240,111 @@ export async function verifyRequest(
         .where(eq(requests.id, requestId))
         .limit(1)
 
-      if (!existingRequest) {
-        throw new Error('Permintaan tidak ditemukan.')
-      }
-
-      let newStatus: typeof requests.$inferSelect.status
-      let updateData: Partial<typeof requests.$inferSelect> = {}
-      let logMessage = ''
+      if (!existingRequest) throw new Error('Permintaan tidak ditemukan.')
 
       if (action === 'REJECT') {
-        newStatus = 'REJECTED'
-        logMessage = `Permintaan ditolak oleh ${userRole === 'unit_admin' ? 'Unit' : 'Fakultas'}. Alasan: ${reason}`
-        updateData = { rejectionReason: reason }
-      } else {
-        if (userRole === 'unit_admin') {
-          if (existingRequest.status !== 'PENDING_UNIT') {
-            throw new Error('Unit Admin hanya dapat memproses status PENDING_UNIT.')
-          }
-          newStatus = 'PENDING_FACULTY'
-          logMessage = 'Disetujui Unit Admin. Menunggu persetujuan Fakultas.'
-          updateData = { approvedByUnitId: session.user.id }
-        } else if (userRole === 'faculty_admin') {
-          if (existingRequest.status !== 'PENDING_FACULTY') {
-            throw new Error('Faculty Admin hanya dapat memproses status PENDING_FACULTY.')
-          }
-          newStatus = 'APPROVED'
-          logMessage = 'Disetujui Fakultas. Masuk antrian gudang.'
-          updateData = { approvedByFacultyId: session.user.id }
-        } else {
-          throw new Error('Role tidak dikenali untuk approval.')
-        }
+        await tx
+          .update(requests)
+          .set({ status: 'REJECTED', rejectionReason: reason, updatedAt: new Date() })
+          .where(eq(requests.id, requestId))
+
+        await tx.insert(requestTimelines).values({
+          id: randomUUID(),
+          requestId: requestId,
+          status: 'REJECTED',
+          actorId: session.user.id,
+          notes: `Ditolak: ${reason}`,
+        })
+        return
       }
 
-      await tx
-        .update(requests)
-        .set({
-          status: newStatus,
-          updatedAt: new Date(),
-          ...updateData,
-        })
-        .where(eq(requests.id, requestId))
+      let newStatus: typeof requests.$inferSelect.status = 'PENDING_FACULTY'
 
-      if (newStatus === 'APPROVED') {
-        const items = await tx
+      if (userRole === 'unit_admin') {
+        if (existingRequest.status !== 'PENDING_UNIT') {
+          throw new Error('Status harus PENDING_UNIT.')
+        }
+        newStatus = 'PENDING_FACULTY'
+
+        await tx
+          .update(requests)
+          .set({
+            status: newStatus,
+            approvedByUnitId: session.user.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(requests.id, requestId))
+      } else if (userRole === 'faculty_admin') {
+        if (existingRequest.status !== 'PENDING_FACULTY') {
+          throw new Error('Status harus PENDING_FACULTY.')
+        }
+        newStatus = 'APPROVED'
+
+        const itemsRequested = await tx
           .select()
           .from(requestItems)
           .where(eq(requestItems.requestId, requestId))
 
-        for (const item of items) {
-          await tx
-            .update(requestItems)
-            .set({ qtyApproved: item.qtyRequested })
-            .where(eq(requestItems.id, item.id))
+        for (const item of itemsRequested) {
+          const qtyNeeded = Number(item.qtyApproved || item.qtyRequested)
+          let remainingQtyNeeded = qtyNeeded
+
+          const availableStocks = await tx
+            .select()
+            .from(warehouseStocks)
+            .where(
+              and(
+                eq(warehouseStocks.warehouseId, existingRequest.targetWarehouseId!),
+                eq(warehouseStocks.consumableId, item.consumableId),
+              ),
+            )
+            .orderBy(asc(warehouseStocks.expiryDate), asc(warehouseStocks.updatedAt))
+
+          const totalAvailable = availableStocks.reduce((acc, s) => acc + Number(s.quantity), 0)
+
+          if (totalAvailable < qtyNeeded) {
+            throw new Error(
+              `Stok GAGAL: Item ID ${item.consumableId} kurang. Butuh: ${qtyNeeded}, Ada: ${totalAvailable}.`,
+            )
+          }
+
+          for (const stock of availableStocks) {
+            if (remainingQtyNeeded <= 0) break
+
+            const stockQty = Number(stock.quantity)
+            const qtyToTake = Math.min(stockQty, remainingQtyNeeded)
+
+            await tx.insert(requestItemAllocations).values({
+              id: randomUUID(),
+              requestItemId: item.id,
+              warehouseId: stock.warehouseId,
+              consumableId: stock.consumableId,
+              batchNumber: stock.batchNumber,
+              expiryDate: stock.expiryDate,
+              quantity: qtyToTake.toString(),
+            })
+
+            if (stockQty === qtyToTake) {
+              await tx.delete(warehouseStocks).where(eq(warehouseStocks.id, stock.id))
+            } else {
+              await tx
+                .update(warehouseStocks)
+                .set({ quantity: (stockQty - qtyToTake).toString() })
+                .where(eq(warehouseStocks.id, stock.id))
+            }
+
+            remainingQtyNeeded -= qtyToTake
+          }
         }
+
+        await tx
+          .update(requests)
+          .set({
+            status: newStatus,
+            approvedByFacultyId: session.user.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(requests.id, requestId))
       }
 
       await tx.insert(requestTimelines).values({
@@ -362,39 +352,172 @@ export async function verifyRequest(
         requestId: requestId,
         status: newStatus,
         actorId: session.user.id,
-        notes: logMessage,
-      })
-
-      await tx.insert(auditLogs).values({
-        id: randomUUID(),
-        userId: session.user.id,
-        action: action,
-        tableName: 'requests',
-        recordId: requestId,
-        newValues: { status: newStatus, ...updateData },
+        notes:
+          userRole === 'faculty_admin'
+            ? 'Disetujui Fakultas. Stok telah dialokasikan.'
+            : 'Disetujui Unit. Menunggu Fakultas.',
       })
     })
 
     revalidatePath('/dashboard/consumable-requests')
-    return {
-      success: true,
-      message: action === 'APPROVE' ? 'Permintaan berhasil disetujui.' : 'Permintaan ditolak.',
-    }
+    return { success: true, message: 'Permintaan berhasil disetujui.' }
   } catch (error) {
-    console.error('Verify Request Error:', error)
-    const msg = error instanceof Error ? error.message : 'Gagal memproses permintaan.'
-    return { error: msg }
+    console.error('Verify Error:', error)
+    return { error: error instanceof Error ? error.message : 'Gagal memproses approval.' }
+  }
+}
+
+export async function updateRequestStatusByWarehouse(
+  requestId: string,
+  newStatus: 'PROCESSING' | 'READY_TO_PICKUP',
+) {
+  const session = await requireAuth({ roles: ['warehouse_staff'] })
+
+  try {
+    await db.transaction(async (tx) => {
+      const [req] = await tx
+        .select()
+        .from(requests)
+        .where(
+          and(
+            eq(requests.id, requestId),
+            eq(requests.targetWarehouseId, session.user.warehouseId!),
+          ),
+        )
+        .limit(1)
+
+      if (!req) throw new Error('Request tidak ditemukan di gudang Anda.')
+
+      if (newStatus === 'PROCESSING' && req.status !== 'APPROVED') {
+        throw new Error('Hanya request APPROVED yang bisa diproses.')
+      }
+      if (newStatus === 'READY_TO_PICKUP' && req.status !== 'PROCESSING') {
+        throw new Error('Request harus PROCESSING dulu sebelum siap diambil.')
+      }
+
+      await tx
+        .update(requests)
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(eq(requests.id, requestId))
+
+      await tx.insert(requestTimelines).values({
+        id: randomUUID(),
+        requestId: requestId,
+        status: newStatus,
+        actorId: session.user.id,
+        notes: newStatus === 'PROCESSING' ? 'Sedang disiapkan.' : 'Siap diambil user.',
+      })
+    })
+
+    revalidatePath('/dashboard/consumable-requests')
+    return { success: true, message: `Status updated to ${newStatus}` }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal update status gudang.' }
+  }
+}
+
+export async function completeRequestByQr(qrData: { requestId: string }) {
+  const session = await requireAuth({ roles: ['warehouse_staff'] })
+
+  try {
+    await db.transaction(async (tx) => {
+      const { requestId } = qrData
+
+      const [req] = await tx
+        .select()
+        .from(requests)
+        .where(
+          and(
+            eq(requests.id, requestId),
+            eq(requests.targetWarehouseId, session.user.warehouseId!),
+            eq(requests.status, 'READY_TO_PICKUP'),
+          ),
+        )
+        .limit(1)
+
+      if (!req) throw new Error('Request tidak valid atau belum siap diambil.')
+
+      const allocations = await tx
+        .select({
+          consumableId: requestItemAllocations.consumableId,
+          batchNumber: requestItemAllocations.batchNumber,
+          expiryDate: requestItemAllocations.expiryDate,
+          quantity: requestItemAllocations.quantity,
+        })
+        .from(requestItemAllocations)
+        .innerJoin(requestItems, eq(requestItemAllocations.requestItemId, requestItems.id))
+        .where(eq(requestItems.requestId, requestId))
+
+      if (allocations.length === 0) throw new Error('Data alokasi stok hilang/korup.')
+
+      for (const alloc of allocations) {
+        const [existingRoomStock] = await tx
+          .select()
+          .from(roomConsumables)
+          .where(
+            and(
+              eq(roomConsumables.roomId, req.roomId),
+              eq(roomConsumables.consumableId, alloc.consumableId),
+              alloc.batchNumber
+                ? eq(roomConsumables.batchNumber, alloc.batchNumber)
+                : sql`${roomConsumables.batchNumber} IS NULL`,
+              alloc.expiryDate
+                ? eq(roomConsumables.expiryDate, alloc.expiryDate)
+                : sql`${roomConsumables.expiryDate} IS NULL`,
+            ),
+          )
+
+        if (existingRoomStock) {
+          await tx
+            .update(roomConsumables)
+            .set({
+              quantity: sql`${roomConsumables.quantity} + ${alloc.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(roomConsumables.id, existingRoomStock.id))
+        } else {
+          await tx.insert(roomConsumables).values({
+            id: randomUUID(),
+            roomId: req.roomId,
+            consumableId: alloc.consumableId,
+            batchNumber: alloc.batchNumber,
+            expiryDate: alloc.expiryDate,
+            quantity: alloc.quantity,
+          })
+        }
+      }
+
+      await tx
+        .update(requests)
+        .set({ status: 'COMPLETED', updatedAt: new Date() })
+        .where(eq(requests.id, requestId))
+
+      await tx.insert(requestTimelines).values({
+        id: randomUUID(),
+        requestId: requestId,
+        status: 'COMPLETED',
+        actorId: session.user.id,
+        notes: 'Barang telah diterima oleh user (Scan QR).',
+      })
+    })
+
+    revalidatePath('/dashboard/consumable-requests')
+    return { success: true, message: 'Serah terima berhasil. Stok ruangan bertambah.' }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal scan QR.' }
   }
 }
 
 export async function getConsumableRequests(page: number = 1, limit: number = 10, query?: string) {
-  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin', 'faculty_admin'] })
-  const { role, id: userId, unitId, facultyId } = session.user
+  const session = await requireAuth({
+    roles: ['unit_staff', 'unit_admin', 'faculty_admin', 'warehouse_staff'],
+  })
+  const { role, id: userId, unitId, facultyId, warehouseId } = session.user
   const offset = (page - 1) * limit
 
   let searchCondition = query ? ilike(requests.requestCode, `%${query}%`) : undefined
 
-  if ((role === 'unit_admin' || role === 'faculty_admin') && query) {
+  if (role !== 'unit_staff' && query) {
     searchCondition = or(ilike(requests.requestCode, `%${query}%`), ilike(user.name, `%${query}%`))
   }
 
@@ -403,6 +526,12 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
     whereCondition = and(eq(units.facultyId, facultyId!), searchCondition)
   } else if (role === 'unit_admin') {
     whereCondition = and(eq(user.unitId, unitId!), searchCondition)
+  } else if (role === 'warehouse_staff') {
+    whereCondition = and(
+      eq(requests.targetWarehouseId, warehouseId!),
+      inArray(requests.status, ['APPROVED', 'PROCESSING', 'READY_TO_PICKUP', 'COMPLETED']),
+      searchCondition,
+    )
   } else {
     whereCondition = and(eq(requests.requesterId, userId), searchCondition)
   }
@@ -431,20 +560,23 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
 
   const requestIds = requestsData.map((r) => r.id)
   const itemsMap: Record<string, { consumableId: string; quantity: number }[]> = {}
+
   if (requestIds.length > 0) {
     const itemsData = await db
       .select({
         requestId: requestItems.requestId,
         consumableId: requestItems.consumableId,
         qtyRequested: requestItems.qtyRequested,
+        qtyApproved: requestItems.qtyApproved,
       })
       .from(requestItems)
       .where(inArray(requestItems.requestId, requestIds))
+
     itemsData.forEach((item) => {
       if (!itemsMap[item.requestId!]) itemsMap[item.requestId!] = []
       itemsMap[item.requestId!].push({
         consumableId: item.consumableId,
-        quantity: Number(item.qtyRequested),
+        quantity: Number(item.qtyApproved ?? item.qtyRequested),
       })
     })
   }
@@ -466,5 +598,106 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
     data: finalData,
     totalItems: Number(countRes[0]?.count || 0),
     userRole: role,
+  }
+}
+
+export async function completeRequestByQR(requestId: string) {
+  const session = await requireAuth({
+    roles: ['warehouse_staff', 'unit_admin', 'faculty_admin'],
+  })
+
+  try {
+    await db.transaction(async (tx) => {
+      const [request] = await tx.select().from(requests).where(eq(requests.id, requestId)).limit(1)
+
+      if (!request) {
+        throw new Error('QR Code tidak valid. Data permintaan tidak ditemukan.')
+      }
+
+      if (request.status !== 'READY_TO_PICKUP') {
+        if (request.status === 'COMPLETED') {
+          throw new Error('Permintaan ini sudah selesai diambil sebelumnya.')
+        }
+        throw new Error(`Status permintaan tidak valid untuk diambil (${request.status}).`)
+      }
+
+      const allocations = await tx
+        .select({
+          consumableId: requestItemAllocations.consumableId,
+          batchNumber: requestItemAllocations.batchNumber,
+          expiryDate: requestItemAllocations.expiryDate,
+          quantity: requestItemAllocations.quantity,
+        })
+        .from(requestItemAllocations)
+        .innerJoin(requestItems, eq(requestItemAllocations.requestItemId, requestItems.id))
+        .where(eq(requestItems.requestId, requestId))
+
+      if (allocations.length === 0) {
+        console.warn('Data alokasi tidak ditemukan untuk request ini.')
+      }
+
+      for (const alloc of allocations) {
+        const [existingRoomStock] = await tx
+          .select()
+          .from(roomConsumables)
+          .where(
+            and(
+              eq(roomConsumables.roomId, request.roomId),
+              eq(roomConsumables.consumableId, alloc.consumableId),
+              alloc.batchNumber
+                ? eq(roomConsumables.batchNumber, alloc.batchNumber)
+                : sql`${roomConsumables.batchNumber} IS NULL`,
+              alloc.expiryDate
+                ? eq(roomConsumables.expiryDate, alloc.expiryDate)
+                : sql`${roomConsumables.expiryDate} IS NULL`,
+            ),
+          )
+          .limit(1)
+
+        if (existingRoomStock) {
+          await tx
+            .update(roomConsumables)
+            .set({
+              quantity: sql`${roomConsumables.quantity} + ${alloc.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(roomConsumables.id, existingRoomStock.id))
+        } else {
+          await tx.insert(roomConsumables).values({
+            id: randomUUID(),
+            roomId: request.roomId,
+            consumableId: alloc.consumableId,
+            batchNumber: alloc.batchNumber,
+            expiryDate: alloc.expiryDate,
+            quantity: alloc.quantity,
+          })
+        }
+      }
+
+      await tx
+        .update(requests)
+        .set({
+          status: 'COMPLETED',
+          updatedAt: new Date(),
+        })
+        .where(eq(requests.id, requestId))
+
+      await tx.insert(requestTimelines).values({
+        id: randomUUID(),
+        requestId: requestId,
+        status: 'COMPLETED',
+        actorId: session.user.id,
+        notes: `Barang diterima via Scan QR oleh ${session.user.name}`,
+      })
+    })
+
+    revalidatePath('/dashboard/consumable-requests')
+    return {
+      success: true,
+      message: 'Verifikasi berhasil! Barang telah diserahkan dan stok ruangan bertambah.',
+    }
+  } catch (error) {
+    console.error('QR Scan Error:', error)
+    return { error: error instanceof Error ? error.message : 'Gagal memproses QR Code.' }
   }
 }

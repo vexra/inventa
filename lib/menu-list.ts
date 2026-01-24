@@ -76,8 +76,8 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Operasional Gudang',
       items: [
         {
-          title: 'Permintaan Unit',
-          url: '/dashboard/requests',
+          title: 'Permintaan Barang',
+          url: '/dashboard/consumable-requests',
           icon: ClipboardList,
         },
         {

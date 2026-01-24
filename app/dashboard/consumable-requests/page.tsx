@@ -18,11 +18,28 @@ interface PageProps {
 }
 
 export default async function RequestConsumablesPage({ searchParams }: PageProps) {
-  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin', 'faculty_admin'] })
+  const session = await requireAuth({
+    roles: ['unit_staff', 'unit_admin', 'faculty_admin', 'warehouse_staff'],
+  })
   const userRole = session.user.role
 
-  if (userRole !== 'faculty_admin' && !session.user.unitId) {
-    return <div>Error: Akun Anda tidak terhubung dengan Unit Kerja.</div>
+  const isUnitUser = userRole === 'unit_staff' || userRole === 'unit_admin'
+  const isWarehouseUser = userRole === 'warehouse_staff'
+
+  if (isUnitUser && !session.user.unitId) {
+    return (
+      <div className="p-6 text-red-500">
+        Error: Akun Unit Anda tidak terhubung dengan data Unit Kerja. Hubungi Administrator.
+      </div>
+    )
+  }
+
+  if (isWarehouseUser && !session.user.warehouseId) {
+    return (
+      <div className="p-6 text-red-500">
+        Error: Akun Gudang Anda tidak terhubung dengan data Gudang. Hubungi Administrator.
+      </div>
+    )
   }
 
   const params = await searchParams
@@ -89,7 +106,15 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
   } else if (userRole === 'faculty_admin') {
     pageTitle = 'Permintaan Fakultas'
     pageDescription = 'Verifikasi akhir permintaan barang dari berbagai unit di fakultas.'
+  } else if (userRole === 'warehouse_staff') {
+    pageTitle = 'Dashboard Gudang'
+    pageDescription = 'Kelola permintaan masuk, siapkan barang, dan proses pengambilan via QR.'
   }
+
+  const canCreateRequest = userRole === 'unit_staff'
+
+  const canExtendedSearch =
+    userRole === 'unit_admin' || userRole === 'faculty_admin' || userRole === 'warehouse_staff'
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -99,19 +124,14 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
           <p className="text-muted-foreground">{pageDescription}</p>
         </div>
 
-        {/* Hanya tampilkan Dialog Buat Request jika bukan Faculty Admin */}
-        {userRole !== 'faculty_admin' && (
+        {canCreateRequest && (
           <RequestDialog warehouses={warehousesList} stocks={availableStocks} rooms={unitRooms} />
         )}
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
         <SearchInput
-          placeholder={
-            userRole === 'unit_admin' || userRole === 'faculty_admin'
-              ? 'Cari Kode / Nama Pemohon...'
-              : 'Cari Kode Request...'
-          }
+          placeholder={canExtendedSearch ? 'Cari Kode / Nama Pemohon...' : 'Cari Kode Request...'}
           className="w-full sm:max-w-xs"
         />
       </div>

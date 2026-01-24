@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, inArray } from 'drizzle-orm'
 import {
   AlertCircle,
   ArrowLeft,
@@ -24,15 +24,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
   consumables,
+  requestItemAllocations,
   requestItems,
   requestStatusEnum,
   requestTimelines,
@@ -44,6 +37,8 @@ import {
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
+import { RequestItemsTable } from '../_components/request-items-table'
+
 type RequestStatus = (typeof requestStatusEnum.enumValues)[number]
 
 interface PageProps {
@@ -51,7 +46,7 @@ interface PageProps {
 }
 
 export default async function RequestDetailPage({ params }: PageProps) {
-  await requireAuth({
+  const session = await requireAuth({
     roles: ['unit_staff', 'unit_admin', 'warehouse_staff', 'faculty_admin'],
   })
 
@@ -65,14 +60,10 @@ export default async function RequestDetailPage({ params }: PageProps) {
       description: requests.description,
       createdAt: requests.createdAt,
       rejectionReason: requests.rejectionReason,
-
       requesterName: user.name,
-      requesterEmail: user.email,
       requesterRole: user.role,
-
       roomName: rooms.name,
       roomType: rooms.type,
-
       warehouseName: warehouses.name,
     })
     .from(requests)
@@ -99,6 +90,38 @@ export default async function RequestDetailPage({ params }: PageProps) {
     .innerJoin(consumables, eq(requestItems.consumableId, consumables.id))
     .where(eq(requestItems.requestId, id))
 
+  const allocationsMap: Record<
+    string,
+    { batch: string | null; expiry: Date | null; qty: string }[]
+  > = {}
+
+  if (
+    items.length > 0 &&
+    ['APPROVED', 'PROCESSING', 'READY_TO_PICKUP', 'COMPLETED'].includes(requestData.status || '')
+  ) {
+    const itemIds = items.map((i) => i.id)
+    const allocationsData = await db
+      .select({
+        itemId: requestItemAllocations.requestItemId,
+        batch: requestItemAllocations.batchNumber,
+        expiry: requestItemAllocations.expiryDate,
+        quantity: requestItemAllocations.quantity,
+      })
+      .from(requestItemAllocations)
+      .where(inArray(requestItemAllocations.requestItemId, itemIds))
+
+    allocationsData.forEach((alloc) => {
+      if (!allocationsMap[alloc.itemId]) {
+        allocationsMap[alloc.itemId] = []
+      }
+      allocationsMap[alloc.itemId].push({
+        batch: alloc.batch,
+        expiry: alloc.expiry,
+        qty: alloc.quantity,
+      })
+    })
+  }
+
   const timelines = await db
     .select({
       id: requestTimelines.id,
@@ -112,9 +135,10 @@ export default async function RequestDetailPage({ params }: PageProps) {
     .where(eq(requestTimelines.requestId, id))
     .orderBy(desc(requestTimelines.createdAt))
 
+  const isWarehouseStaff = session.user.role === 'warehouse_staff'
+
   return (
     <div className="flex flex-col gap-6 p-6">
-      {/* Header Section */}
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" asChild>
           <Link href="/dashboard/consumable-requests">
@@ -124,7 +148,6 @@ export default async function RequestDetailPage({ params }: PageProps) {
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">
-              {/* Tampilkan Deskripsi sebagai Judul Utama */}
               {requestData.description || 'Detail Permintaan Barang'}
             </h1>
             <StatusBadge status={requestData.status as RequestStatus} />
@@ -145,10 +168,8 @@ export default async function RequestDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Main Content (Left) */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          {/* Rejection Alert */}
           {requestData.status === 'REJECTED' && requestData.rejectionReason && (
             <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-200">
               <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
@@ -161,7 +182,6 @@ export default async function RequestDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Info Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -172,7 +192,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
             <CardContent className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-1">
                 <div className="text-muted-foreground mb-1 flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4" /> Pemohon (Requester)
+                  <User className="h-4 w-4" /> Pemohon
                 </div>
                 <div className="font-medium">{requestData.requesterName}</div>
                 <div className="text-muted-foreground text-xs capitalize">
@@ -182,26 +202,23 @@ export default async function RequestDetailPage({ params }: PageProps) {
 
               <div className="space-y-1">
                 <div className="text-muted-foreground mb-1 flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4" /> Lokasi Ruangan
+                  <MapPin className="h-4 w-4" /> Lokasi
                 </div>
                 <div className="font-medium">{requestData.roomName}</div>
                 <div className="text-muted-foreground text-xs capitalize">
-                  Tipe: {requestData.roomType?.replace('_', ' ')}
+                  {requestData.roomType?.replace('_', ' ')}
                 </div>
               </div>
 
               <div className="space-y-1 sm:col-span-2">
                 <div className="text-muted-foreground mb-1 flex items-center gap-2 text-sm">
-                  <Warehouse className="h-4 w-4" /> Gudang Sumber
+                  <Warehouse className="h-4 w-4" /> Sumber Gudang
                 </div>
                 <div className="font-medium">{requestData.warehouseName || '-'}</div>
               </div>
 
-              {/* TAMPILKAN DESKRIPSI DI SINI */}
               <div className="space-y-1 rounded-md border bg-slate-50 p-4 sm:col-span-2 dark:bg-slate-900/50">
-                <div className="text-muted-foreground mb-1 text-sm font-medium">
-                  Keperluan / Deskripsi:
-                </div>
+                <div className="text-muted-foreground mb-1 text-sm font-medium">Deskripsi:</div>
                 <p className="text-sm">
                   {requestData.description || (
                     <span className="text-muted-foreground italic">Tidak ada deskripsi.</span>
@@ -211,67 +228,16 @@ export default async function RequestDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Items Table Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="h-5 w-5 text-blue-600" />
-                Daftar Barang ({items.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12 text-center">#</TableHead>
-                    <TableHead>Nama Barang</TableHead>
-                    <TableHead className="text-center">Jumlah Diminta</TableHead>
-                    {requestData.status !== 'PENDING_UNIT' &&
-                      requestData.status !== 'PENDING_FACULTY' && (
-                        <TableHead className="text-center">Jumlah Disetujui</TableHead>
-                      )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item, index) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground text-center">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{item.consumableName}</span>
-                          <span className="text-muted-foreground text-[10px]">
-                            Unit: {item.unit} {item.sku && `• SKU: ${item.sku}`}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center font-mono font-medium">
-                        {Number(item.qtyRequested)}
-                      </TableCell>
-                      {requestData.status !== 'PENDING_UNIT' &&
-                        requestData.status !== 'PENDING_FACULTY' && (
-                          <TableCell className="text-center font-mono font-medium">
-                            {item.qtyApproved !== null ? (
-                              Number(item.qtyApproved)
-                            ) : (
-                              <span className="text-muted-foreground text-xs italic">
-                                Belum diproses
-                              </span>
-                            )}
-                          </TableCell>
-                        )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <RequestItemsTable
+            items={items}
+            allocationsMap={allocationsMap}
+            isWarehouseStaff={isWarehouseStaff}
+            requestStatus={requestData.status || ''}
+          />
         </div>
 
-        {/* Timeline Sidebar (Right) */}
         <div className="space-y-6 lg:col-span-1">
-          <Card className="flex h-full max-h-[calc(100vh-8rem)] flex-col">
+          <Card className="sticky top-6 flex max-h-[calc(100vh-3rem)] flex-col">
             <CardHeader className="shrink-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Clock className="h-5 w-5 text-blue-600" />
@@ -279,49 +245,53 @@ export default async function RequestDetailPage({ params }: PageProps) {
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="overflow-y-auto pr-2">
-              <div className="border-muted relative ml-3 space-y-8 border-l pb-1 pl-6">
-                {timelines.map((log, index) => {
-                  const isLatest = index === 0
-                  return (
-                    <div key={log.id} className="relative">
-                      <div
-                        className={`ring-background absolute top-1 -left-7.25 h-2.5 w-2.5 rounded-full border ring-4 ${
-                          isLatest
-                            ? 'border-blue-600 bg-blue-600'
-                            : 'bg-muted-foreground/30 border-muted-foreground/30'
-                        }`}
-                      />
+            <CardContent className="flex-1 overflow-y-auto p-0">
+              <div className="p-6">
+                <div className="border-muted relative ml-3 space-y-8 border-l pb-1 pl-6">
+                  {timelines.map((log, index) => {
+                    const isLatest = index === 0
+                    return (
+                      <div key={log.id} className="relative">
+                        <div
+                          className={`ring-background absolute top-1 -left-7.25 h-2.5 w-2.5 rounded-full border ring-4 ${
+                            isLatest
+                              ? 'border-blue-600 bg-blue-600'
+                              : 'bg-muted-foreground/30 border-muted-foreground/30'
+                          }`}
+                        />
 
-                      <div className="flex flex-col gap-1">
-                        <span className="text-muted-foreground text-xs">
-                          {log.createdAt
-                            ? format(new Date(log.createdAt), 'dd MMM yyyy, HH:mm', {
-                                locale: idLocale,
-                              })
-                            : '-'}
-                        </span>
-
-                        <div className="text-sm font-medium">
-                          <span className={isLatest ? 'text-foreground font-bold' : 'font-medium'}>
-                            {STATUS_LABEL_MAP[log.status as RequestStatus] || log.status}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-muted-foreground text-xs">
+                            {log.createdAt
+                              ? format(new Date(log.createdAt), 'dd MMM yyyy, HH:mm', {
+                                  locale: idLocale,
+                                })
+                              : '-'}
                           </span>
-                        </div>
 
-                        {log.notes && (
-                          <p className="text-muted-foreground bg-muted/50 mt-1 rounded p-2 text-sm italic">
-                            &quot;{log.notes}&quot;
-                          </p>
-                        )}
+                          <div className="text-sm font-medium">
+                            <span
+                              className={isLatest ? 'text-foreground font-bold' : 'font-medium'}
+                            >
+                              {STATUS_LABEL_MAP[log.status as RequestStatus] || log.status}
+                            </span>
+                          </div>
 
-                        <div className="text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
-                          <User className="h-3 w-3" />
-                          <span>{log.actorName || 'System'}</span>
+                          {log.notes && (
+                            <p className="bg-muted/50 text-muted-foreground mt-1 rounded p-2 text-sm italic">
+                              &quot;{log.notes}&quot;
+                            </p>
+                          )}
+
+                          <div className="text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
+                            <User className="h-3 w-3" />
+                            <span>{log.actorName || 'System'}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             </CardContent>
           </Card>
