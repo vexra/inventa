@@ -91,7 +91,7 @@ interface RequestItemRowProps {
   remove: (index: number) => void
   isRemovable: boolean
   availableItems: StockOption[]
-  watchedItems: { consumableId: string; quantity: number }[]
+  watchedItems: RequestFormValues['items']
 }
 
 function RequestItemRow({
@@ -169,7 +169,7 @@ function RequestItemRow({
                   className="text-center font-medium"
                   {...field}
                   onChange={(e) => {
-                    const val = e.target.valueAsNumber || 1
+                    const val = e.target.valueAsNumber || 0
                     field.onChange(val > maxQty ? maxQty : val)
                   }}
                 />
@@ -225,7 +225,12 @@ export function RequestDialog({
     name: 'items',
   })
 
-  const watchedItems = useWatch({ control: form.control, name: 'items' })
+  const rawWatchedItems = useWatch({ control: form.control, name: 'items' })
+  const watchedItems = useMemo(
+    () => (rawWatchedItems || []) as RequestFormValues['items'],
+    [rawWatchedItems],
+  )
+
   const selectedWarehouseId = useWatch({ control: form.control, name: 'targetWarehouseId' })
 
   const availableItems = useMemo(() => {
@@ -409,11 +414,11 @@ export function RequestDialog({
                     <RequestItemRow
                       key={fieldItem.id}
                       index={index}
-                      control={form.control as any}
+                      control={form.control as unknown as Control<RequestFormValues>}
                       remove={remove}
                       isRemovable={fields.length > 1}
                       availableItems={availableItems}
-                      watchedItems={watchedItems as any}
+                      watchedItems={watchedItems}
                     />
                   ))
                 ) : (
