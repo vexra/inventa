@@ -35,10 +35,19 @@ interface StockDetailDialogProps {
   itemName: string
   unit: string
   batches: BatchItem[]
-  children: React.ReactNode
+  children?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function StockDetailDialog({ itemName, unit, batches, children }: StockDetailDialogProps) {
+export function StockDetailDialog({
+  itemName,
+  unit,
+  batches,
+  children,
+  open,
+  onOpenChange,
+}: StockDetailDialogProps) {
   const sortedBatches = useMemo(() => {
     return [...batches].sort((a, b) => {
       const isZeroA = a.qty <= 0
@@ -56,8 +65,8 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
   }, [batches])
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
