@@ -116,7 +116,7 @@ export function StockDetailDialog({
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
                     if (diffDays < 0) status = 'expired'
-                    else if (diffDays <= 30) status = 'warning'
+                    else if (diffDays <= 90) status = 'warning'
                     else status = 'ok'
                   }
 
