@@ -255,7 +255,7 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
         </div>
 
         <div className="space-y-6 lg:col-span-1">
-          <Card className="flex h-full max-h-[calc(100vh-8rem)] flex-col">
+          <Card className="flex h-full flex-col">
             <CardHeader className="shrink-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Clock className="h-5 w-5 text-blue-600" />
@@ -263,7 +263,7 @@ export default async function ProcurementDetailPage({ params }: PageProps) {
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="overflow-y-auto pr-2">
+            <CardContent className="overflow-x-hidden overflow-y-auto pr-2">
               <div className="border-muted relative ml-3 space-y-8 border-l pb-1 pl-6">
                 {timelines.map((log, index) => {
                   const isLatest = index === 0
