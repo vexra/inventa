@@ -1,20 +1,19 @@
-import { asc, ilike, or, sql } from 'drizzle-orm'
+import { asc, desc, ilike, or, sql } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { faculties } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { FacultyDialog } from './_components/faculty-dialog'
-import { FacultyList } from './_components/faculty-list'
-
-const ITEMS_PER_PAGE = 10
+import { FacultyTable } from './_components/faculty-table'
 
 interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    limit?: string
+    sort?: string
+    order?: 'asc' | 'desc'
   }>
 }
 
@@ -26,11 +25,20 @@ export default async function FacultiesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE
+  const itemsPerPage = Number(params.limit) || 10
+
+  const sortCol = params.sort || 'name'
+  const sortOrder = params.order || 'asc'
+
+  const offset = (currentPage - 1) * itemsPerPage
 
   const searchCondition = query
     ? or(ilike(faculties.name, `%${query}%`), ilike(faculties.description, `%${query}%`))
     : undefined
+
+  const orderColumn = sortCol === 'description' ? faculties.description : faculties.name
+
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const dataPromise = db
     .select({
@@ -40,9 +48,9 @@ export default async function FacultiesPage({ searchParams }: PageProps) {
     })
     .from(faculties)
     .where(searchCondition)
-    .limit(ITEMS_PER_PAGE)
+    .limit(itemsPerPage)
     .offset(offset)
-    .orderBy(asc(faculties.name))
+    .orderBy(orderBy)
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
@@ -52,7 +60,7 @@ export default async function FacultiesPage({ searchParams }: PageProps) {
   const [data, countResult] = await Promise.all([dataPromise, countPromise])
 
   const totalItems = Number(countResult[0]?.count || 0)
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -61,25 +69,21 @@ export default async function FacultiesPage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">Data Fakultas</h1>
           <p className="text-muted-foreground">Kelola daftar fakultas induk universitas</p>
         </div>
-
         <FacultyDialog mode="create" />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <SearchInput placeholder="Cari nama fakultas..." className="w-full sm:max-w-xs" />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <FacultyList data={data} />
-
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-
-        {data.length === 0 && query && (
-          <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan fakultas dengan kata kunci <strong>&quot;{query}&quot;</strong>.
-          </div>
-        )}
-      </div>
+      <FacultyTable
+        data={data}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage,
+          itemsPerPage,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+        }}
+        currentSort={{ column: sortCol, direction: sortOrder }}
+      />
     </div>
   )
 }
