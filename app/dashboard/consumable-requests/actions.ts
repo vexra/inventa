@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { randomUUID } from 'crypto'
-import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -416,98 +416,6 @@ export async function updateRequestStatusByWarehouse(
   }
 }
 
-export async function completeRequestByQr(qrData: { requestId: string }) {
-  const session = await requireAuth({ roles: ['warehouse_staff'] })
-
-  try {
-    await db.transaction(async (tx) => {
-      const { requestId } = qrData
-
-      const [req] = await tx
-        .select()
-        .from(requests)
-        .where(
-          and(
-            eq(requests.id, requestId),
-            eq(requests.targetWarehouseId, session.user.warehouseId!),
-            eq(requests.status, 'READY_TO_PICKUP'),
-          ),
-        )
-        .limit(1)
-
-      if (!req) throw new Error('Request tidak valid atau belum siap diambil.')
-
-      const allocations = await tx
-        .select({
-          consumableId: requestItemAllocations.consumableId,
-          batchNumber: requestItemAllocations.batchNumber,
-          expiryDate: requestItemAllocations.expiryDate,
-          quantity: requestItemAllocations.quantity,
-        })
-        .from(requestItemAllocations)
-        .innerJoin(requestItems, eq(requestItemAllocations.requestItemId, requestItems.id))
-        .where(eq(requestItems.requestId, requestId))
-
-      if (allocations.length === 0) throw new Error('Data alokasi stok hilang/korup.')
-
-      for (const alloc of allocations) {
-        const [existingRoomStock] = await tx
-          .select()
-          .from(roomConsumables)
-          .where(
-            and(
-              eq(roomConsumables.roomId, req.roomId),
-              eq(roomConsumables.consumableId, alloc.consumableId),
-              alloc.batchNumber
-                ? eq(roomConsumables.batchNumber, alloc.batchNumber)
-                : sql`${roomConsumables.batchNumber} IS NULL`,
-              alloc.expiryDate
-                ? eq(roomConsumables.expiryDate, alloc.expiryDate)
-                : sql`${roomConsumables.expiryDate} IS NULL`,
-            ),
-          )
-
-        if (existingRoomStock) {
-          await tx
-            .update(roomConsumables)
-            .set({
-              quantity: sql`${roomConsumables.quantity} + ${alloc.quantity}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(roomConsumables.id, existingRoomStock.id))
-        } else {
-          await tx.insert(roomConsumables).values({
-            id: randomUUID(),
-            roomId: req.roomId,
-            consumableId: alloc.consumableId,
-            batchNumber: alloc.batchNumber,
-            expiryDate: alloc.expiryDate,
-            quantity: alloc.quantity,
-          })
-        }
-      }
-
-      await tx
-        .update(requests)
-        .set({ status: 'COMPLETED', updatedAt: new Date() })
-        .where(eq(requests.id, requestId))
-
-      await tx.insert(requestTimelines).values({
-        id: randomUUID(),
-        requestId: requestId,
-        status: 'COMPLETED',
-        actorId: session.user.id,
-        notes: 'Barang telah diterima oleh user (Scan QR).',
-      })
-    })
-
-    revalidatePath('/dashboard/consumable-requests')
-    return { success: true, message: 'Serah terima berhasil. Stok ruangan bertambah.' }
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Gagal scan QR.' }
-  }
-}
-
 export async function getConsumableRequests(page: number = 1, limit: number = 10, query?: string) {
   const session = await requireAuth({
     roles: ['unit_staff', 'unit_admin', 'faculty_admin', 'warehouse_staff'],
@@ -618,7 +526,7 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
 
 export async function completeRequestByQR(requestId: string) {
   const session = await requireAuth({
-    roles: ['warehouse_staff', 'unit_admin', 'faculty_admin'],
+    roles: ['warehouse_staff'],
   })
 
   try {
@@ -633,7 +541,7 @@ export async function completeRequestByQR(requestId: string) {
         if (request.status === 'COMPLETED') {
           throw new Error('Permintaan ini sudah selesai diambil sebelumnya.')
         }
-        throw new Error(`Status permintaan tidak valid untuk diambil (${request.status}).`)
+        throw new Error(`Status permintaan belum siap diambil (Status: ${request.status}).`)
       }
 
       const allocations = await tx
@@ -648,25 +556,31 @@ export async function completeRequestByQR(requestId: string) {
         .where(eq(requestItems.requestId, requestId))
 
       if (allocations.length === 0) {
-        console.warn('Data alokasi tidak ditemukan untuk request ini.')
+        throw new Error('Data alokasi stok korup atau hilang. Hubungi admin.')
       }
 
       for (const alloc of allocations) {
+        const whereConditions = [
+          eq(roomConsumables.roomId, request.roomId),
+          eq(roomConsumables.consumableId, alloc.consumableId),
+        ]
+
+        if (alloc.batchNumber) {
+          whereConditions.push(eq(roomConsumables.batchNumber, alloc.batchNumber))
+        } else {
+          whereConditions.push(isNull(roomConsumables.batchNumber))
+        }
+
+        if (alloc.expiryDate) {
+          whereConditions.push(eq(roomConsumables.expiryDate, alloc.expiryDate))
+        } else {
+          whereConditions.push(isNull(roomConsumables.expiryDate))
+        }
+
         const [existingRoomStock] = await tx
           .select()
           .from(roomConsumables)
-          .where(
-            and(
-              eq(roomConsumables.roomId, request.roomId),
-              eq(roomConsumables.consumableId, alloc.consumableId),
-              alloc.batchNumber
-                ? eq(roomConsumables.batchNumber, alloc.batchNumber)
-                : sql`${roomConsumables.batchNumber} IS NULL`,
-              alloc.expiryDate
-                ? eq(roomConsumables.expiryDate, alloc.expiryDate)
-                : sql`${roomConsumables.expiryDate} IS NULL`,
-            ),
-          )
+          .where(and(...whereConditions))
           .limit(1)
 
         if (existingRoomStock) {
@@ -707,9 +621,10 @@ export async function completeRequestByQR(requestId: string) {
     })
 
     revalidatePath('/dashboard/consumable-requests')
+
     return {
       success: true,
-      message: 'Verifikasi berhasil! Barang telah diserahkan dan stok ruangan bertambah.',
+      message: 'Verifikasi berhasil! Stok masuk ke ruangan sesuai Batch & Expired date.',
     }
   } catch (error) {
     console.error('QR Scan Error:', error)
