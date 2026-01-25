@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 
-import { faculties, rooms, units, user, userRoleEnum, warehouses } from '@/db/schema'
+import { buildings, faculties, rooms, units, user, userRoleEnum, warehouses } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 
@@ -45,7 +45,24 @@ async function seedOrganization() {
     ])
     .onConflictDoNothing()
 
-  // 3. Buat Gudang (Kimia & ATK)
+  await db
+    .insert(buildings)
+    .values([
+      {
+        id: 'bld-mipa-terpadu',
+        facultyId: 'fac-fmipa',
+        name: 'Gedung MIPA Terpadu',
+        code: 'GMT',
+      },
+      {
+        id: 'bld-bio',
+        facultyId: 'fac-fmipa',
+        name: 'Gedung Jurusan Biologi',
+        code: 'GJB',
+      },
+    ])
+    .onConflictDoNothing()
+
   await db
     .insert(warehouses)
     .values([
@@ -66,12 +83,12 @@ async function seedOrganization() {
     ])
     .onConflictDoNothing()
 
-  // 4. Buat Contoh Ruangan (Lab)
   await db
     .insert(rooms)
     .values([
       {
         id: 'room-bio-1',
+        buildingId: 'bld-bio',
         unitId: 'unit-bio',
         name: 'Lab Mikrobiologi Dasar',
         type: 'LABORATORY',
@@ -79,10 +96,20 @@ async function seedOrganization() {
       },
       {
         id: 'room-tu-bio',
+        buildingId: 'bld-bio',
         unitId: 'unit-bio',
         name: 'Ruang TU Biologi',
         type: 'ADMIN_OFFICE',
         qrToken: 'QR-BIO-TU',
+      },
+
+      {
+        id: 'room-aula-mipa',
+        buildingId: 'bld-mipa-terpadu',
+        unitId: null,
+        name: 'Aula Utama FMIPA',
+        type: 'LECTURE_HALL',
+        qrToken: 'QR-AULA-01',
       },
     ])
     .onConflictDoNothing()
