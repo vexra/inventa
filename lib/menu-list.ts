@@ -7,12 +7,14 @@ import {
   FilePenLine,
   FileText,
   FlaskConical,
+  Landmark,
   Layers,
   LayoutDashboard,
   type LucideIcon,
   MapPin,
   MonitorSmartphone,
   PackageCheck,
+  ScanBarcode,
   ShoppingCart,
   Tags,
   Users,
@@ -44,6 +46,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Organisasi & Lokasi',
       items: [
         { title: 'Fakultas', url: '/dashboard/faculties', icon: Building },
+        { title: 'Gedung', url: '/dashboard/buildings', icon: Landmark },
         { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
         { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
         { title: 'Ruangan', url: '/dashboard/rooms', icon: MapPin },
@@ -96,7 +99,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Data Inventaris',
       items: [
         {
-          title: 'Stok Gudang',
+          title: 'Stok BHP Gudang',
           url: '/dashboard/warehouse-stocks',
           icon: Boxes,
         },
@@ -132,9 +135,14 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Inventaris Ruangan',
       items: [
         {
-          title: 'Stok Ruangan',
+          title: 'Stok BHP Ruangan',
           url: '/dashboard/room-stocks',
           icon: Boxes,
+        },
+        {
+          title: 'Aset Ruangan',
+          url: '/dashboard/room-assets',
+          icon: Layers,
         },
         {
           title: 'Lapor Pemakaian',
@@ -165,15 +173,20 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Monitoring Inventaris',
+      title: 'Monitoring Unit',
       items: [
         {
-          title: 'Stok per Ruangan',
+          title: 'Total Stok BHP',
           url: '/dashboard/unit-stocks',
           icon: Boxes,
         },
         {
-          title: 'Ruangan',
+          title: 'Daftar Aset Unit',
+          url: '/dashboard/unit-assets',
+          icon: Layers,
+        },
+        {
+          title: 'Daftar Ruangan',
           url: '/dashboard/rooms',
           icon: MapPin,
         },
@@ -206,22 +219,17 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Aset & Inventaris',
+      title: 'Manajemen Aset',
       items: [
         {
-          title: 'Aset Tetap',
+          title: 'Semua Aset Tetap',
           url: '/dashboard/fixed-assets',
           icon: Layers,
         },
         {
-          title: 'Stok Gudang',
-          url: '/dashboard/warehouse-stocks',
-          icon: Warehouse,
-        },
-        {
-          title: 'Monitoring Unit',
-          url: '/dashboard/unit-stocks',
-          icon: Building2,
+          title: 'Audit Aset',
+          url: '/dashboard/asset-audits',
+          icon: ScanBarcode,
         },
       ],
     },
@@ -234,9 +242,19 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Users,
         },
         {
+          title: 'Gedung & Fasilitas',
+          url: '/dashboard/buildings',
+          icon: Landmark,
+        },
+        {
           title: 'Ruangan',
           url: '/dashboard/rooms',
           icon: MapPin,
+        },
+        {
+          title: 'Stok Gudang Pusat',
+          url: '/dashboard/warehouse-stocks',
+          icon: Warehouse,
         },
       ],
     },
