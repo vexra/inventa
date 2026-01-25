@@ -46,10 +46,10 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Organisasi & Lokasi',
       items: [
         { title: 'Fakultas', url: '/dashboard/faculties', icon: Building },
-        { title: 'Gedung', url: '/dashboard/buildings', icon: Landmark },
         { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
-        { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
+        { title: 'Gedung', url: '/dashboard/buildings', icon: Landmark },
         { title: 'Ruangan', url: '/dashboard/rooms', icon: MapPin },
+        { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
       ],
     },
     {
