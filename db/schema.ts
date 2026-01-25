@@ -81,6 +81,14 @@ export const assetConditionEnum = pgEnum('asset_condition', [
   'MAINTENANCE', // Sedang diservis
 ])
 
+// Status Pergerakan Aset (Untuk Aset Bergerak)
+export const assetMovementStatusEnum = pgEnum('asset_movement_status', [
+  'IN_STORE', // Ada di lokasi penyimpanannya (Home Base)
+  'IN_USE', // Sedang dipakai (dipinjam/digunakan/driver)
+  'IN_TRANSIT', // Sedang dibawa/pindah lokasi
+  'LOST', // Hilang saat pemakaian
+])
+
 // Kondisi Penerimaan Barang (Quality Control Inbound)
 export const receiptConditionEnum = pgEnum('receipt_condition', [
   'GOOD', // Diterima baik
@@ -181,8 +189,8 @@ export const verification = pgTable(
  * =========================================
  * 3. ORGANIZATIONAL STRUCTURE
  * =========================================
- * Hierarki: Faculty (Fakultas) -> Unit (Jurusan/Prodi) -> Rooms (Ruangan).
- * Warehouse (Gudang) berdiri terpisah di bawah Fakultas.
+ * Hierarki: Faculty -> Buildings (Fisik) -> Rooms (Fisik).
+ * Unit (Logis) menempel pada Room.
  */
 
 export const faculties = pgTable('faculties', {
@@ -204,15 +212,44 @@ export const units = pgTable(
   (table) => [index('units_faculty_id_idx').on(table.facultyId)],
 )
 
+// Tabel Buildings (Gedung Fisik)
+export const buildings = pgTable(
+  'buildings',
+  {
+    id: text('id').primaryKey(),
+    facultyId: text('faculty_id')
+      .notNull()
+      .references(() => faculties.id),
+
+    name: text('name').notNull(), // Contoh: "Gedung MIPA Terpadu", "Gedung GSG"
+    code: text('code'), // Contoh: "GMT", "GSG-01"
+
+    // Koordinat Geo (Opsional)
+    latitude: decimal('latitude'),
+    longitude: decimal('longitude'),
+
+    description: text('description'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [index('buildings_faculty_id_idx').on(table.facultyId)],
+)
+
 export const rooms = pgTable(
   'rooms',
   {
     id: text('id').primaryKey(),
-    unitId: text('unit_id')
+
+    // Relasi ke Gedung Fisik
+    buildingId: text('building_id')
       .notNull()
-      .references(() => units.id, { onDelete: 'cascade' }),
+      .references(() => buildings.id, { onDelete: 'cascade' }),
+
+    // Jika NULL: Ruangan Umum (GSG, Aula Fakultas).
+    // Jika ISI: Ruangan Jurusan (Lab, R. Dosen Jurusan).
+    unitId: text('unit_id').references(() => units.id),
 
     name: text('name').notNull(), // Contoh: "Lab Mikrobiologi 1"
+    floorLevel: integer('floor_level').default(1),
     type: roomTypeEnum('type').default('LECTURE_HALL').notNull(),
     qrToken: text('qr_token').unique(), // QR yang ditempel di ruangan
 
@@ -220,6 +257,7 @@ export const rooms = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
+    index('rooms_building_id_idx').on(table.buildingId),
     index('rooms_unit_id_idx').on(table.unitId),
     index('rooms_qr_token_idx').on(table.qrToken),
   ],
@@ -305,9 +343,6 @@ export const warehouseStocks = pgTable(
 
     quantity: decimal('quantity', { precision: 10, scale: 2 }).default('0'),
 
-    // Tracking Batch & Kadaluarsa
-    // Batch number tetap boleh NULL (secara database),
-    // tapi logic aplikasi (Action) akan mengisinya dengan '-' jika kosong.
     batchNumber: text('batch_number'),
     expiryDate: timestamp('expiry_date'),
 
@@ -340,7 +375,6 @@ export const roomConsumables = pgTable(
 
     quantity: decimal('quantity', { precision: 10, scale: 2 }).default('0').notNull(),
 
-    // Penting untuk tracking experiment lab (Batch mana yang dipakai?)
     batchNumber: text('batch_number'),
     expiryDate: timestamp('expiry_date'),
 
@@ -364,10 +398,22 @@ export const fixedAssets = pgTable(
     /**
      * [HYBRID LOCATION LOGIC]
      * Aset bisa berada di Ruangan (Lab/Kelas) ATAU di Gudang.
-     * Salah satu kolom ini harus terisi.
+     * Salah satu kolom ini harus terisi sebagai "Home Base" atau "Last Known Location".
      */
-    roomId: text('room_id').references(() => rooms.id), // e.g. Mikroskop di Lab
+    roomId: text('room_id').references(() => rooms.id), // e.g. Mikroskop di Lab / Kendaraan di Pool
     warehouseId: text('warehouse_id').references(() => warehouses.id), // e.g. Rak Besi di Gudang
+
+    /**
+     * CUSTODIAN (Penanggung Jawab Aset Bergerak)
+     * Wajib diisi untuk kendaraan dinas atau alat mahal yang dibawa-bawa.
+     */
+    custodianId: text('custodian_id').references(() => user.id),
+
+    /**
+     * STATUS PERGERAKAN
+     * Membedakan aset yang "Parkir" vs "Jalan".
+     */
+    movementStatus: assetMovementStatusEnum('movement_status').default('IN_STORE'),
 
     qrToken: text('qr_token').notNull().unique(), // Data yang tersimpan di QR Code fisik
     serialNumber: text('serial_number'), // SN dari pabrik
@@ -389,6 +435,7 @@ export const fixedAssets = pgTable(
     index('fa_room_idx').on(table.roomId),
     index('fa_warehouse_idx').on(table.warehouseId),
     index('fa_qr_idx').on(table.qrToken),
+    index('fa_custodian_idx').on(table.custodianId),
   ],
 )
 
@@ -484,7 +531,7 @@ export const requestItemAllocations = pgTable('request_item_allocations', {
  * =========================================
  * 7. PROCUREMENT & TIMELINE (PENGADAAN)
  * =========================================
- * Flow Admin membeli barang dari Vendor (Masuk ke Gudang/Ruangan).
+ * Flow warehouse staff mengambil barang dari vendor (Masuk ke Gudang/Ruangan).
  */
 
 export const procurements = pgTable('procurements', {
@@ -522,7 +569,7 @@ export const procurementTimelines = pgTable('procurement_timelines', {
   createdAt: timestamp('created_at').defaultNow(),
 })
 
-// Detail BHP yang dibeli (Otomatis masuk Warehouse Stocks saat Completed)
+// Detail BHP yang dibeli
 export const procurementConsumables = pgTable('procurement_consumables', {
   id: text('id').primaryKey(),
   procurementId: text('procurement_id')
@@ -541,7 +588,7 @@ export const procurementConsumables = pgTable('procurement_consumables', {
   condition: receiptConditionEnum('condition'),
 })
 
-// Detail Aset Tetap yang dibeli (Otomatis jadi Fixed Assets saat Completed)
+// Detail Aset Tetap yang dibeli
 export const procurementAssets = pgTable('procurement_assets', {
   id: text('id').primaryKey(),
   procurementId: text('procurement_id')
@@ -643,30 +690,26 @@ export const assetAudits = pgTable('asset_audits', {
  * =========================================
  * 9. LOGGING (SYSTEM LOGS)
  * =========================================
- * Catatan teknis untuk debugging dan security audit.
  */
 
-// Log Perubahan Data Sensitif (Siapa mengubah apa)
 export const auditLogs = pgTable('audit_logs', {
   id: text('id').primaryKey(),
   userId: text('user_id').references(() => user.id),
 
-  action: text('action').notNull(), // 'CREATE', 'UPDATE', 'DELETE'
+  action: text('action').notNull(),
   tableName: text('table_name').notNull(),
   recordId: text('record_id').notNull(),
 
-  // Snapshot JSON data sebelum & sesudah (Undo capability)
   oldValues: json('old_values'),
   newValues: json('new_values'),
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Log Aktivitas User (Login/Logout)
 export const systemActivityLogs = pgTable('system_activity_logs', {
   id: text('id').primaryKey(),
   actorId: text('actor_id').references(() => user.id),
-  actionType: text('action_type').notNull(), // 'LOGIN', 'EXPORT_REPORT'
+  actionType: text('action_type').notNull(),
   description: text('description'),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
@@ -678,46 +721,60 @@ export const systemActivityLogs = pgTable('system_activity_logs', {
  * =========================================
  * 10. RELATIONS (DRIZZLE ORM)
  * =========================================
- * Mendefinisikan hubungan antar tabel untuk memudahkan query (with: { ... }).
+ * Mendefinisikan hubungan antar tabel.
  */
 
 // --- ORGANIZATION ---
 export const facultiesRelations = relations(faculties, ({ many }) => ({
   units: many(units),
+  buildings: many(buildings), // Relation
   warehouses: many(warehouses),
   users: many(user),
 }))
 
 export const unitsRelations = relations(units, ({ one, many }) => ({
-  faculty: one(faculties, { fields: [units.facultyId], references: [faculties.id] }),
+  faculty: one(faculties, {
+    fields: [units.facultyId],
+    references: [faculties.id],
+  }),
   rooms: many(rooms),
   users: many(user),
 }))
 
+// Relations untuk Buildings
+export const buildingsRelations = relations(buildings, ({ one, many }) => ({
+  faculty: one(faculties, { fields: [buildings.facultyId], references: [faculties.id] }),
+  rooms: many(rooms),
+}))
+
 export const roomsRelations = relations(rooms, ({ one, many }) => ({
+  building: one(buildings, { fields: [rooms.buildingId], references: [buildings.id] }),
   unit: one(units, { fields: [rooms.unitId], references: [units.id] }),
-  consumables: many(roomConsumables), // Stok consumable di ruangan ini
-  fixedAssets: many(fixedAssets), // Aset tetap yang ada di ruangan ini
+  consumables: many(roomConsumables),
+  fixedAssets: many(fixedAssets),
   requests: many(requests),
   usageReports: many(usageReports),
 }))
 
 export const warehousesRelations = relations(warehouses, ({ one, many }) => ({
   faculty: one(faculties, { fields: [warehouses.facultyId], references: [faculties.id] }),
-  stocks: many(warehouseStocks), // Stok consumable di gudang ini
-  fixedAssets: many(fixedAssets), // [NEW] Aset tetap (inventaris) milik gudang ini
+  stocks: many(warehouseStocks),
+  fixedAssets: many(fixedAssets),
 }))
 
 // --- CATALOG ---
 export const consumablesRelations = relations(consumables, ({ one, many }) => ({
-  category: one(categories, { fields: [consumables.categoryId], references: [categories.id] }),
+  category: one(categories, {
+    fields: [consumables.categoryId],
+    references: [categories.id],
+  }),
   warehouseStocks: many(warehouseStocks),
   roomConsumables: many(roomConsumables),
 }))
 
 export const assetModelsRelations = relations(assetModels, ({ one, many }) => ({
   category: one(categories, { fields: [assetModels.categoryId], references: [categories.id] }),
-  fixedAssets: many(fixedAssets), // Semua unit fisik dari model ini
+  fixedAssets: many(fixedAssets),
 }))
 
 // --- INVENTORY ---
@@ -740,14 +797,13 @@ export const roomConsumablesRelations = relations(roomConsumables, ({ one }) => 
   }),
 }))
 
-// [IMPORTANT] Relasi Hybrid Location untuk Aset Tetap
 export const fixedAssetsRelations = relations(fixedAssets, ({ one, many }) => ({
   model: one(assetModels, { fields: [fixedAssets.modelId], references: [assetModels.id] }),
 
   // Relasi opsional: Aset bisa punya 'room' ATAU 'warehouse'
   room: one(rooms, { fields: [fixedAssets.roomId], references: [rooms.id] }),
   warehouse: one(warehouses, { fields: [fixedAssets.warehouseId], references: [warehouses.id] }),
-
+  custodian: one(user, { fields: [fixedAssets.custodianId], references: [user.id] }),
   audits: many(assetAudits),
 }))
 
