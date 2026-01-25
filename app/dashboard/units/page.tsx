@@ -1,43 +1,59 @@
-import { and, asc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { faculties, units } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { UnitDialog } from './_components/unit-dialog'
-import { UnitList } from './_components/unit-list'
-
-const ITEMS_PER_PAGE = 10
+import { UnitTable } from './_components/unit-table'
 
 interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    limit?: string
+    sort?: string
+    order?: 'asc' | 'desc'
+    facultyId?: string
   }>
 }
 
 export default async function UnitsPage({ searchParams }: PageProps) {
   const session = await requireAuth({ roles: ['super_admin', 'faculty_admin'] })
 
-  const { role, facultyId } = session.user
+  const { role, facultyId: userFacultyId } = session.user
   const isSuperAdmin = role === 'super_admin'
-
-  const fixedFacultyId = role === 'faculty_admin' ? facultyId! : undefined
+  const fixedFacultyId = role === 'faculty_admin' ? userFacultyId! : undefined
 
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE
+  const itemsPerPage = Number(params.limit) || 10
+  const sortCol = params.sort || 'name'
+  const sortOrder = params.order || 'asc'
+  const filterFacultyId = params.facultyId || 'all'
+
+  const offset = (currentPage - 1) * itemsPerPage
 
   const textSearch = query
     ? or(ilike(units.name, `%${query}%`), ilike(units.description, `%${query}%`))
     : undefined
 
-  const roleFilter = !isSuperAdmin ? eq(units.facultyId, facultyId!) : undefined
+  const facultyFilter =
+    isSuperAdmin && filterFacultyId !== 'all' ? eq(units.facultyId, filterFacultyId) : undefined
 
-  const searchCondition = and(textSearch, roleFilter)
+  const roleFilter = !isSuperAdmin ? eq(units.facultyId, userFacultyId!) : undefined
+
+  const searchCondition = and(textSearch, facultyFilter, roleFilter)
+
+  const orderColumn =
+    sortCol === 'faculty'
+      ? faculties.name
+      : sortCol === 'description'
+        ? units.description
+        : units.name
+
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const dataPromise = db
     .select({
@@ -50,9 +66,9 @@ export default async function UnitsPage({ searchParams }: PageProps) {
     .from(units)
     .leftJoin(faculties, eq(units.facultyId, faculties.id))
     .where(searchCondition)
-    .limit(ITEMS_PER_PAGE)
+    .limit(itemsPerPage)
     .offset(offset)
-    .orderBy(asc(units.name))
+    .orderBy(orderBy)
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
@@ -76,7 +92,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
   ])
 
   const totalItems = Number(countResult[0]?.count || 0)
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -89,21 +105,21 @@ export default async function UnitsPage({ searchParams }: PageProps) {
         <UnitDialog mode="create" faculties={facultiesList} fixedFacultyId={fixedFacultyId} />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <SearchInput placeholder="Cari nama unit..." className="w-full sm:max-w-xs" />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <UnitList data={data} faculties={facultiesList} fixedFacultyId={fixedFacultyId} />
-
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-
-        {data.length === 0 && query && (
-          <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan unit dengan kata kunci <strong>&quot;{query}&quot;</strong>.
-          </div>
-        )}
-      </div>
+      <UnitTable
+        data={data}
+        faculties={facultiesList}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage,
+          itemsPerPage,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+        }}
+        currentSort={{ column: sortCol, direction: sortOrder }}
+        currentFacultyFilter={filterFacultyId}
+        fixedFacultyId={fixedFacultyId}
+      />
     </div>
   )
 }
