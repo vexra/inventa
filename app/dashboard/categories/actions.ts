@@ -87,7 +87,6 @@ export async function deleteCategory(id: string) {
   try {
     await db.transaction(async (tx) => {
       const [oldData] = await tx.select().from(categories).where(eq(categories.id, id)).limit(1)
-
       if (!oldData) throw new Error('Category not found')
 
       await tx.delete(categories).where(eq(categories.id, id))
@@ -99,7 +98,6 @@ export async function deleteCategory(id: string) {
         tableName: 'categories',
         recordId: id,
         oldValues: oldData,
-        newValues: oldData,
       })
     })
 
@@ -107,10 +105,9 @@ export async function deleteCategory(id: string) {
     return { success: true, message: 'Kategori dihapus' }
   } catch (error) {
     const dbError = error as { code?: string }
-    // Handle error jika kategori sedang dipakai (Foreign Key Violation - Postgres Code 23503)
     if (dbError.code === '23503') {
       return {
-        error: 'Gagal hapus: Kategori ini sedang digunakan oleh Barang atau Aset.',
+        error: 'Gagal hapus: Kategori ini sedang digunakan oleh Barang.',
       }
     }
     console.error('Delete category error:', error)
