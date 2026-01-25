@@ -19,9 +19,7 @@ interface PageProps {
 }
 
 export default async function WarehousesPage({ searchParams }: PageProps) {
-  const session = await requireAuth({
-    roles: ['super_admin'],
-  })
+  await requireAuth({ roles: ['super_admin'] })
 
   const params = await searchParams
   const query = params.q || ''

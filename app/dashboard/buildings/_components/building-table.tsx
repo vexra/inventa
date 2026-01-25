@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Building,
-  Hash,
   Landmark,
   MoreHorizontal,
   Pencil,
