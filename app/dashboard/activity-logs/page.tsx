@@ -1,10 +1,23 @@
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { SQL, and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { PgColumn } from 'drizzle-orm/pg-core'
 
 import { auditLogs, user } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { LogsTable } from './_components/activity-logs-table'
+
+export interface ActivityLogEntry {
+  id: string
+  action: string
+  tableName: string
+  recordId: string
+  oldValues: unknown
+  newValues: unknown
+  createdAt: Date
+  actorName: string | null
+  actorEmail: string | null
+}
 
 interface PageProps {
   searchParams: Promise<{
@@ -26,7 +39,7 @@ export default async function LogsPage({ searchParams }: PageProps) {
   const currentPage = Number(params.page) || 1
   const itemsPerPage = Number(params.limit) || 10
   const sortCol = params.sort || 'createdAt'
-  const sortOrder = params.order || 'desc'
+  const sortOrder = params.order || 'asc'
   const offset = (currentPage - 1) * itemsPerPage
 
   const isSuperAdmin = session.user.role === 'super_admin'
@@ -42,12 +55,13 @@ export default async function LogsPage({ searchParams }: PageProps) {
 
   const finalCondition = and(searchCondition, userCondition)
 
-  const sortMap: Record<string, any> = {
+  const sortMap: Record<string, PgColumn | SQL> = {
     createdAt: auditLogs.createdAt,
     action: auditLogs.action,
     tableName: auditLogs.tableName,
     actorName: user.name,
   }
+
   const orderColumn = sortMap[sortCol] || auditLogs.createdAt
   const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
@@ -76,7 +90,11 @@ export default async function LogsPage({ searchParams }: PageProps) {
     .leftJoin(user, eq(auditLogs.userId, user.id))
     .where(finalCondition)
 
-  const [data, countResult] = await Promise.all([dataPromise, countPromise])
+  const [data, countResult] = await Promise.all([
+    dataPromise as Promise<ActivityLogEntry[]>,
+    countPromise,
+  ])
+
   const totalItems = Number(countResult[0]?.count || 0)
   const totalPages = Math.ceil(totalItems / itemsPerPage)
 
@@ -92,7 +110,7 @@ export default async function LogsPage({ searchParams }: PageProps) {
       </div>
 
       <LogsTable
-        data={data as any}
+        data={data}
         currentSort={{ column: sortCol, direction: sortOrder as 'asc' | 'desc' }}
         metadata={{
           totalItems,

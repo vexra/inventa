@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { ArrowUpDown, Eye, History, Settings2 } from 'lucide-react'
+import { ArrowUpDown, Eye, Settings2 } from 'lucide-react'
 
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 import { DataTableToolbar } from '@/components/shared/data-table-toolbar'
@@ -46,7 +46,14 @@ export type LogEntry = {
 
 interface LogsTableProps {
   data: LogEntry[]
-  metadata: any
+  metadata: {
+    totalItems: number
+    totalPages: number
+    currentPage: number
+    itemsPerPage: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }
   currentSort: {
     column: string
     direction: 'asc' | 'desc'
