@@ -2,12 +2,17 @@
 
 import { useState } from 'react'
 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+
 import {
+  AlertTriangle,
+  ArrowUpDown,
   Ban,
   Building2,
   KeyRound,
   MoreHorizontal,
   School,
+  Settings2,
   Trash2,
   UserCog,
   VenetianMask,
@@ -15,6 +20,18 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { DataTablePagination } from '@/components/shared/data-table-pagination'
+import { DataTableToolbar } from '@/components/shared/data-table-toolbar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,6 +44,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -45,6 +63,7 @@ import {
 } from '@/components/ui/table'
 import { userRoleEnum } from '@/db/schema'
 import { authClient } from '@/lib/auth-client'
+import { cn } from '@/lib/utils'
 
 import {
   banUserAction,
@@ -54,23 +73,23 @@ import {
 } from '../actions'
 import { UserDialog } from './user-dialog'
 
-type UserRole = (typeof userRoleEnum.enumValues)[number]
-
-interface UnitData {
+interface Unit {
   id: string
   name: string
   facultyId: string | null
 }
 
-interface WarehouseData {
+interface Warehouse {
   id: string
   name: string
 }
 
-interface FacultyData {
+interface Faculty {
   id: string
   name: string
 }
+
+type UserRole = (typeof userRoleEnum.enumValues)[number]
 
 interface UserData {
   id: string
@@ -78,36 +97,101 @@ interface UserData {
   email: string
   role: string
   banned: boolean
-  banReason?: string | null
   usageCount: number
-
   unitId: string | null
   warehouseId: string | null
   facultyId: string | null
   unitFacultyId: string | null
-
   unit: { name: string } | null
   warehouse: { name: string } | null
 }
 
 interface UserListProps {
   data: UserData[]
-  units: UnitData[]
-  warehouses: WarehouseData[]
-  faculties: FacultyData[]
+  units: Unit[]
+  warehouses: Warehouse[]
+  faculties: Faculty[]
+  metadata: {
+    totalItems: number
+    totalPages: number
+    currentPage: number
+    itemsPerPage: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }
+  currentSort: {
+    column: string
+    direction: 'asc' | 'desc'
+  }
 }
 
-export function UserList({ data, units, warehouses, faculties }: UserListProps) {
+function SortableHeader({
+  id: columnId,
+  label,
+  currentSort,
+  onSort,
+  className,
+}: {
+  id: string
+  label: string
+  currentSort: { column: string; direction: 'asc' | 'desc' }
+  onSort: (id: string) => void
+  className?: string
+}) {
+  return (
+    <TableHead className={cn('h-10 px-0', className)}>
+      <Button
+        variant="ghost"
+        onClick={() => onSort(columnId)}
+        className="hover:bg-muted h-full w-full justify-start px-4 text-xs font-medium tracking-wider uppercase"
+      >
+        {label}
+        {currentSort.column === columnId && (
+          <ArrowUpDown
+            className={cn('ml-2 h-3 w-3', currentSort.direction === 'asc' && 'rotate-180')}
+          />
+        )}
+      </Button>
+    </TableHead>
+  )
+}
+
+export function UserList({
+  data,
+  units,
+  warehouses,
+  faculties,
+  metadata,
+  currentSort,
+}: UserListProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
 
   const [userToBan, setUserToBan] = useState<UserData | null>(null)
   const [banReason, setBanReason] = useState('')
   const [userToDelete, setUserToDelete] = useState<UserData | null>(null)
-
   const [userToImpersonate, setUserToImpersonate] = useState<UserData | null>(null)
 
+  const [visibleColumns, setVisibleColumns] = useState({
+    user: true,
+    role: true,
+    affiliation: true,
+    status: true,
+  })
+
   const userToEdit = data.find((u) => u.id === editingId)
+
+  const handleSort = (column: string) => {
+    const isAsc = currentSort.column === column && currentSort.direction === 'asc'
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', column)
+    params.set('order', isAsc ? 'desc' : 'asc')
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
 
   const confirmImpersonate = async () => {
     if (!userToImpersonate) return
@@ -117,7 +201,6 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
 
     try {
       await logImpersonationAction(userToImpersonate.id)
-
       const { error } = await authClient.admin.impersonateUser({
         userId: userToImpersonate.id,
       })
@@ -128,7 +211,6 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
         setUserToImpersonate(null)
       } else {
         toast.success(`Berhasil masuk sebagai ${userToImpersonate.name}`, { id: toastId })
-
         window.location.href = '/dashboard'
       }
     } catch {
@@ -141,22 +223,13 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
   const handleProcessBan = async (userId: string, isBanned: boolean, reason?: string) => {
     setIsPending(true)
     try {
-      if (isBanned) {
-        const res = await unbanUserAction(userId)
-        if (res.error) toast.error(res.error)
-        else {
-          toast.success(res.message)
-          setUserToBan(null)
-          setBanReason('')
-        }
+      const res = isBanned ? await unbanUserAction(userId) : await banUserAction(userId, reason)
+      if (res.error) {
+        toast.error(res.error)
       } else {
-        const res = await banUserAction(userId, reason)
-        if (res.error) toast.error(res.error)
-        else {
-          toast.success(res.message)
-          setUserToBan(null)
-          setBanReason('')
-        }
+        toast.success(res.message)
+        setUserToBan(null)
+        setBanReason('')
       }
     } catch {
       toast.error('Gagal memproses status user')
@@ -165,12 +238,14 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
     }
   }
 
-  const handleDelete = async (userId: string) => {
+  const handleDelete = async () => {
+    if (!userToDelete) return
     setIsPending(true)
     try {
-      const res = await deleteUserAction(userId)
-      if (res.error) toast.error(res.error)
-      else {
+      const res = await deleteUserAction(userToDelete.id)
+      if (res.error) {
+        toast.error(res.error)
+      } else {
         toast.success(res.message)
         setUserToDelete(null)
       }
@@ -182,135 +257,216 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
   }
 
   return (
-    <>
-      <div className="bg-card rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Afiliasi</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-12.5"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground h-24 text-center">
-                  Tidak ada pengguna ditemukan.
-                </TableCell>
+    <div className="w-full space-y-4">
+      <div className="bg-card rounded-md border shadow-sm">
+        <DataTableToolbar placeholder="Cari nama atau email..." limit={metadata.itemsPerPage}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto hidden h-9 px-3 text-xs sm:flex"
+              >
+                <Settings2 className="mr-2 h-3.5 w-3.5" />
+                Tampilan
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
+                Atur Kolom
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.user}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, user: !!v }))}
+              >
+                User
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.role}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, role: !!v }))}
+              >
+                Role
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.affiliation}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, affiliation: !!v }))}
+              >
+                Afiliasi
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.status}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, status: !!v }))}
+              >
+                Status
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </DataTableToolbar>
+
+        <div className="relative w-full overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                {visibleColumns.user && (
+                  <SortableHeader
+                    id="name"
+                    label="User"
+                    currentSort={currentSort}
+                    onSort={handleSort}
+                  />
+                )}
+                {visibleColumns.role && (
+                  <SortableHeader
+                    id="role"
+                    label="Role"
+                    currentSort={currentSort}
+                    onSort={handleSort}
+                  />
+                )}
+                {visibleColumns.affiliation && (
+                  <TableHead className="px-4 text-xs font-medium tracking-wider uppercase">
+                    Afiliasi
+                  </TableHead>
+                )}
+                {visibleColumns.status && (
+                  <SortableHeader
+                    id="banned"
+                    label="Status"
+                    currentSort={currentSort}
+                    onSort={handleSort}
+                  />
+                )}
+                <TableHead className="w-12 px-4"></TableHead>
               </TableRow>
-            ) : (
-              data.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{user.name}</span>
-                      <span className="text-muted-foreground text-xs">{user.email}</span>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {user.role.replace('_', ' ')}
-                    </Badge>
-                  </TableCell>
-
-                  <TableCell>
-                    {user.unit ? (
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm">{user.unit.name}</span>
-                      </div>
-                    ) : user.warehouse ? (
-                      <div className="flex items-center gap-2">
-                        <Warehouse className="h-4 w-4 text-amber-500" />
-                        <span className="text-sm">{user.warehouse.name}</span>
-                      </div>
-                    ) : user.role === 'faculty_admin' ? (
-                      <div className="flex items-center gap-2">
-                        <School className="h-4 w-4 text-purple-500" />
-                        <span className="text-sm">
-                          {faculties.find((f) => f.id === user.facultyId)?.name || (
-                            <span className="text-muted-foreground italic">Belum set fakultas</span>
-                          )}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">-</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell>
-                    {user.banned ? (
-                      <Badge variant="destructive">Banned</Badge>
-                    ) : (
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
-                      >
-                        Aktif
-                      </Badge>
-                    )}
-                  </TableCell>
-
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Aksi</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-
-                        <DropdownMenuItem
-                          onClick={() => setUserToImpersonate(user)}
-                          disabled={isPending || user.role === 'super_admin'}
-                        >
-                          <VenetianMask className="mr-2 h-4 w-4" /> Login Sebagai User
-                        </DropdownMenuItem>
-
-                        <DropdownMenuSeparator />
-
-                        <DropdownMenuItem onClick={() => setEditingId(user.id)}>
-                          <UserCog className="mr-2 h-4 w-4" /> Edit Role/Data
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem onClick={() => setUserToBan(user)}>
-                          {user.banned ? (
-                            <>
-                              <KeyRound className="mr-2 h-4 w-4" /> Buka Blokir
-                            </>
-                          ) : (
-                            <>
-                              <Ban className="mr-2 h-4 w-4" /> Blokir User
-                            </>
-                          )}
-                        </DropdownMenuItem>
-
-                        <DropdownMenuSeparator />
-
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600"
-                          onClick={() => setUserToDelete(user)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4 text-red-600 focus:text-red-600" /> Hapus
-                          Permanen
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            </TableHeader>
+            <TableBody>
+              {data.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-muted-foreground h-24 text-center text-sm">
+                    Tidak ada pengguna ditemukan.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                data.map((user) => (
+                  <TableRow key={user.id} className="group hover:bg-muted/30">
+                    {visibleColumns.user && (
+                      <TableCell className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="text-sm leading-none font-medium">{user.name}</span>
+                          <span className="text-muted-foreground mt-1 text-[11px] font-normal tracking-tight">
+                            {user.email}
+                          </span>
+                        </div>
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.role && (
+                      <TableCell className="px-4 py-3">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-bold tracking-tighter uppercase shadow-none"
+                        >
+                          {user.role.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.affiliation && (
+                      <TableCell className="px-4 py-3">
+                        {user.unit ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                            <span className="max-w-37.5 truncate">{user.unit.name}</span>
+                          </div>
+                        ) : user.warehouse ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Warehouse className="h-3.5 w-3.5 text-amber-500" />
+                            <span className="max-w-37.5 truncate">{user.warehouse.name}</span>
+                          </div>
+                        ) : user.role === 'faculty_admin' ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <School className="h-3.5 w-3.5 text-purple-500" />
+                            <span className="max-w-37.5 truncate">
+                              {faculties.find((f) => f.id === user.facultyId)?.name ||
+                                'Fakultas N/A'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">-</span>
+                        )}
+                      </TableCell>
+                    )}
+
+                    {visibleColumns.status && (
+                      <TableCell className="px-4 py-3">
+                        {user.banned ? (
+                          <Badge variant="destructive" className="text-[10px] font-semibold">
+                            Banned
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-emerald-100 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-400">
+                            Aktif
+                          </Badge>
+                        )}
+                      </TableCell>
+                    )}
+
+                    <TableCell className="px-4 py-3 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuLabel>Aksi</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setUserToImpersonate(user)}
+                            disabled={isPending || user.role === 'super_admin'}
+                          >
+                            <VenetianMask className="mr-2 h-4 w-4" /> Login Sebagai User
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setEditingId(user.id)}>
+                            <UserCog className="mr-2 h-4 w-4" /> Edit Role/Data
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setUserToBan(user)}>
+                            {user.banned ? (
+                              <>
+                                <KeyRound className="mr-2 h-4 w-4" /> Buka Blokir
+                              </>
+                            ) : (
+                              <>
+                                <Ban className="mr-2 h-4 w-4" /> Blokir User
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-950"
+                            onClick={() => setUserToDelete(user)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Permanen
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <DataTablePagination metadata={metadata} />
       </div>
 
-      {/* --- DIALOG IMPERSONATE --- */}
       <Dialog
         open={!!userToImpersonate}
         onOpenChange={(open) => !open && setUserToImpersonate(null)}
@@ -328,7 +484,6 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
             </DialogDescription>
           </DialogHeader>
 
-          {/* User Profile Card */}
           <div className="mb-2 flex items-center justify-center rounded-lg border bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
             <div className="text-center">
               <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -346,7 +501,6 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
             </div>
           </div>
 
-          {/* Warning Box */}
           <div className="rounded-md border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-950/30">
             <div className="flex gap-3">
               <div className="mt-0.5 text-blue-600 dark:text-blue-400">
@@ -402,7 +556,6 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
         </DialogContent>
       </Dialog>
 
-      {/* --- DIALOG EDIT --- */}
       {editingId && userToEdit && (
         <UserDialog
           mode="edit"
@@ -415,7 +568,6 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
             id: userToEdit.id,
             name: userToEdit.name,
             email: userToEdit.email,
-            // 2. Cast string role ke tipe UserRole yang valid
             role: userToEdit.role as UserRole,
             unitId: userToEdit.unitId || undefined,
             warehouseId: userToEdit.warehouseId || undefined,
@@ -427,7 +579,6 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
         />
       )}
 
-      {/* --- DIALOG BAN / UNBAN --- */}
       <Dialog open={!!userToBan} onOpenChange={(open) => !open && setUserToBan(null)}>
         <DialogContent>
           <DialogHeader>
@@ -468,35 +619,34 @@ export function UserList({ data, units, warehouses, faculties }: UserListProps) 
         </DialogContent>
       </Dialog>
 
-      {/* --- DIALOG DELETE --- */}
-      <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2">
-              <Trash2 className="h-5 w-5" />
-              Hapus Pengguna Permanen
-            </DialogTitle>
-            <DialogDescription>
-              Anda akan menghapus user <b>{userToDelete?.name}</b> secara permanen.
-              <br />
-              <br />
-              Tindakan ini <b>tidak dapat dibatalkan</b>.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUserToDelete(null)} disabled={isPending}>
-              Batal
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => userToDelete && handleDelete(userToDelete.id)}
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-2 flex items-center gap-3">
+              <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/20">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-500" />
+              </div>
+              <AlertDialogTitle>Hapus Pengguna Permanen?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus user{' '}
+              <span className="text-foreground font-bold">{userToDelete?.name}</span> secara
+              permanen? Tindakan ini <strong>tidak dapat dibatalkan</strong> dan semua data terkait
+              user ini akan hilang.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
               disabled={isPending}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
             >
-              {isPending ? 'Menghapus...' : 'Ya, Hapus Permanen'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+              {isPending ? 'Menghapus...' : 'Ya, Hapus'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
