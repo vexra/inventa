@@ -1,60 +1,82 @@
-import { and, asc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
-import { faculties, rooms, units } from '@/db/schema'
+import { buildings, faculties, roomTypeEnum, rooms, units } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { RoomDialog } from './_components/room-dialog'
-import { RoomList } from './_components/room-list'
+import { RoomTable } from './_components/room-table'
 
-const ITEMS_PER_PAGE = 10
+type RoomType = (typeof roomTypeEnum.enumValues)[number]
 
 interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    limit?: string
+    sort?: string
+    order?: 'asc' | 'desc'
+    buildingId?: string
   }>
 }
 
 export default async function RoomsPage({ searchParams }: PageProps) {
   const session = await requireAuth({
-    roles: ['super_admin', 'unit_admin', 'faculty_admin'],
+    roles: ['super_admin', 'faculty_admin', 'unit_admin'],
   })
 
-  const { role, unitId, facultyId } = session.user
-
-  const isUnitAdmin = role === 'unit_admin'
+  const { role, facultyId: userFacultyId, unitId: userUnitId } = session.user
   const isSuperAdmin = role === 'super_admin'
+  const isFacultyAdmin = role === 'faculty_admin'
+  const isUnitAdmin = role === 'unit_admin'
 
-  const fixedUnitId = isUnitAdmin ? unitId! : undefined
+  const fixedUnitId = isUnitAdmin ? userUnitId! : undefined
 
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE
+  const itemsPerPage = Number(params.limit) || 10
+  const sortCol = params.sort || 'name'
+  const sortOrder = params.order || 'asc'
+  const filterBuildingId = params.buildingId || 'all'
+
+  const offset = (currentPage - 1) * itemsPerPage
 
   const textSearch = query
     ? or(
         ilike(rooms.name, `%${query}%`),
         ilike(rooms.description, `%${query}%`),
+        ilike(buildings.name, `%${query}%`),
         ilike(units.name, `%${query}%`),
       )
     : undefined
 
-  let roleFilter
-  let unitsCondition
+  const buildingFilter =
+    filterBuildingId !== 'all' ? eq(rooms.buildingId, filterBuildingId) : undefined
 
-  if (role === 'unit_admin') {
-    roleFilter = eq(rooms.unitId, unitId!)
-    unitsCondition = eq(units.id, unitId!)
-  } else if (role === 'faculty_admin') {
-    roleFilter = eq(units.facultyId, facultyId!)
-    unitsCondition = eq(units.facultyId, facultyId!)
+  let roleFilter
+  if (isFacultyAdmin) {
+    roleFilter = eq(buildings.facultyId, userFacultyId!)
+  } else if (isUnitAdmin) {
+    roleFilter = eq(rooms.unitId, userUnitId!)
   }
 
-  const finalCondition = and(textSearch, roleFilter)
+  const searchCondition = and(textSearch, buildingFilter, roleFilter)
+
+  const orderColumn =
+    sortCol === 'building'
+      ? buildings.name
+      : sortCol === 'unit'
+        ? units.name
+        : sortCol === 'type'
+          ? rooms.type
+          : sortCol === 'qr'
+            ? rooms.qrToken
+            : sortCol === 'description'
+              ? rooms.description
+              : rooms.name
+
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const dataPromise = db
     .select({
@@ -63,21 +85,45 @@ export default async function RoomsPage({ searchParams }: PageProps) {
       description: rooms.description,
       type: rooms.type,
       qrToken: rooms.qrToken,
+      buildingId: rooms.buildingId,
+      buildingName: buildings.name,
       unitId: rooms.unitId,
       unitName: units.name,
     })
     .from(rooms)
+    .leftJoin(buildings, eq(rooms.buildingId, buildings.id))
     .leftJoin(units, eq(rooms.unitId, units.id))
-    .where(finalCondition)
-    .limit(ITEMS_PER_PAGE)
+    .where(searchCondition)
+    .limit(itemsPerPage)
     .offset(offset)
-    .orderBy(asc(rooms.name))
+    .orderBy(orderBy)
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
     .from(rooms)
+    .leftJoin(buildings, eq(rooms.buildingId, buildings.id))
     .leftJoin(units, eq(rooms.unitId, units.id))
-    .where(finalCondition)
+    .where(searchCondition)
+
+  const buildingsCondition =
+    !isSuperAdmin && userFacultyId ? eq(buildings.facultyId, userFacultyId) : undefined
+
+  const buildingsPromise = db
+    .select({
+      id: buildings.id,
+      name: buildings.name,
+      facultyId: buildings.facultyId,
+    })
+    .from(buildings)
+    .where(buildingsCondition)
+    .orderBy(asc(buildings.name))
+
+  let unitsCondition
+  if (isFacultyAdmin) {
+    unitsCondition = eq(units.facultyId, userFacultyId!)
+  } else if (isUnitAdmin) {
+    unitsCondition = eq(units.id, userUnitId!)
+  }
 
   const unitsPromise = db
     .select({
@@ -96,16 +142,16 @@ export default async function RoomsPage({ searchParams }: PageProps) {
         .orderBy(asc(faculties.name))
     : Promise.resolve([])
 
-  const [data, countResult, unitsList, facultiesList] = await Promise.all([
+  const [data, countResult, buildingsList, unitsList, facultiesList] = await Promise.all([
     dataPromise,
     countPromise,
+    buildingsPromise,
     unitsPromise,
     facultiesPromise,
   ])
 
   const totalItems = Number(countResult[0]?.count || 0)
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
-  const showUnitColumn = role === 'super_admin' || role === 'faculty_admin'
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -113,33 +159,36 @@ export default async function RoomsPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Data Ruangan</h1>
           <p className="text-muted-foreground">
-            Kelola daftar ruangan, laboratorium, dan kantor unit.
+            Kelola daftar ruangan, laboratorium, dan fasilitas.
           </p>
         </div>
 
         <RoomDialog
           mode="create"
+          buildings={buildingsList}
           units={unitsList}
           faculties={facultiesList}
           fixedUnitId={fixedUnitId}
         />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <SearchInput placeholder="Cari ruangan..." className="w-full sm:max-w-xs" />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <RoomList
-          data={data}
-          units={unitsList}
-          faculties={facultiesList}
-          showUnitColumn={showUnitColumn}
-          fixedUnitId={fixedUnitId}
-        />
-
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-      </div>
+      <RoomTable
+        data={data.map((d) => ({ ...d, type: d.type as RoomType }))}
+        buildings={buildingsList}
+        units={unitsList}
+        faculties={facultiesList}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage,
+          itemsPerPage,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+        }}
+        currentSort={{ column: sortCol, direction: sortOrder }}
+        currentBuildingFilter={filterBuildingId}
+        fixedUnitId={fixedUnitId}
+      />
     </div>
   )
 }
