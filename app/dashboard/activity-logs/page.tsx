@@ -1,19 +1,18 @@
-import { and, desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { auditLogs, user } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { LogsTable } from './_components/activity-logs-table'
 
-const ITEMS_PER_PAGE = 10
-
 interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    limit?: string
+    sort?: string
+    order?: 'asc' | 'desc'
   }>
 }
 
@@ -25,17 +24,32 @@ export default async function LogsPage({ searchParams }: PageProps) {
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE
+  const itemsPerPage = Number(params.limit) || 10
+  const sortCol = params.sort || 'createdAt'
+  const sortOrder = params.order || 'desc'
+  const offset = (currentPage - 1) * itemsPerPage
 
   const isSuperAdmin = session.user.role === 'super_admin'
-
-  const searchCondition = query
-    ? or(ilike(user.name, `%${query}%`), ilike(auditLogs.tableName, `%${query}%`))
-    : undefined
-
   const userCondition = isSuperAdmin ? undefined : eq(auditLogs.userId, session.user.id)
 
+  const searchCondition = query
+    ? or(
+        ilike(user.name, `%${query}%`),
+        ilike(auditLogs.tableName, `%${query}%`),
+        ilike(auditLogs.action, `%${query}%`),
+      )
+    : undefined
+
   const finalCondition = and(searchCondition, userCondition)
+
+  const sortMap: Record<string, any> = {
+    createdAt: auditLogs.createdAt,
+    action: auditLogs.action,
+    tableName: auditLogs.tableName,
+    actorName: user.name,
+  }
+  const orderColumn = sortMap[sortCol] || auditLogs.createdAt
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const dataPromise = db
     .select({
@@ -48,14 +62,13 @@ export default async function LogsPage({ searchParams }: PageProps) {
       createdAt: auditLogs.createdAt,
       actorName: user.name,
       actorEmail: user.email,
-      actorImage: user.image,
     })
     .from(auditLogs)
     .leftJoin(user, eq(auditLogs.userId, user.id))
     .where(finalCondition)
-    .limit(ITEMS_PER_PAGE)
+    .limit(itemsPerPage)
     .offset(offset)
-    .orderBy(desc(auditLogs.createdAt))
+    .orderBy(orderBy)
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
@@ -64,43 +77,32 @@ export default async function LogsPage({ searchParams }: PageProps) {
     .where(finalCondition)
 
   const [data, countResult] = await Promise.all([dataPromise, countPromise])
-
   const totalItems = Number(countResult[0]?.count || 0)
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">Activity Logs</h1>
         <p className="text-muted-foreground">
           {isSuperAdmin
-            ? 'Memantau seluruh riwayat perubahan data sistem.'
-            : 'Memantau riwayat aktivitas akun Anda.'}
+            ? 'Memantau seluruh riwayat perubahan data sistem oleh semua pengguna.'
+            : 'Memantau riwayat aktivitas dan perubahan data pada akun Anda.'}
         </p>
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <SearchInput
-          placeholder={
-            isSuperAdmin ? 'Cari berdasarkan User atau Tabel...' : 'Cari riwayat aktivitas...'
-          }
-          className="w-full sm:max-w-xs"
-        />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <LogsTable data={data} />
-
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-
-        {data.length === 0 && (
-          <div className="text-muted-foreground py-10 text-center">
-            {query
-              ? `Tidak ditemukan log dengan kata kunci "${query}".`
-              : 'Belum ada riwayat aktivitas.'}
-          </div>
-        )}
-      </div>
+      <LogsTable
+        data={data as any}
+        currentSort={{ column: sortCol, direction: sortOrder as 'asc' | 'desc' }}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage,
+          itemsPerPage,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+        }}
+      />
     </div>
   )
 }
