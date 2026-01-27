@@ -90,6 +90,7 @@ interface WarehouseTableProps {
     direction: 'asc' | 'desc'
   }
   currentFacultyFilter: string
+  fixedFacultyId?: string | null
 }
 
 export function WarehouseTable({
@@ -98,6 +99,7 @@ export function WarehouseTable({
   metadata,
   currentSort,
   currentFacultyFilter,
+  fixedFacultyId,
 }: WarehouseTableProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -178,26 +180,30 @@ export function WarehouseTable({
     )
   }
 
+  const showFacultyFilter = !fixedFacultyId
+
   return (
     <div className="w-full">
       <div className="bg-card text-card-foreground rounded-md border shadow-sm">
         <DataTableToolbar placeholder="Cari gudang..." limit={metadata.itemsPerPage}>
-          <Select value={currentFacultyFilter} onValueChange={handleFacultyFilterChange}>
-            <SelectTrigger className="h-9 w-45 text-xs">
-              <div className="flex items-center gap-2 truncate">
-                <Building2 className="text-muted-foreground h-3.5 w-3.5" />
-                <SelectValue placeholder="Semua Fakultas" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Fakultas</SelectItem>
-              {faculties.map((f) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {f.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {showFacultyFilter && (
+            <Select value={currentFacultyFilter} onValueChange={handleFacultyFilterChange}>
+              <SelectTrigger className="h-9 w-45 text-xs">
+                <div className="flex items-center gap-2 truncate">
+                  <Building2 className="text-muted-foreground h-3.5 w-3.5" />
+                  <SelectValue placeholder="Semua Fakultas" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Fakultas</SelectItem>
+                {faculties.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -395,6 +401,7 @@ export function WarehouseTable({
           onOpenChange={(open) => !open && setEditingId(null)}
           initialData={warehouseToEdit}
           faculties={faculties}
+          fixedFacultyId={fixedFacultyId}
         />
       )}
 
@@ -419,7 +426,7 @@ export function WarehouseTable({
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
             >
               Hapus
             </AlertDialogAction>

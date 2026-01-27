@@ -19,7 +19,10 @@ interface PageProps {
 }
 
 export default async function WarehousesPage({ searchParams }: PageProps) {
-  await requireAuth({ roles: ['super_admin'] })
+  const session = await requireAuth({ roles: ['super_admin', 'faculty_admin'] })
+
+  const isFacultyAdmin = session.user.role === 'faculty_admin'
+  const userFacultyId = session.user.facultyId
 
   const params = await searchParams
   const query = params.q || ''
@@ -27,7 +30,8 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
   const itemsPerPage = Number(params.limit) || 10
   const sortCol = params.sort || 'name'
   const sortOrder = params.order || 'asc'
-  const filterFacultyId = params.facultyId || 'all'
+
+  const filterFacultyId = isFacultyAdmin ? userFacultyId : params.facultyId || 'all'
 
   const offset = (currentPage - 1) * itemsPerPage
 
@@ -36,7 +40,9 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
     : undefined
 
   const facultyFilter =
-    filterFacultyId !== 'all' ? eq(warehouses.facultyId, filterFacultyId) : undefined
+    filterFacultyId && filterFacultyId !== 'all'
+      ? eq(warehouses.facultyId, filterFacultyId)
+      : undefined
 
   const searchCondition = and(textSearch, facultyFilter)
 
@@ -93,7 +99,11 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">Data Gudang</h1>
           <p className="text-muted-foreground">Kelola gudang penyimpanan Bahan Kimia & ATK</p>
         </div>
-        <WarehouseDialog mode="create" faculties={facultiesList} />
+        <WarehouseDialog
+          mode="create"
+          faculties={facultiesList}
+          fixedFacultyId={isFacultyAdmin ? userFacultyId : undefined}
+        />
       </div>
 
       <WarehouseTable
@@ -108,7 +118,8 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
           hasPrevPage: currentPage > 1,
         }}
         currentSort={{ column: sortCol, direction: sortOrder }}
-        currentFacultyFilter={filterFacultyId}
+        currentFacultyFilter={filterFacultyId || 'all'}
+        fixedFacultyId={isFacultyAdmin ? userFacultyId : undefined}
       />
     </div>
   )

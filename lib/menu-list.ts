@@ -252,8 +252,8 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: MapPin,
         },
         {
-          title: 'Stok Gudang Pusat',
-          url: '/dashboard/warehouse-stocks',
+          title: 'Gudang',
+          url: '/dashboard/warehouses',
           icon: Warehouse,
         },
       ],
