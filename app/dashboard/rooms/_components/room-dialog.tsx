@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { roomTypeEnum } from '@/db/schema'
+import { cn } from '@/lib/utils'
 import { RoomFormValues, roomSchema } from '@/lib/validations/room'
 
 import { createRoom, updateRoom } from '../actions'
@@ -192,7 +193,7 @@ export function RoomDialog({
                   value={selectedFacultyId}
                 >
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Pilih Fakultas..." />
                     </SelectTrigger>
                   </FormControl>
@@ -219,7 +220,7 @@ export function RoomDialog({
                     disabled={isSuperAdmin && !selectedFacultyId}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pilih Gedung..." />
                       </SelectTrigger>
                     </FormControl>
@@ -272,11 +273,11 @@ export function RoomDialog({
                     >
                       <FormControl>
                         <SelectTrigger
-                          className={
-                            !field.value || field.value === 'null_value'
-                              ? 'text-muted-foreground'
-                              : ''
-                          }
+                          className={cn(
+                            'w-full',
+                            (!field.value || field.value === 'null_value') &&
+                              'text-muted-foreground',
+                          )}
                         >
                           <SelectValue placeholder="Pilih Unit..." />
                         </SelectTrigger>
@@ -308,7 +309,7 @@ export function RoomDialog({
                     <FormLabel>Jenis</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
