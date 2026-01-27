@@ -7,9 +7,9 @@ import { categories, consumables, warehouseStocks, warehouses } from '@/db/schem
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
-type BatchItem = {
+type BatchQueryResult = {
   id: string
-  batch: string
+  batch: string | null
   qty: number
   exp: string | null
 }
@@ -54,26 +54,21 @@ export async function getWarehouseStocks(
 ) {
   const session = await requireAuth({ roles: ['warehouse_staff', 'faculty_admin'] })
 
-  // --- LOGIC FIX: Penentuan Active Warehouse ID ---
   let activeWarehouseId = session.user.warehouseId
 
   if (session.user.role === 'faculty_admin') {
-    // Jika Faculty Admin, gunakan targetWarehouseId yang dikirim dari UI
     if (!targetWarehouseId) {
       return { error: 'Silakan pilih gudang terlebih dahulu.' }
     }
     activeWarehouseId = targetWarehouseId
   } else {
-    // Jika Warehouse Staff, gunakan ID dari session (Security)
     if (!activeWarehouseId) {
       return { error: 'Anda tidak terdaftar di gudang manapun.' }
     }
   }
-  // ------------------------------------------------
 
   const offset = (page - 1) * limit
 
-  // Logic Search
   let searchCondition = undefined
   if (query) {
     searchCondition = or(
@@ -82,12 +77,10 @@ export async function getWarehouseStocks(
     )
   }
 
-  // Logic Sorting Map
   const sortMap: Record<string, PgColumn | SQL> = {
     name: consumables.name,
     sku: consumables.sku,
     category: categories.name,
-    // Mengurutkan berdasarkan hasil agregasi/subquery
     totalQuantity: sql`sq.total_qty`,
     minimumStock: consumables.minimumStock,
   }
@@ -96,7 +89,6 @@ export async function getWarehouseStocks(
   const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   try {
-    // 1. Subquery untuk menghitung total quantity per consumable di warehouse ini
     const sq = db
       .select({
         warehouseId: warehouseStocks.warehouseId,
@@ -108,7 +100,6 @@ export async function getWarehouseStocks(
       .groupBy(warehouseStocks.warehouseId, warehouseStocks.consumableId)
       .as('sq')
 
-    // 2. Main Query
     let mainQuery = db
       .select({
         id: consumables.id,
@@ -117,9 +108,8 @@ export async function getWarehouseStocks(
         category: categories.name,
         unit: consumables.baseUnit,
         minimumStock: consumables.minimumStock,
-        totalQty: sq.totalQty, // Ambil dari subquery
-        // JSON Aggregation untuk batches
-        batches: sql<any[]>`json_agg(
+        totalQty: sq.totalQty,
+        batches: sql<BatchQueryResult[]>`json_agg(
             json_build_object(
               'id', ${warehouseStocks.id},
               'batch', ${warehouseStocks.batchNumber},
@@ -131,7 +121,6 @@ export async function getWarehouseStocks(
       .from(sq)
       .innerJoin(consumables, eq(sq.consumableId, consumables.id))
       .leftJoin(categories, eq(consumables.categoryId, categories.id))
-      // Join lagi ke warehouseStocks untuk ambil detail batch agar bisa di-aggregate
       .innerJoin(
         warehouseStocks,
         and(
@@ -148,14 +137,12 @@ export async function getWarehouseStocks(
         consumables.minimumStock,
         sq.totalQty,
       )
-      .$dynamic() // Enable dynamic query building
+      .$dynamic()
 
-    // Apply Search
     if (searchCondition) {
       mainQuery = mainQuery.where(searchCondition)
     }
 
-    // Apply Status Filter (Having clause karena totalQty adalah agregat)
     if (statusFilter === 'out') {
       mainQuery = mainQuery.having(lte(sq.totalQty, 0))
     } else if (statusFilter === 'low') {
@@ -164,10 +151,8 @@ export async function getWarehouseStocks(
       )
     }
 
-    // Execute Data Query dengan Limit, Offset, dan OrderBy
     const rows = await mainQuery.limit(limit).offset(offset).orderBy(orderBy)
 
-    // 3. Count Query (untuk Pagination)
     const countQuery = db
       .select({
         consumableId: warehouseStocks.consumableId,
@@ -193,16 +178,13 @@ export async function getWarehouseStocks(
     const totalItems = allMatchingRows.length
     const totalPages = Math.ceil(totalItems / limit)
 
-    // 4. Formatting Data
     const formattedData = rows.map((row) => {
       const batches = row.batches || []
       let hasExpired = false
       let hasNearExpiry = false
 
-      // Filter batch yang qty > 0
       const activeBatches = batches.filter((b) => Number(b.qty) > 0)
 
-      // Cek status expiry
       activeBatches.forEach((b) => {
         if (b.exp) {
           const diffDays = getDaysDifference(b.exp)
