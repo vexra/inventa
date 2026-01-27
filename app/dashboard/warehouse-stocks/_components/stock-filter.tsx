@@ -2,7 +2,15 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Filter } from 'lucide-react'
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export function StockFilter({ currentFilter }: { currentFilter: string }) {
   const router = useRouter()
@@ -20,12 +28,18 @@ export function StockFilter({ currentFilter }: { currentFilter: string }) {
   }
 
   return (
-    <Tabs value={currentFilter} onValueChange={handleChange} className="w-auto">
-      <TabsList>
-        <TabsTrigger value="all">Semua</TabsTrigger>
-        <TabsTrigger value="low">Menipis</TabsTrigger>
-        <TabsTrigger value="out">Habis</TabsTrigger>
-      </TabsList>
-    </Tabs>
+    <Select value={currentFilter} onValueChange={handleChange}>
+      <SelectTrigger className="h-8 w-40">
+        <div className="flex items-center gap-2">
+          <Filter className="text-muted-foreground h-3.5 w-3.5" />
+          <SelectValue placeholder="Status Stok" />
+        </div>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Semua Status</SelectItem>
+        <SelectItem value="low">Stok Menipis</SelectItem>
+        <SelectItem value="out">Stok Habis</SelectItem>
+      </SelectContent>
+    </Select>
   )
 }
