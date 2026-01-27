@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import {
+  AlertTriangle,
   Armchair,
   ArrowUpDown,
   Beaker,
@@ -20,16 +21,18 @@ import { toast } from 'sonner'
 
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 import { DataTableToolbar } from '@/components/shared/data-table-toolbar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -436,6 +439,7 @@ export function RoomTable({
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Menu</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -445,7 +449,7 @@ export function RoomTable({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setDeletingId(item.id)}
-                            className="text-red-600"
+                            className="text-red-600 focus:text-red-600"
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Hapus
                           </DropdownMenuItem>
@@ -474,32 +478,34 @@ export function RoomTable({
         />
       )}
 
-      <Dialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Hapus Ruangan?</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/20">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-500" />
+              </div>
+              <AlertDialogTitle>Hapus Ruangan?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-2">
               Apakah Anda yakin ingin menghapus ruangan{' '}
               <span className="text-foreground font-bold">{roomToDelete?.name}</span>?
-              <br className="mb-2" />
+              <br />
               Tindakan ini tidak dapat dibatalkan. Pastikan tidak ada aset inventaris yang masih
               tercatat di ruangan ini.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingId(null)}>
-              Batal
-            </Button>
-            <Button
-              variant="destructive"
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
             >
               Hapus
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

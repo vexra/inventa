@@ -19,16 +19,18 @@ import { toast } from 'sonner'
 
 import { DataTablePagination } from '@/components/shared/data-table-pagination'
 import { DataTableToolbar } from '@/components/shared/data-table-toolbar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -360,36 +362,34 @@ export function UnitTable({
         />
       )}
 
-      <Dialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <div className="mb-2 flex items-center gap-3">
+      <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
               <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/20">
                 <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-500" />
               </div>
-              <DialogTitle>Hapus Unit?</DialogTitle>
+              <AlertDialogTitle>Hapus Unit?</AlertDialogTitle>
             </div>
-            <DialogDescription className="pt-2">
+            <AlertDialogDescription className="pt-2">
               Apakah Anda yakin ingin menghapus unit{' '}
               <span className="text-foreground font-bold">{unitToDelete?.name}</span>?
               <br />
               Menghapus unit dapat mempengaruhi data pengguna dan ruangan yang terkait di dalamnya.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingId(null)}>
-              Batal
-            </Button>
-            <Button
-              variant="destructive"
+              Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+              className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
             >
               Hapus
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

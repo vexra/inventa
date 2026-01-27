@@ -133,10 +133,10 @@ export function BuildingDialog({
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
-                    disabled={!!currentUserFacultyId} // Disable jika dia Faculty Admin (Otomatis terkunci)
+                    disabled={!!currentUserFacultyId}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pilih Fakultas" />
                       </SelectTrigger>
                     </FormControl>
