@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 
 import { randomUUID } from 'crypto'
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { SQL, and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { PgColumn } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 
 import {
@@ -416,7 +417,14 @@ export async function updateRequestStatusByWarehouse(
   }
 }
 
-export async function getConsumableRequests(page: number = 1, limit: number = 10, query?: string) {
+export async function getConsumableRequests(
+  page: number = 1,
+  limit: number = 10,
+  query: string = '',
+  statusFilter: string = 'all',
+  sortCol: string = 'createdAt',
+  sortOrder: 'asc' | 'desc' = 'desc',
+) {
   const session = await requireAuth({
     roles: ['unit_staff', 'unit_admin', 'faculty_admin', 'warehouse_staff'],
   })
@@ -424,16 +432,23 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
   const { role, id: userId, unitId, facultyId, warehouseId } = session.user
   const offset = (page - 1) * limit
 
-  let searchCondition = query ? ilike(requests.requestCode, `%${query}%`) : undefined
-
-  if (role !== 'unit_staff' && query) {
+  let searchCondition = undefined
+  if (query) {
     searchCondition = or(ilike(requests.requestCode, `%${query}%`), ilike(user.name, `%${query}%`))
   }
 
-  let whereCondition
+  let uiStatusCondition = undefined
+  if (statusFilter && statusFilter !== 'all') {
+    uiStatusCondition = eq(
+      requests.status,
+      statusFilter as NonNullable<(typeof requests.$inferSelect)['status']>,
+    )
+  }
+
+  let roleCondition
 
   if (role === 'faculty_admin') {
-    whereCondition = and(
+    roleCondition = and(
       eq(units.facultyId, facultyId!),
       inArray(requests.status, [
         'PENDING_FACULTY',
@@ -443,19 +458,30 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
         'COMPLETED',
         'REJECTED',
       ]),
-      searchCondition,
     )
   } else if (role === 'warehouse_staff') {
-    whereCondition = and(
+    roleCondition = and(
       eq(requests.targetWarehouseId, warehouseId!),
       inArray(requests.status, ['APPROVED', 'PROCESSING', 'READY_TO_PICKUP', 'COMPLETED']),
-      searchCondition,
     )
   } else if (role === 'unit_admin') {
-    whereCondition = and(eq(user.unitId, unitId!), searchCondition)
+    roleCondition = eq(user.unitId, unitId!)
   } else {
-    whereCondition = and(eq(requests.requesterId, userId), searchCondition)
+    roleCondition = eq(requests.requesterId, userId)
   }
+
+  const whereCondition = and(roleCondition, searchCondition, uiStatusCondition)
+
+  const sortMap: Record<string, PgColumn | SQL> = {
+    code: requests.requestCode,
+    status: requests.status,
+    createdAt: requests.createdAt,
+    requester: user.name,
+    room: rooms.name,
+  }
+
+  const orderColumn = sortMap[sortCol] || requests.createdAt
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const requestsData = await db
     .select({
@@ -475,7 +501,7 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
     .innerJoin(rooms, eq(requests.roomId, rooms.id))
     .leftJoin(units, eq(user.unitId, units.id))
     .where(whereCondition)
-    .orderBy(desc(requests.createdAt))
+    .orderBy(orderBy)
     .limit(limit)
     .offset(offset)
 
