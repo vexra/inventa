@@ -356,7 +356,8 @@ export function AdjustmentDialog({
                           Keterangan
                         </h3>
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
+
+                      <div className="grid gap-4">
                         <FormField
                           control={form.control}
                           name="type"
@@ -372,7 +373,6 @@ export function AdjustmentDialog({
                                 <SelectContent>
                                   {ADJUSTMENT_TYPES.map((type) => (
                                     <SelectItem key={type.value} value={type.value}>
-                                      {/* PERBAIKAN: Menghapus class warna spesifik */}
                                       <span className="font-medium">{type.label}</span>
                                     </SelectItem>
                                   ))}
@@ -392,7 +392,7 @@ export function AdjustmentDialog({
                               <FormControl>
                                 <Textarea
                                   placeholder="Contoh: Rutin, Rusak, dll."
-                                  className="bg-background h-10 min-h-10 resize-none transition-all focus:min-h-20"
+                                  className="bg-background"
                                   {...field}
                                 />
                               </FormControl>
