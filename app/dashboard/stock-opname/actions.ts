@@ -42,10 +42,6 @@ export async function submitStockOpname(values: z.infer<typeof stockOpnameSchema
     const systemQty = Number(currentStock.quantity)
     const delta = physicalQty - systemQty
 
-    if (delta === 0) {
-      return { success: true, message: 'Jumlah sesuai, tidak ada perubahan.' }
-    }
-
     await db.transaction(async (tx) => {
       await tx.insert(consumableAdjustments).values({
         id: randomUUID(),
@@ -55,7 +51,7 @@ export async function submitStockOpname(values: z.infer<typeof stockOpnameSchema
         batchNumber: currentStock.batchNumber,
         deltaQuantity: String(delta),
         type: type,
-        reason: reason,
+        reason: reason || (delta === 0 ? 'Rutin (Sesuai)' : reason),
       })
 
       await tx
@@ -72,13 +68,20 @@ export async function submitStockOpname(values: z.infer<typeof stockOpnameSchema
         action: type,
         tableName: 'warehouse_stocks',
         recordId: warehouseStockId,
-        oldValues: { quantity: systemQty, batch: currentStock.batchNumber },
-        newValues: { quantity: physicalQty, type, reason, delta },
+        oldValues: {
+          quantity: systemQty,
+          batch: currentStock.batchNumber,
+          updatedAt: currentStock.updatedAt,
+        },
+        newValues: { quantity: physicalQty, type, reason, delta, updatedAt: new Date() },
       })
     })
 
     revalidatePath('/dashboard/stock-opname')
-    return { success: true, message: 'Stok berhasil diperbarui' }
+
+    const message = delta === 0 ? 'Stok terverifikasi (Sesuai)' : 'Stok berhasil diperbarui'
+
+    return { success: true, message }
   } catch (error) {
     console.error('Stock Opname Error:', error)
     return { error: 'Gagal menyimpan perubahan' }
