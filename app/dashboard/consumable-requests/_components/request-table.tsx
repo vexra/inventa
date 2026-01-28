@@ -574,18 +574,19 @@ export function RequestTable({
                             </Link>
                           </DropdownMenuItem>
 
+                          {/* Action Logic for Admin/Staff */}
                           {isUnitAdmin && req.status === 'PENDING_UNIT' && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => handleApprove(req.id)}
-                                className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:text-green-400 dark:focus:bg-green-900/40"
+                                className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:text-green-400 dark:focus:bg-green-900/40 dark:focus:text-green-300"
                               >
                                 <Check className="mr-2 h-4 w-4" /> Setujui
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => setRejectId(req.id)}
-                                className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40"
+                                className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40 dark:focus:text-red-300"
                               >
                                 <X className="mr-2 h-4 w-4" /> Tolak
                               </DropdownMenuItem>
@@ -597,13 +598,13 @@ export function RequestTable({
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => handleApprove(req.id)}
-                                className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:text-green-400"
+                                className="text-green-600 focus:bg-green-50 focus:text-green-700 dark:text-green-400 dark:focus:bg-green-900/40 dark:focus:text-green-300"
                               >
                                 <Check className="mr-2 h-4 w-4" /> Setujui Final
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => setRejectId(req.id)}
-                                className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400"
+                                className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40 dark:focus:text-red-300"
                               >
                                 <X className="mr-2 h-4 w-4" /> Tolak
                               </DropdownMenuItem>
@@ -615,7 +616,7 @@ export function RequestTable({
                               {req.status === 'APPROVED' && (
                                 <DropdownMenuItem
                                   onClick={() => handleWarehouseUpdate(req.id, 'PROCESSING')}
-                                  className="text-indigo-600 focus:bg-indigo-50 dark:text-indigo-400"
+                                  className="text-indigo-600 focus:bg-indigo-50 dark:text-indigo-400 dark:focus:bg-indigo-900/40 dark:focus:text-indigo-300"
                                 >
                                   <Box className="mr-2 h-4 w-4" /> Mulai Packing
                                 </DropdownMenuItem>
@@ -623,7 +624,7 @@ export function RequestTable({
                               {req.status === 'PROCESSING' && (
                                 <DropdownMenuItem
                                   onClick={() => handleWarehouseUpdate(req.id, 'READY_TO_PICKUP')}
-                                  className="text-emerald-600 focus:bg-emerald-50 dark:text-emerald-400"
+                                  className="text-emerald-600 focus:bg-emerald-50 dark:text-emerald-400 dark:focus:bg-emerald-900/40 dark:focus:text-emerald-300"
                                 >
                                   <PackageCheck className="mr-2 h-4 w-4" /> Siap Diambil
                                 </DropdownMenuItem>
@@ -631,7 +632,7 @@ export function RequestTable({
                               {req.status === 'READY_TO_PICKUP' && (
                                 <DropdownMenuItem
                                   onClick={() => setIsScannerOpen(true)}
-                                  className="text-blue-600 focus:bg-blue-50 dark:text-blue-400"
+                                  className="text-blue-600 focus:bg-blue-50 dark:text-blue-400 dark:focus:bg-blue-900/40 dark:focus:text-blue-300"
                                 >
                                   <ScanLine className="mr-2 h-4 w-4" /> Scan QR User
                                 </DropdownMenuItem>
@@ -649,7 +650,7 @@ export function RequestTable({
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => setDeletingId(req.id)}
-                                    className="text-red-600 focus:text-red-600"
+                                    className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-900/40 dark:focus:text-red-300"
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" /> Hapus
                                   </DropdownMenuItem>
@@ -660,7 +661,7 @@ export function RequestTable({
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onClick={() => setPickupQrRequest(req)}
-                                    className="text-blue-600 focus:bg-blue-50 dark:text-blue-400"
+                                    className="text-blue-600 focus:bg-blue-50 dark:text-blue-400 dark:focus:bg-blue-900/40 dark:focus:text-blue-300"
                                   >
                                     <QrCode className="mr-2 h-4 w-4" /> Tunjukkan QR
                                   </DropdownMenuItem>
