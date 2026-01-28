@@ -13,8 +13,8 @@ import {
   type LucideIcon,
   MapPin,
   MonitorSmartphone,
+  Package,
   PackageCheck,
-  ScanBarcode,
   ShoppingCart,
   Tags,
   Users,
@@ -176,8 +176,8 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Monitoring Unit',
       items: [
         {
-          title: 'Total Stok BHP',
-          url: '/dashboard/unit-stocks',
+          title: 'Stok BHP Ruangan',
+          url: '/dashboard/room-stocks',
           icon: Boxes,
         },
         {
@@ -204,7 +204,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
     },
     {
-      title: 'Otorisasi & Pengadaan',
+      title: 'Permintaan & Pengadaan',
       items: [
         {
           title: 'Permintaan Barang',
@@ -219,17 +219,22 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Manajemen Aset',
+      title: 'Monitoring Aset & Persediaan',
       items: [
+        {
+          title: 'Stok Gudang',
+          url: '/dashboard/warehouse-stocks',
+          icon: Boxes,
+        },
+        {
+          title: 'Stok Ruangan',
+          url: '/dashboard/room-stocks',
+          icon: Package,
+        },
         {
           title: 'Semua Aset Tetap',
           url: '/dashboard/fixed-assets',
           icon: Layers,
-        },
-        {
-          title: 'Audit Aset',
-          url: '/dashboard/asset-audits',
-          icon: ScanBarcode,
         },
       ],
     },
