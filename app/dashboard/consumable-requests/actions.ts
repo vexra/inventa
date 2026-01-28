@@ -9,6 +9,7 @@ import { z } from 'zod'
 
 import {
   auditLogs,
+  consumables,
   requestItemAllocations,
   requestItems,
   requestTimelines,
@@ -282,8 +283,16 @@ export async function verifyRequest(
         newStatus = 'APPROVED'
 
         const itemsRequested = await tx
-          .select()
+          .select({
+            id: requestItems.id,
+            requestId: requestItems.requestId,
+            consumableId: requestItems.consumableId,
+            qtyRequested: requestItems.qtyRequested,
+            qtyApproved: requestItems.qtyApproved,
+            itemName: consumables.name,
+          })
           .from(requestItems)
+          .innerJoin(consumables, eq(requestItems.consumableId, consumables.id))
           .where(eq(requestItems.requestId, requestId))
 
         for (const item of itemsRequested) {
@@ -305,7 +314,7 @@ export async function verifyRequest(
 
           if (totalAvailable < qtyNeeded) {
             throw new Error(
-              `Stok GAGAL: Item ID ${item.consumableId} kurang. Butuh: ${qtyNeeded}, Ada: ${totalAvailable}.`,
+              `Stok tidak mencukupi untuk barang "${item.itemName}". Dibutuhkan: ${qtyNeeded}, Tersedia di gudang: ${totalAvailable}.`,
             )
           }
 
