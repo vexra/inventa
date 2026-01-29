@@ -624,6 +624,9 @@ export const usageReports = pgTable('usage_reports', {
   activityName: text('activity_name').notNull(), // e.g. "Modul 1: Titrasi Asam Basa"
   evidenceFile: text('evidence_file'), // Foto kegiatan/Logbook
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 })
 
 export const usageDetails = pgTable('usage_details', {

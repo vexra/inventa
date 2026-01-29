@@ -145,7 +145,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Layers,
         },
         {
-          title: 'Lapor Pemakaian',
+          title: 'Laporan Pemakaian',
           url: '/dashboard/usage-reports',
           icon: FilePenLine,
         },

@@ -1,8 +1,5 @@
-import { and, asc, eq, sql } from 'drizzle-orm'
-import { ClipboardList } from 'lucide-react'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { consumables, roomConsumables, rooms } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
@@ -11,76 +8,135 @@ import { UsageDialog } from './_components/usage-dialog'
 import { UsageTable } from './_components/usage-table'
 import { getUsageReports } from './actions'
 
+interface StockItem {
+  id: string
+  name: string
+  unit: string
+  currentQty: number
+  roomId: string
+}
+
+interface RawUsageReport {
+  id: string
+  activityName: string
+  createdAt: Date | null
+  user: { name: string; image: string | null } | null
+  room: { id: string; name: string } | null
+  details: {
+    consumableId: string
+    qtyUsed: string
+    consumable: {
+      name: string
+      unit: string
+    }
+  }[]
+}
+
 interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    limit?: string
+    sort?: string
+    order?: 'asc' | 'desc'
   }>
 }
 
-interface RoomStockItem {
-  consumableId: string
-  name: string
-  unit: string
-  currentQty: number
-}
-
 export default async function UsageReportsPage({ searchParams }: PageProps) {
-  const session = await requireAuth({ roles: ['unit_staff'] })
+  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin', 'super_admin'] })
 
   const params = await searchParams
   const query = params.q || ''
-  const page = Number(params.page) || 1
-  const limit = 10
+  const currentPage = Number(params.page) || 1
+  const itemsPerPage = Number(params.limit) || 10
+  const sortCol = params.sort || 'createdAt'
+  const sortOrder = params.order || 'desc'
 
-  const [userRoom] = await db
-    .select({ id: rooms.id })
+  const unitRooms = await db
+    .select({
+      id: rooms.id,
+      name: rooms.name,
+    })
     .from(rooms)
     .where(eq(rooms.unitId, session.user.unitId!))
-    .limit(1)
+    .orderBy(asc(rooms.name))
 
-  let roomStocksList: RoomStockItem[] = []
+  const unitRoomIds = unitRooms.map((r) => r.id)
 
-  if (userRoom) {
-    roomStocksList = await db
+  let availableStocks: StockItem[] = []
+
+  if (unitRoomIds.length > 0) {
+    availableStocks = await db
       .select({
-        consumableId: consumables.id,
+        id: consumables.id,
         name: consumables.name,
         unit: consumables.baseUnit,
         currentQty: sql<number>`${roomConsumables.quantity}`,
+        roomId: roomConsumables.roomId,
       })
       .from(roomConsumables)
       .innerJoin(consumables, eq(roomConsumables.consumableId, consumables.id))
-      .where(and(eq(roomConsumables.roomId, userRoom.id), sql`${roomConsumables.quantity} > 0`))
+      .where(
+        and(inArray(roomConsumables.roomId, unitRoomIds), sql`${roomConsumables.quantity} > 0`),
+      )
       .orderBy(asc(consumables.name))
   }
 
-  const { data, totalItems } = await getUsageReports(page, limit, query)
-  const totalPages = Math.ceil(totalItems / limit)
+  const { data, totalItems } = await getUsageReports(
+    currentPage,
+    itemsPerPage,
+    query,
+    sortCol,
+    sortOrder,
+  )
+
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+
+  const formattedData = data.map((report: RawUsageReport) => ({
+    id: report.id,
+    activityName: report.activityName,
+    createdAt: report.createdAt || new Date(),
+    user: report.user,
+    room: report.room,
+    details: report.details.map((d) => ({
+      consumableId: d.consumableId,
+      qtyUsed: d.qtyUsed,
+      consumable: d.consumable,
+    })),
+  }))
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
-            <ClipboardList className="h-8 w-8" />
-            Laporan Pemakaian
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight">Laporan Pemakaian</h1>
           <p className="text-muted-foreground">
-            Catat pemakaian barang habis pakai untuk mengurangi stok ruangan.
+            Kelola dan pantau penggunaan barang habis pakai di ruangan.
           </p>
         </div>
-        <UsageDialog stocks={roomStocksList} />
+
+        {unitRooms.length > 0 && (
+          <UsageDialog rooms={unitRooms} availableStocks={availableStocks} />
+        )}
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <SearchInput placeholder="Cari Kode Laporan..." className="w-full sm:max-w-xs" />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <UsageTable data={data} />
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-      </div>
+      <UsageTable
+        data={formattedData}
+        rooms={unitRooms}
+        availableStocks={availableStocks}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage,
+          itemsPerPage: itemsPerPage,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+        }}
+        currentSort={{
+          column: sortCol,
+          direction: sortOrder,
+        }}
+      />
     </div>
   )
 }
