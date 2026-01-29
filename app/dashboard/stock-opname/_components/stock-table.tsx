@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import {
@@ -288,12 +289,16 @@ export function StockTable({ data, metadata, currentSort }: StockTableProps) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Aksi</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => setSelectedItem(item)}
-                            className="cursor-pointer"
-                          >
-                            <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/dashboard/stock-opname/${item.consumableId}`}
+                              className="cursor-pointer"
+                            >
+                              <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+                            </Link>
                           </DropdownMenuItem>
+
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setSelectedItem(item)}

@@ -346,6 +346,7 @@ export const warehouseStocks = pgTable(
     batchNumber: text('batch_number'),
     expiryDate: timestamp('expiry_date'),
 
+    createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at')
       .defaultNow()
       .$onUpdate(() => new Date()),

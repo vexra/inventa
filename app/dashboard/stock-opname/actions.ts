@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { randomUUID } from 'crypto'
-import { SQL, and, asc, countDistinct, desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { SQL, and, asc, count, countDistinct, desc, eq, ilike, or, sql } from 'drizzle-orm'
 import { PgColumn } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 
@@ -12,7 +12,9 @@ import {
   categories,
   consumableAdjustments,
   consumables,
+  user,
   warehouseStocks,
+  warehouses,
 } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
@@ -187,5 +189,113 @@ export async function getWarehouseStocks(
   return {
     data: formattedStocks,
     totalItems,
+  }
+}
+
+export async function getStockDetail(
+  consumableId: string,
+  page: number = 1,
+  limit: number = 10,
+  query: string = '',
+) {
+  const session = await requireAuth({ roles: ['warehouse_staff'] })
+
+  if (!session.user.warehouseId) {
+    return null
+  }
+
+  const offset = (page - 1) * limit
+
+  const [consumable] = await db
+    .select({
+      id: consumables.id,
+      name: consumables.name,
+      unit: consumables.baseUnit,
+      categoryName: categories.name,
+    })
+    .from(consumables)
+    .leftJoin(categories, eq(consumables.categoryId, categories.id))
+    .where(eq(consumables.id, consumableId))
+    .limit(1)
+
+  if (!consumable) return null
+
+  const [warehouse] = await db
+    .select({ name: warehouses.name })
+    .from(warehouses)
+    .where(eq(warehouses.id, session.user.warehouseId))
+    .limit(1)
+
+  const batchesRaw = await db
+    .select({
+      id: warehouseStocks.id,
+      batchNumber: warehouseStocks.batchNumber,
+      quantity: warehouseStocks.quantity,
+      expiryDate: warehouseStocks.expiryDate,
+      createdAt: warehouseStocks.createdAt,
+    })
+    .from(warehouseStocks)
+    .where(
+      and(
+        eq(warehouseStocks.consumableId, consumableId),
+        eq(warehouseStocks.warehouseId, session.user.warehouseId),
+      ),
+    )
+    .orderBy(asc(warehouseStocks.expiryDate))
+
+  const historyConditions: SQL[] = [
+    eq(consumableAdjustments.consumableId, consumableId),
+    eq(consumableAdjustments.warehouseId, session.user.warehouseId),
+
+    eq(consumableAdjustments.userId, session.user.id),
+  ]
+
+  if (query) {
+    const searchFilter = or(ilike(consumableAdjustments.reason, `%${query}%`))
+
+    if (searchFilter) {
+      historyConditions.push(searchFilter)
+    }
+  }
+
+  const adjustmentsRaw = await db
+    .select({
+      id: consumableAdjustments.id,
+      deltaQuantity: consumableAdjustments.deltaQuantity,
+      type: consumableAdjustments.type,
+      reason: consumableAdjustments.reason,
+      createdAt: consumableAdjustments.createdAt,
+      actorName: user.name,
+    })
+    .from(consumableAdjustments)
+    .leftJoin(user, eq(consumableAdjustments.userId, user.id))
+    .where(and(...historyConditions))
+    .orderBy(desc(consumableAdjustments.createdAt))
+    .limit(limit)
+    .offset(offset)
+
+  const [totalResult] = await db
+    .select({ count: count() })
+    .from(consumableAdjustments)
+    .where(and(...historyConditions))
+
+  const totalHistoryItems = totalResult?.count || 0
+
+  const batches = batchesRaw.map((batch) => ({
+    ...batch,
+    quantity: Number(batch.quantity || 0),
+  }))
+
+  const adjustments = adjustmentsRaw.map((adj) => ({
+    ...adj,
+    deltaQuantity: Number(adj.deltaQuantity || 0),
+  }))
+
+  return {
+    ...consumable,
+    warehouseName: warehouse?.name,
+    batches,
+    adjustments,
+    totalHistoryItems,
   }
 }
