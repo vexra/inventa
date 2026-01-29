@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, sql } from 'drizzle-orm'
 
 import { consumables, roomConsumables, rooms } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
@@ -10,21 +10,26 @@ import { getUsageReports } from './actions'
 
 interface StockItem {
   id: string
+  consumableId: string
   name: string
   unit: string
   currentQty: number
   roomId: string
+  batchNumber: string | null
+  expiryDate: Date | null
 }
 
 interface RawUsageReport {
   id: string
   activityName: string
+  activityDate: Date
   createdAt: Date | null
   user: { name: string; image: string | null } | null
   room: { id: string; name: string } | null
   details: {
     consumableId: string
     qtyUsed: string
+    batchNumber: string | null
     consumable: {
       name: string
       unit: string
@@ -50,7 +55,7 @@ export default async function UsageReportsPage({ searchParams }: PageProps) {
   const currentPage = Number(params.page) || 1
   const itemsPerPage = Number(params.limit) || 10
   const sortCol = params.sort || 'createdAt'
-  const sortOrder = params.order || 'desc'
+  const sortOrder = params.order || ('desc' as 'asc' | 'desc')
 
   const unitRooms = await db
     .select({
@@ -66,20 +71,33 @@ export default async function UsageReportsPage({ searchParams }: PageProps) {
   let availableStocks: StockItem[] = []
 
   if (unitRoomIds.length > 0) {
-    availableStocks = await db
+    const stocksRaw = await db
       .select({
-        id: consumables.id,
+        id: roomConsumables.id,
+        consumableId: roomConsumables.consumableId,
+        quantity: roomConsumables.quantity,
+        batchNumber: roomConsumables.batchNumber,
+        expiryDate: roomConsumables.expiryDate,
+        roomId: roomConsumables.roomId,
         name: consumables.name,
         unit: consumables.baseUnit,
-        currentQty: sql<number>`${roomConsumables.quantity}`,
-        roomId: roomConsumables.roomId,
       })
       .from(roomConsumables)
       .innerJoin(consumables, eq(roomConsumables.consumableId, consumables.id))
-      .where(
-        and(inArray(roomConsumables.roomId, unitRoomIds), sql`${roomConsumables.quantity} > 0`),
-      )
-      .orderBy(asc(consumables.name))
+      .where(and(gt(roomConsumables.quantity, sql`0`)))
+
+    availableStocks = stocksRaw
+      .filter((s) => unitRoomIds.includes(s.roomId))
+      .map((s) => ({
+        id: s.id,
+        consumableId: s.consumableId,
+        name: s.name,
+        unit: s.unit,
+        currentQty: Number(s.quantity),
+        roomId: s.roomId,
+        batchNumber: s.batchNumber,
+        expiryDate: s.expiryDate,
+      }))
   }
 
   const { data, totalItems } = await getUsageReports(
@@ -95,14 +113,11 @@ export default async function UsageReportsPage({ searchParams }: PageProps) {
   const formattedData = data.map((report: RawUsageReport) => ({
     id: report.id,
     activityName: report.activityName,
+    activityDate: report.activityDate,
     createdAt: report.createdAt || new Date(),
     user: report.user,
     room: report.room,
-    details: report.details.map((d) => ({
-      consumableId: d.consumableId,
-      qtyUsed: d.qtyUsed,
-      consumable: d.consumable,
-    })),
+    details: report.details,
   }))
 
   return (

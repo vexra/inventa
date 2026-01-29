@@ -20,12 +20,13 @@ import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 const itemSchema = z.object({
-  consumableId: z.string().min(1, 'Pilih barang'),
+  roomConsumableId: z.string().min(1, 'Pilih stok/batch barang'),
   quantity: z.coerce.number().min(1, 'Minimal 1'),
 })
 
 const usageReportSchema = z.object({
   activityName: z.string().min(3, 'Nama kegiatan wajib diisi (Min. 3 karakter)'),
+  activityDate: z.date('Tanggal kegiatan wajib diisi'),
   items: z.array(itemSchema).min(1, 'Minimal satu barang harus dilaporkan'),
 })
 
@@ -39,6 +40,7 @@ interface UsageDetailRow {
   reportId: string
   consumableId: string
   qtyUsed: string
+  batchNumber: string | null
   consumable: {
     name: string
     unit: string
@@ -79,6 +81,7 @@ export async function createUsageReport(data: UsageReportFormData & { roomId?: s
         userId: session.user.id,
         roomId: targetRoomId,
         activityName: parsed.data.activityName,
+        activityDate: parsed.data.activityDate,
         createdAt: new Date(),
       })
 
@@ -88,25 +91,28 @@ export async function createUsageReport(data: UsageReportFormData & { roomId?: s
           .from(roomConsumables)
           .where(
             and(
+              eq(roomConsumables.id, item.roomConsumableId),
               eq(roomConsumables.roomId, targetRoomId),
-              eq(roomConsumables.consumableId, item.consumableId),
             ),
           )
           .limit(1)
 
-        if (!currentStock || Number(currentStock.quantity) < item.quantity) {
+        if (!currentStock) {
+          throw new Error(`Stok barang tidak ditemukan (ID: ${item.roomConsumableId}).`)
+        }
+
+        if (Number(currentStock.quantity) < item.quantity) {
           throw new Error(
-            `Stok tidak cukup untuk item ID: ${item.consumableId}. Tersedia: ${Number(
-              currentStock?.quantity || 0,
-            )}`,
+            `Stok tidak cukup untuk batch ini. Tersedia: ${Number(currentStock.quantity || 0)}`,
           )
         }
 
         await tx.insert(usageDetails).values({
           id: randomUUID(),
           reportId: reportId,
-          consumableId: item.consumableId,
+          consumableId: currentStock.consumableId,
           qtyUsed: item.quantity.toString(),
+          batchNumber: currentStock.batchNumber,
         })
 
         await tx
@@ -115,12 +121,7 @@ export async function createUsageReport(data: UsageReportFormData & { roomId?: s
             quantity: sql`${roomConsumables.quantity} - ${item.quantity}`,
             updatedAt: new Date(),
           })
-          .where(
-            and(
-              eq(roomConsumables.roomId, targetRoomId),
-              eq(roomConsumables.consumableId, item.consumableId),
-            ),
-          )
+          .where(eq(roomConsumables.id, item.roomConsumableId))
       }
 
       await tx.insert(auditLogs).values({
@@ -145,11 +146,12 @@ export async function createUsageReport(data: UsageReportFormData & { roomId?: s
 export async function updateUsageReport(
   data: z.infer<typeof updateUsageSchema> & { roomId?: string },
 ) {
-  await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
+  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
+
   const parsed = updateUsageSchema.safeParse(data)
   if (!parsed.success) return { error: 'Data tidak valid' }
 
-  const { reportId, items, activityName } = parsed.data
+  const { reportId, items, activityName, activityDate } = parsed.data
 
   try {
     await db.transaction(async (tx) => {
@@ -161,72 +163,100 @@ export async function updateUsageReport(
 
       if (!existingReport) throw new Error('Laporan tidak ditemukan')
 
+      if (session.user.role === 'unit_staff' && existingReport.userId !== session.user.id) {
+        throw new Error('Anda hanya dapat mengubah laporan milik sendiri.')
+      }
+
       const oldDetails = await tx
         .select()
         .from(usageDetails)
         .where(eq(usageDetails.reportId, reportId))
 
       for (const d of oldDetails) {
-        await tx
-          .update(roomConsumables)
-          .set({ quantity: sql`${roomConsumables.quantity} + ${d.qtyUsed}` })
-          .where(
-            and(
-              eq(roomConsumables.roomId, existingReport.roomId),
-              eq(roomConsumables.consumableId, d.consumableId),
-            ),
-          )
-      }
-      await tx.delete(usageDetails).where(eq(usageDetails.reportId, reportId))
+        const batchCondition = d.batchNumber
+          ? eq(roomConsumables.batchNumber, d.batchNumber)
+          : sql`${roomConsumables.batchNumber} IS NULL`
 
-      await tx
-        .update(usageReports)
-        .set({ activityName, updatedAt: new Date() })
-        .where(eq(usageReports.id, reportId))
-
-      for (const item of items) {
-        const [stock] = await tx
+        const [existingStock] = await tx
           .select()
           .from(roomConsumables)
           .where(
             and(
               eq(roomConsumables.roomId, existingReport.roomId),
-              eq(roomConsumables.consumableId, item.consumableId),
+              eq(roomConsumables.consumableId, d.consumableId),
+              batchCondition,
             ),
           )
           .limit(1)
 
-        if (!stock || Number(stock.quantity) < item.quantity)
-          throw new Error(`Stok tidak cukup saat update untuk item ${item.consumableId}`)
+        if (existingStock) {
+          await tx
+            .update(roomConsumables)
+            .set({ quantity: sql`${roomConsumables.quantity} + ${d.qtyUsed}` })
+            .where(eq(roomConsumables.id, existingStock.id))
+        } else {
+          await tx.insert(roomConsumables).values({
+            id: randomUUID(),
+            roomId: existingReport.roomId,
+            consumableId: d.consumableId,
+            quantity: d.qtyUsed,
+            batchNumber: d.batchNumber,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+        }
+      }
+
+      await tx.delete(usageDetails).where(eq(usageDetails.reportId, reportId))
+
+      await tx
+        .update(usageReports)
+        .set({
+          activityName,
+          activityDate,
+          updatedAt: new Date(),
+        })
+        .where(eq(usageReports.id, reportId))
+
+      for (const item of items) {
+        const [targetStock] = await tx
+          .select()
+          .from(roomConsumables)
+          .where(eq(roomConsumables.id, item.roomConsumableId))
+          .limit(1)
+
+        if (!targetStock) throw new Error(`Stok baru tidak ditemukan/tidak valid.`)
+
+        if (Number(targetStock.quantity) < item.quantity) {
+          throw new Error(`Stok revisi tidak cukup. Tersedia: ${targetStock.quantity}`)
+        }
 
         await tx.insert(usageDetails).values({
           id: randomUUID(),
           reportId: reportId,
-          consumableId: item.consumableId,
+          consumableId: targetStock.consumableId,
           qtyUsed: item.quantity.toString(),
+          batchNumber: targetStock.batchNumber,
         })
 
         await tx
           .update(roomConsumables)
           .set({ quantity: sql`${roomConsumables.quantity} - ${item.quantity}` })
-          .where(
-            and(
-              eq(roomConsumables.roomId, existingReport.roomId),
-              eq(roomConsumables.consumableId, item.consumableId),
-            ),
-          )
+          .where(eq(roomConsumables.id, item.roomConsumableId))
       }
     })
+
     revalidatePath('/dashboard/usage-reports')
-    return { success: true, message: 'Laporan diperbarui.' }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Gagal memperbarui laporan.'
-    return { error: message }
+    return { success: true, message: 'Laporan berhasil diperbarui.' }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Gagal update laporan'
+    return { error: msg }
   }
 }
 
 export async function deleteUsageReport(reportId: string) {
-  await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
+  const session = await requireAuth({ roles: ['unit_staff', 'unit_admin'] })
+
   try {
     await db.transaction(async (tx) => {
       const [report] = await tx
@@ -235,7 +265,11 @@ export async function deleteUsageReport(reportId: string) {
         .where(eq(usageReports.id, reportId))
         .limit(1)
 
-      if (!report) throw new Error('Data tidak ditemukan')
+      if (!report) throw new Error('Laporan tidak ditemukan')
+
+      if (session.user.role === 'unit_staff' && report.userId !== session.user.id) {
+        throw new Error('Anda hanya dapat menghapus laporan milik sendiri.')
+      }
 
       const details = await tx
         .select()
@@ -243,25 +277,48 @@ export async function deleteUsageReport(reportId: string) {
         .where(eq(usageDetails.reportId, reportId))
 
       for (const d of details) {
-        await tx
-          .update(roomConsumables)
-          .set({ quantity: sql`${roomConsumables.quantity} + ${d.qtyUsed}` })
+        const batchCondition = d.batchNumber
+          ? eq(roomConsumables.batchNumber, d.batchNumber)
+          : sql`${roomConsumables.batchNumber} IS NULL`
+
+        const [stock] = await tx
+          .select()
+          .from(roomConsumables)
           .where(
             and(
               eq(roomConsumables.roomId, report.roomId),
               eq(roomConsumables.consumableId, d.consumableId),
+              batchCondition,
             ),
           )
+          .limit(1)
+
+        if (stock) {
+          await tx
+            .update(roomConsumables)
+            .set({ quantity: sql`${roomConsumables.quantity} + ${d.qtyUsed}` })
+            .where(eq(roomConsumables.id, stock.id))
+        } else {
+          await tx.insert(roomConsumables).values({
+            id: randomUUID(),
+            roomId: report.roomId,
+            consumableId: d.consumableId,
+            quantity: d.qtyUsed,
+            batchNumber: d.batchNumber,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+        }
       }
 
       await tx.delete(usageDetails).where(eq(usageDetails.reportId, reportId))
       await tx.delete(usageReports).where(eq(usageReports.id, reportId))
     })
+
     revalidatePath('/dashboard/usage-reports')
     return { success: true, message: 'Laporan dihapus & stok dikembalikan.' }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Gagal menghapus laporan.'
-    return { error: message }
+  } catch (error: unknown) {
+    return { error: error instanceof Error ? error.message : 'Gagal menghapus' }
   }
 }
 
@@ -273,21 +330,25 @@ export async function getUsageReports(
   sortOrder: 'asc' | 'desc' = 'desc',
 ) {
   const session = await requireAuth({ roles: ['unit_staff', 'unit_admin', 'super_admin'] })
+
   const offset = (page - 1) * limit
 
-  const baseFilter =
-    session.user.role === 'unit_staff' ? eq(usageReports.userId, session.user.id) : undefined
+  const conditions = []
 
-  const searchFilter = query ? ilike(usageReports.activityName, `%${query}%`) : undefined
+  if (query) {
+    conditions.push(ilike(usageReports.activityName, `%${query}%`))
+  }
 
-  const whereCondition =
-    baseFilter && searchFilter ? and(baseFilter, searchFilter) : baseFilter || searchFilter
+  if (session.user.role === 'unit_staff') {
+    conditions.push(eq(usageReports.userId, session.user.id))
+  }
+
+  const whereClauseRaw = conditions.length > 0 ? and(...conditions) : undefined
 
   const columnMap: Record<string, PgColumn | SQL> = {
     activityName: usageReports.activityName,
     createdAt: usageReports.createdAt,
-    userName: user.name,
-    roomName: rooms.name,
+    activityDate: usageReports.activityDate,
   }
 
   const orderByClause =
@@ -295,11 +356,14 @@ export async function getUsageReports(
       ? asc(columnMap[sortCol] || usageReports.createdAt)
       : desc(columnMap[sortCol] || usageReports.createdAt)
 
-  const reportsData = await db
+  const baseQuery = db
     .select({
       id: usageReports.id,
       activityName: usageReports.activityName,
+      activityDate: usageReports.activityDate,
       createdAt: usageReports.createdAt,
+      userId: usageReports.userId,
+      roomId: usageReports.roomId,
       user: {
         name: user.name,
         image: user.image,
@@ -312,10 +376,30 @@ export async function getUsageReports(
     .from(usageReports)
     .leftJoin(user, eq(usageReports.userId, user.id))
     .leftJoin(rooms, eq(usageReports.roomId, rooms.id))
-    .where(whereCondition)
+
+  const finalWhere = []
+  if (whereClauseRaw) finalWhere.push(whereClauseRaw)
+
+  if (session.user.role === 'unit_admin' || session.user.role === 'unit_staff') {
+    finalWhere.push(eq(rooms.unitId, session.user.unitId!))
+  }
+
+  const finalWhereClause = finalWhere.length > 0 ? and(...finalWhere) : undefined
+
+  const reportsData = await baseQuery
+    .where(finalWhereClause)
     .orderBy(orderByClause)
     .limit(limit)
     .offset(offset)
+
+  const countQuery = db
+    .select({ count: sql<number>`count(*)` })
+    .from(usageReports)
+    .leftJoin(rooms, eq(usageReports.roomId, rooms.id))
+    .where(finalWhereClause)
+
+  const [totalResult] = await countQuery
+  const totalItems = Number(totalResult?.count || 0)
 
   const reportIds = reportsData.map((r) => r.id)
 
@@ -327,6 +411,7 @@ export async function getUsageReports(
         reportId: usageDetails.reportId,
         consumableId: usageDetails.consumableId,
         qtyUsed: usageDetails.qtyUsed,
+        batchNumber: usageDetails.batchNumber,
         consumable: {
           name: consumables.name,
           unit: consumables.baseUnit,
@@ -344,18 +429,14 @@ export async function getUsageReports(
       details: reportDetails.map((d) => ({
         consumableId: d.consumableId,
         qtyUsed: d.qtyUsed,
+        batchNumber: d.batchNumber,
         consumable: d.consumable || { name: 'Unknown', unit: '-' },
       })),
     }
   })
 
-  const [countRes] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(usageReports)
-    .where(whereCondition)
-
   return {
     data: combinedData,
-    totalItems: Number(countRes?.count || 0),
+    totalItems,
   }
 }

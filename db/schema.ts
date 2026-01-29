@@ -378,6 +378,7 @@ export const roomConsumables = pgTable(
     batchNumber: text('batch_number'),
     expiryDate: timestamp('expiry_date'),
 
+    createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at')
       .defaultNow()
       .$onUpdate(() => new Date()),
@@ -612,22 +613,27 @@ export const procurementAssets = pgTable('procurement_assets', {
  */
 
 // Laporan Pemakaian BHP di Ruangan (e.g. Praktikum Kimia Dasar)
-export const usageReports = pgTable('usage_reports', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id), // Pelapor (Laboran/Asisten)
-  roomId: text('room_id')
-    .notNull()
-    .references(() => rooms.id), // Terjadi di lab mana?
+export const usageReports = pgTable(
+  'usage_reports',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id), // Pelapor (Laboran/Asisten)
+    roomId: text('room_id')
+      .notNull()
+      .references(() => rooms.id), // Terjadi di lab mana?
 
-  activityName: text('activity_name').notNull(), // e.g. "Modul 1: Titrasi Asam Basa"
-  evidenceFile: text('evidence_file'), // Foto kegiatan/Logbook
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at')
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-})
+    activityName: text('activity_name').notNull(), // e.g. "Modul 1: Titrasi Asam Basa"
+    activityDate: timestamp('activity_date').notNull(),
+    evidenceFile: text('evidence_file'), // Foto kegiatan/Logbook
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index('usage_activity_date_idx').on(table.activityDate)],
+)
 
 export const usageDetails = pgTable('usage_details', {
   id: text('id').primaryKey(),

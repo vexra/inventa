@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { format } from 'date-fns'
@@ -10,9 +11,9 @@ import {
   ArrowUpDown,
   Calendar,
   ClipboardList,
+  Eye,
   MapPin,
   MoreHorizontal,
-  Package,
   Pencil,
   Settings2,
   Trash2,
@@ -59,6 +60,7 @@ import { UsageDialog } from './usage-dialog'
 interface UsageReportItem {
   consumableId: string
   qtyUsed: string
+  batchNumber: string | null
   consumable: {
     name: string
     unit: string
@@ -68,6 +70,7 @@ interface UsageReportItem {
 interface UsageReportData {
   id: string
   activityName: string
+  activityDate: Date
   createdAt: Date
   user: { name: string; image: string | null } | null
   room: { id: string; name: string } | null
@@ -76,10 +79,13 @@ interface UsageReportData {
 
 interface AvailableStockOption {
   id: string
+  consumableId: string
   name: string
   unit: string
   currentQty: number
   roomId: string
+  batchNumber: string | null
+  expiryDate: Date | null
 }
 
 interface RoomOption {
@@ -160,6 +166,16 @@ export function UsageTable({
 
   const itemToEdit = data.find((item) => item.id === editingId)
 
+  const findStockId = (roomId: string, consumableId: string, batchNumber: string | null) => {
+    const match = availableStocks.find(
+      (s) =>
+        s.roomId === roomId &&
+        s.consumableId === consumableId &&
+        (batchNumber ? s.batchNumber === batchNumber : true),
+    )
+    return match ? match.id : ''
+  }
+
   const createQueryString = (params: Record<string, string | number | null>) => {
     const newParams = new URLSearchParams(searchParams.toString())
     Object.entries(params).forEach(([key, value]) => {
@@ -201,7 +217,6 @@ export function UsageTable({
   return (
     <div className="w-full space-y-4">
       <div className="bg-card text-card-foreground rounded-md border shadow-sm">
-        {/* --- TOOLBAR --- */}
         <DataTableToolbar placeholder="Cari nama kegiatan..." limit={metadata.itemsPerPage}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -233,28 +248,26 @@ export function UsageTable({
                 checked={visibleColumns.user}
                 onCheckedChange={(c) => setVisibleColumns((p) => ({ ...p, user: c }))}
               >
-                Pelapor & Ruangan
+                Pelapor
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={visibleColumns.items}
                 onCheckedChange={(c) => setVisibleColumns((p) => ({ ...p, items: c }))}
               >
-                Total Item
+                Detail Barang
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </DataTableToolbar>
 
-        {/* --- TABLE CONTENT --- */}
         <div className="relative w-full overflow-auto">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead className="w-10 text-center text-xs">#</TableHead>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
                 {visibleColumns.date && (
                   <SortableHeader
-                    id="createdAt"
-                    label="Tanggal"
+                    id="activityDate"
+                    label="Tanggal Kegiatan"
                     currentSort={currentSort}
                     onSort={handleSort}
                     className="w-45"
@@ -263,107 +276,117 @@ export function UsageTable({
                 {visibleColumns.activity && (
                   <SortableHeader
                     id="activityName"
-                    label="Kegiatan"
+                    label="Nama Kegiatan"
                     currentSort={currentSort}
                     onSort={handleSort}
                   />
                 )}
                 {visibleColumns.user && (
-                  <TableHead className="text-xs font-medium uppercase">Pelapor</TableHead>
+                  <TableHead className="w-50 text-xs font-medium tracking-wider uppercase">
+                    Pelapor
+                  </TableHead>
                 )}
                 {visibleColumns.items && (
-                  <TableHead className="text-center text-xs font-medium uppercase">Items</TableHead>
+                  <TableHead className="min-w-37.5 text-xs font-medium tracking-wider uppercase">
+                    Barang Digunakan
+                  </TableHead>
                 )}
-                <TableHead className="w-16 text-right text-xs uppercase">Aksi</TableHead>
+                <TableHead className="w-12.5" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground h-24 text-center">
-                    Tidak ada laporan pemakaian.
+                  <TableCell
+                    colSpan={Object.values(visibleColumns).filter(Boolean).length + 1}
+                    className="h-24 text-center text-sm"
+                  >
+                    Belum ada laporan pemakaian.
                   </TableCell>
                 </TableRow>
               ) : (
-                data.map((report, index) => (
-                  <TableRow
-                    key={report.id}
-                    className="hover:bg-muted/50 group border-b last:border-0"
-                  >
-                    <TableCell className="text-muted-foreground text-center text-xs">
-                      {(metadata.currentPage - 1) * metadata.itemsPerPage + index + 1}
-                    </TableCell>
-
+                data.map((report) => (
+                  <TableRow key={report.id} className="hover:bg-muted/50 group">
                     {visibleColumns.date && (
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="px-4 py-3 align-top">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2 text-sm font-medium">
                             <Calendar className="text-muted-foreground h-3.5 w-3.5" />
-                            {format(new Date(report.createdAt), 'dd MMM yyyy', {
+                            {/* Menampilkan activityDate */}
+                            {format(new Date(report.activityDate), 'dd MMM yyyy', {
                               locale: idLocale,
                             })}
                           </div>
-                          <span className="text-muted-foreground pl-5.5 text-xs">
-                            {format(new Date(report.createdAt), 'HH:mm')} WIB
-                          </span>
+                          {/* Opsional: Tampilkan jam input jika perlu, atau hapus */}
+                          {/* <span className="text-muted-foreground pl-5.5 text-xs">
+                             Input: {format(new Date(report.createdAt), 'HH:mm')}
+                          </span> */}
                         </div>
                       </TableCell>
                     )}
 
                     {visibleColumns.activity && (
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="px-4 py-3 align-top">
                         <div className="flex items-center gap-2">
                           <ClipboardList className="h-4 w-4 text-blue-600" />
                           <span className="font-medium">{report.activityName}</span>
                         </div>
+                        {report.room && (
+                          <div className="text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
+                            <MapPin className="h-3 w-3" />
+                            {report.room.name}
+                          </div>
+                        )}
                       </TableCell>
                     )}
 
                     {visibleColumns.user && (
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="px-4 py-3 align-top">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2 text-sm">
                             <User className="text-muted-foreground h-3.5 w-3.5" />
-                            {report.user?.name || 'Unknown'}
-                          </div>
-                          <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {report.room?.name || '-'}
+                            <span className="font-medium">{report.user?.name || 'Unknown'}</span>
                           </div>
                         </div>
                       </TableCell>
                     )}
 
                     {visibleColumns.items && (
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className="font-mono text-[10px]">
-                          <Package className="mr-1.5 h-3 w-3 opacity-60" />
-                          {report.details.length} Jenis
-                        </Badge>
+                      <TableCell className="px-4 py-3 align-top">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-background font-medium">
+                            {new Set(report.details.map((d) => d.consumableId)).size} Jenis Barang
+                          </Badge>
+                        </div>
                       </TableCell>
                     )}
 
-                    <TableCell className="px-4 py-3 text-right">
+                    <TableCell className="px-4 py-3 align-top">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-foreground h-8 w-8"
-                          >
-                            <span className="sr-only">Open menu</span>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Aksi</DropdownMenuLabel>
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/dashboard/usage-reports/${report.id}`}
+                              className="cursor-pointer"
+                            >
+                              <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+                            </Link>
+                          </DropdownMenuItem>
+
                           <DropdownMenuItem onClick={() => setEditingId(report.id)}>
                             <Pencil className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
+
                           <DropdownMenuSeparator />
+
                           <DropdownMenuItem
+                            className="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-900/20"
                             onClick={() => setDeletingId(report.id)}
-                            className="text-red-600 focus:text-red-700"
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Hapus
                           </DropdownMenuItem>
@@ -380,12 +403,7 @@ export function UsageTable({
         <DataTablePagination metadata={metadata} />
       </div>
 
-      {/* --- EDIT DIALOG --- */}
-      {/* 1. rooms: Untuk list ruangan (meski disabled saat edit)
-          2. availableStocks: Untuk dropdown barang
-          3. initialData: Data yang akan diedit (termasuk roomId dari data tabel)
-      */}
-      {editingId && itemToEdit && (
+      {!!editingId && itemToEdit && (
         <UsageDialog
           rooms={rooms}
           availableStocks={availableStocks}
@@ -395,8 +413,13 @@ export function UsageTable({
             id: itemToEdit.id,
             roomId: itemToEdit.room?.id || '',
             activityName: itemToEdit.activityName,
+            activityDate: itemToEdit.activityDate,
             items: itemToEdit.details.map((d) => ({
-              consumableId: d.consumableId,
+              roomConsumableId: findStockId(
+                itemToEdit.room?.id || '',
+                d.consumableId,
+                d.batchNumber,
+              ),
               quantity: Number(d.qtyUsed),
             })),
           }}
@@ -404,7 +427,6 @@ export function UsageTable({
         />
       )}
 
-      {/* --- DELETE ALERT --- */}
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

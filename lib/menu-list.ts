@@ -181,6 +181,11 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Boxes,
         },
         {
+          title: 'Laporan Pemakaian',
+          url: '/dashboard/usage-reports',
+          icon: FilePenLine,
+        },
+        {
           title: 'Daftar Aset Unit',
           url: '/dashboard/unit-assets',
           icon: Layers,

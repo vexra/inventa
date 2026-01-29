@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { format } from 'date-fns'
+import { id as idLocale } from 'date-fns/locale'
 import {
   Activity,
+  CalendarIcon,
   ClipboardList,
   Loader2,
   MapPin,
-  PackageOpen,
   Pencil,
   Plus,
   Trash2,
@@ -18,6 +20,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +39,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -43,26 +47,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 import { createUsageReport, updateUsageReport } from '../actions'
 
 const itemSchema = z.object({
-  consumableId: z.string().min(1, 'Pilih barang'),
+  roomConsumableId: z.string().min(1, 'Pilih barang/batch'),
   quantity: z.coerce.number().min(1, 'Jumlah minimal 1'),
 })
 
 const formSchema = z.object({
   roomId: z.string().min(1, 'Pilih ruangan'),
   activityName: z.string().min(3, 'Nama kegiatan wajib diisi (Min. 3 karakter)'),
+  activityDate: z.date('Tanggal kegiatan wajib diisi'),
   items: z.array(itemSchema).min(1, 'Minimal satu barang harus dipilih'),
 })
 
 interface AvailableStockOption {
   id: string
+  consumableId: string
   name: string
   unit: string
   currentQty: number
   roomId: string
+  batchNumber: string | null
+  expiryDate: Date | null
 }
 
 interface RoomOption {
@@ -74,8 +83,9 @@ interface InitialData {
   id: string
   roomId: string
   activityName: string
+  activityDate: Date
   items: {
-    consumableId: string
+    roomConsumableId: string
     quantity: number
   }[]
 }
@@ -108,7 +118,8 @@ export function UsageDialog({
     defaultValues: {
       roomId: '',
       activityName: '',
-      items: [{ consumableId: '', quantity: 1 }],
+      activityDate: new Date(),
+      items: [{ roomConsumableId: '', quantity: 1 }],
     },
   })
 
@@ -126,23 +137,23 @@ export function UsageDialog({
         form.reset({
           roomId: initialData.roomId,
           activityName: initialData.activityName,
+          activityDate: new Date(initialData.activityDate),
           items: initialData.items,
         })
       } else {
         form.reset({
-          roomId: '',
+          roomId: rooms.length === 1 ? rooms[0].id : '',
           activityName: '',
-          items: [{ consumableId: '', quantity: 1 }],
+          activityDate: new Date(),
+          items: [{ roomConsumableId: '', quantity: 1 }],
         })
       }
     }
-  }, [isOpen, initialData, form])
+  }, [isOpen, initialData, form, rooms])
 
   const filteredStocks = availableStocks.filter((stock) => stock.roomId === selectedRoomId)
 
   const isLoading = form.formState.isSubmitting
-  const isAllItemsSelected =
-    filteredStocks.length > 0 && currentItems.length >= filteredStocks.length
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -165,14 +176,14 @@ export function UsageDialog({
     }
   }
 
-  const getStockInfo = (consumableId: string) => {
-    return filteredStocks.find((s) => s.id === consumableId)
+  const getStockInfo = (rcId: string) => {
+    return filteredStocks.find((s) => s.id === rcId)
   }
 
   const handleRoomChange = (newRoomId: string) => {
     form.setValue('roomId', newRoomId)
-    if (newRoomId !== initialData?.roomId) {
-      replace([{ consumableId: '', quantity: 1 }])
+    if (newRoomId !== initialData?.roomId || !isEditMode) {
+      replace([{ roomConsumableId: '', quantity: 1 }])
     }
   }
 
@@ -198,7 +209,7 @@ export function UsageDialog({
               <DialogTitle>
                 {isEditMode ? 'Edit Laporan Pemakaian' : 'Catat Pemakaian Barang'}
               </DialogTitle>
-              <DialogDescription>Pilih ruangan dan catat barang yang digunakan.</DialogDescription>
+              <DialogDescription>Pilih ruangan dan batch barang yang digunakan.</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -208,83 +219,127 @@ export function UsageDialog({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex flex-1 flex-col overflow-hidden"
           >
-            <div className="bg-background z-10 shrink-0 space-y-4 px-6 pt-6 pb-2">
-              <FormField
-                control={form.control}
-                name="roomId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <MapPin className="text-muted-foreground h-3.5 w-3.5" />
-                      Lokasi Ruangan
-                    </FormLabel>
-                    <Select
-                      onValueChange={handleRoomChange}
-                      value={field.value}
-                      disabled={isEditMode}
-                    >
+            <div className="bg-background z-10 shrink-0 border-b shadow-sm">
+              <div className="space-y-4 px-6 pt-6 pb-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="roomId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <MapPin className="text-muted-foreground h-3.5 w-3.5" />
+                          Lokasi Ruangan
+                        </FormLabel>
+                        <Select
+                          onValueChange={handleRoomChange}
+                          value={field.value}
+                          disabled={isEditMode}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Pilih Ruangan" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {rooms.map((room) => (
+                              <SelectItem key={room.id} value={room.id}>
+                                {room.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Field Activity Date */}
+                  <FormField
+                    control={form.control}
+                    name="activityDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel className="mb-2 flex items-center gap-2">
+                          <CalendarIcon className="text-muted-foreground h-3.5 w-3.5" />
+                          Tanggal Kegiatan
+                        </FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={'outline'}
+                                className={cn(
+                                  'pl-3 text-left font-normal',
+                                  !field.value && 'text-muted-foreground',
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, 'dd MMMM yyyy', { locale: idLocale })
+                                ) : (
+                                  <span>Pilih tanggal</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) =>
+                                date > new Date() || date < new Date('1900-01-01')
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="activityName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Activity className="text-muted-foreground h-3.5 w-3.5" />
+                        Nama Kegiatan
+                      </FormLabel>
                       <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Pilih ruangan..." />
-                        </SelectTrigger>
+                        <Input placeholder="Contoh: Praktikum Kimia Dasar Modul 1" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {rooms.map((room) => (
-                          <SelectItem key={room.id} value={room.id}>
-                            {room.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="activityName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Activity className="text-muted-foreground h-3.5 w-3.5" />
-                      Nama Kegiatan
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Contoh: Praktikum Kimia Dasar"
-                        className="font-medium"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex items-center justify-between border-b pt-2 pb-2">
-                <h3 className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                  <PackageOpen className="h-4 w-4" />
-                  Daftar Barang
-                </h3>
+              <div className="bg-muted/20 flex items-center justify-between border-t px-6 py-3">
+                <FormLabel className="text-muted-foreground text-sm font-semibold">
+                  Daftar Barang ({fields.length})
+                </FormLabel>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
-                  disabled={isAllItemsSelected || !selectedRoomId}
-                  onClick={() => append({ consumableId: '', quantity: 1 })}
-                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:opacity-50 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                  className="bg-background hover:bg-muted"
+                  onClick={() => append({ roomConsumableId: '', quantity: 1 })}
+                  disabled={!selectedRoomId || fields.length >= filteredStocks.length}
                 >
-                  <Plus className="mr-2 h-3.5 w-3.5" />
-                  Tambah Barang
+                  <Plus className="mr-2 h-3.5 w-3.5" /> Tambah Barang
                 </Button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            {/* Bagian List Barang (Tidak berubah banyak) */}
+            <div className="bg-muted/5 flex-1 overflow-y-auto px-6 py-4">
               {!selectedRoomId ? (
-                <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-slate-50 text-center dark:border-slate-800 dark:bg-slate-900/50">
-                  <MapPin className="text-muted-foreground h-8 w-8 opacity-50" />
+                <div className="bg-background flex h-32 items-center justify-center rounded-lg border border-dashed">
                   <p className="text-muted-foreground text-sm">
                     Silakan pilih ruangan terlebih dahulu.
                   </p>
@@ -292,9 +347,14 @@ export function UsageDialog({
               ) : (
                 <div className="flex flex-col gap-4">
                   {fields.map((fieldItem, index) => {
-                    const selectedIds = currentItems
-                      .map((item, idx) => (idx !== index ? item.consumableId : null))
+                    const allSelectedIds = currentItems
+                      .map((item) => item.roomConsumableId)
                       .filter(Boolean)
+                    const currentSelectedId = currentItems[index]?.roomConsumableId
+                    const rowOptions = filteredStocks.filter(
+                      (stock) =>
+                        !allSelectedIds.includes(stock.id) || stock.id === currentSelectedId,
+                    )
 
                     return (
                       <div
@@ -303,120 +363,124 @@ export function UsageDialog({
                       >
                         <div className="flex items-center justify-between sm:hidden">
                           <span className="flex items-center gap-2 text-sm font-bold text-blue-600">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs dark:bg-blue-900">
-                              {index + 1}
-                            </span>
-                            Barang ke-{index + 1}
+                            #{index + 1}
                           </span>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            className="h-8 text-red-600 hover:bg-red-50"
                             onClick={() => remove(index)}
                             disabled={fields.length === 1}
                           >
-                            <Trash2 className="mr-1.5 h-4 w-4" /> Hapus
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
 
-                        <div className="bg-muted text-muted-foreground mt-9 hidden h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold sm:flex">
+                        <span className="mt-3 hidden h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-700 sm:flex dark:bg-blue-900 dark:text-blue-300">
                           {index + 1}
-                        </div>
+                        </span>
 
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.consumableId`}
-                          render={({ field }) => (
-                            <FormItem className="w-full flex-3">
-                              <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                                Pilih Barang
-                              </FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Cari barang..." />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {filteredStocks.length === 0 ? (
-                                    <div className="text-muted-foreground p-2 text-center text-xs">
-                                      Tidak ada stok.
-                                    </div>
-                                  ) : (
-                                    filteredStocks.map((stock) => {
-                                      if (selectedIds.includes(stock.id)) return null
-                                      const isOutOfStock = stock.currentQty <= 0
-                                      const isSelected = field.value === stock.id
-                                      const isDisabled = isOutOfStock && !isSelected
-
-                                      return (
-                                        <SelectItem
-                                          key={stock.id}
-                                          value={stock.id}
-                                          disabled={isDisabled}
-                                          className={isDisabled ? 'opacity-50' : ''}
-                                        >
-                                          <div className="flex w-full items-center justify-between gap-2">
-                                            <span className="font-medium">{stock.name}</span>
-                                            <span className="text-muted-foreground text-xs">
-                                              (Sisa: {stock.currentQty} {stock.unit})
+                        <div className="grid flex-1 gap-4 sm:grid-cols-12">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.roomConsumableId`}
+                            render={({ field }) => (
+                              <FormItem className="sm:col-span-8">
+                                <FormLabel className="sr-only">Barang</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Pilih barang..." />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="max-h-62.5">
+                                    {rowOptions.length === 0 ? (
+                                      <div className="text-muted-foreground p-3 text-center text-sm">
+                                        {filteredStocks.length === 0
+                                          ? 'Stok kosong'
+                                          : 'Semua item sudah dipilih'}
+                                      </div>
+                                    ) : (
+                                      rowOptions.map((stock) => (
+                                        <SelectItem key={stock.id} value={stock.id}>
+                                          <span className="flex w-full items-center truncate text-sm">
+                                            <span className="text-foreground mr-1 font-semibold">
+                                              {stock.name}
                                             </span>
-                                          </div>
+                                            <span className="text-muted-foreground/50 mx-2">•</span>
+                                            <span className="text-muted-foreground">
+                                              Sisa: {stock.currentQty} {stock.unit}
+                                            </span>
+                                            {stock.batchNumber && (
+                                              <>
+                                                <span className="text-muted-foreground/50 mx-2">
+                                                  •
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                  Batch: {stock.batchNumber}
+                                                </span>
+                                              </>
+                                            )}
+                                            {stock.expiryDate && (
+                                              <>
+                                                <span className="text-muted-foreground/50 mx-2">
+                                                  •
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                  Exp:{' '}
+                                                  {format(new Date(stock.expiryDate), 'dd/MM/yy')}
+                                                </span>
+                                              </>
+                                            )}
+                                          </span>
                                         </SelectItem>
-                                      )
-                                    })
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.quantity`}
-                          render={({ field }) => {
-                            const selectedId = currentItems[index]?.consumableId
-                            const stockInfo = getStockInfo(selectedId)
-                            const maxQty = stockInfo?.currentQty || 9999
-
-                            return (
-                              <FormItem className="w-full sm:w-28">
-                                <FormLabel className="text-muted-foreground mb-1.5 block text-xs font-normal">
-                                  Jumlah
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    max={maxQty}
-                                    className="text-center font-medium"
-                                    {...field}
-                                    value={(field.value as number) || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.valueAsNumber
-                                      field.onChange(isNaN(val) ? '' : val)
-                                    }}
-                                  />
-                                </FormControl>
-                                {stockInfo && (
-                                  <p className="text-muted-foreground text-[10px]">
-                                    Max: {maxQty} {stockInfo.unit}
-                                  </p>
-                                )}
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
-                            )
-                          }}
-                        />
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.quantity`}
+                            render={({ field }) => {
+                              const selectedId = currentItems[index]?.roomConsumableId
+                              const stockInfo = getStockInfo(selectedId)
+                              return (
+                                <FormItem className="sm:col-span-4">
+                                  <FormLabel className="sr-only">Jumlah</FormLabel>
+                                  <div className="flex items-center gap-3">
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        max={stockInfo ? stockInfo.currentQty : undefined}
+                                        placeholder="0"
+                                        {...field}
+                                        value={(field.value as number) ?? ''}
+                                        onChange={(e) => field.onChange(e)}
+                                      />
+                                    </FormControl>
+                                    <span className="text-muted-foreground min-w-12 text-sm font-medium whitespace-nowrap">
+                                      {stockInfo?.unit || '-'}
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )
+                            }}
+                          />
+                        </div>
 
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="text-muted-foreground mt-7 hidden hover:bg-red-50 hover:text-red-600 sm:flex dark:hover:bg-red-900/20"
+                          className="text-muted-foreground mt-0 hidden hover:bg-red-50 hover:text-red-600 sm:flex dark:hover:bg-red-900/20"
                           onClick={() => remove(index)}
                           disabled={fields.length === 1}
                         >
@@ -430,7 +494,7 @@ export function UsageDialog({
               )}
             </div>
 
-            <DialogFooter className="bg-background border-t px-6 py-4">
+            <DialogFooter className="bg-background z-20 border-t px-6 py-4">
               <Button
                 type="button"
                 variant="outline"
