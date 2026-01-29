@@ -304,7 +304,7 @@ export async function UnitAdminDashboard({
               variant="outline"
               className="w-full border-blue-200 bg-blue-50 text-xs text-blue-600 hover:bg-blue-100 hover:text-blue-700 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
             >
-              <Link href="/dashboard/unit-stocks">Lihat Stok Seluruh Ruangan</Link>
+              <Link href="/dashboard/room-stocks">Lihat Stok Seluruh Ruangan</Link>
             </Button>
           </CardFooter>
         </Card>
