@@ -1,4 +1,5 @@
 import {
+  Archive,
   Boxes,
   Building,
   Building2,
@@ -13,7 +14,6 @@ import {
   type LucideIcon,
   MapPin,
   MonitorSmartphone,
-  Package,
   PackageCheck,
   ShoppingCart,
   Tags,
@@ -172,10 +172,16 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
   unit_admin: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
+      ],
     },
     {
-      title: 'Manajemen Permintaan',
+      title: 'Pengajuan',
       items: [
         {
           title: 'Permintaan Barang',
@@ -185,23 +191,28 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Monitoring Unit',
+      title: 'Inventaris & Aset',
       items: [
         {
-          title: 'Stok BHP Ruangan',
+          title: 'Stok BHP',
           url: '/dashboard/room-stocks',
           icon: Boxes,
+        },
+        {
+          title: 'Aset Tetap',
+          url: '/dashboard/unit-assets',
+          icon: Layers,
         },
         {
           title: 'Laporan Pemakaian',
           url: '/dashboard/usage-reports',
           icon: FilePenLine,
         },
-        {
-          title: 'Daftar Aset Unit',
-          url: '/dashboard/unit-assets',
-          icon: Layers,
-        },
+      ],
+    },
+    {
+      title: 'Manajemen Fasilitas',
+      items: [
         {
           title: 'Daftar Ruangan',
           url: '/dashboard/rooms',
@@ -211,17 +222,29 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
     {
       title: 'Akun',
-      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+      items: [
+        {
+          title: 'Log Aktivitas',
+          url: '/dashboard/activity-logs',
+          icon: FileClock,
+        },
+      ],
     },
   ],
 
   faculty_admin: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
+      ],
     },
     {
-      title: 'Permintaan & Pengadaan',
+      title: 'Logistik & Pengadaan',
       items: [
         {
           title: 'Permintaan Barang',
@@ -236,27 +259,27 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Monitoring Aset & Persediaan',
+      title: 'Monitoring Inventaris',
       items: [
         {
           title: 'Stok Gudang',
           url: '/dashboard/warehouse-stocks',
-          icon: Boxes,
+          icon: Archive,
         },
         {
           title: 'Stok Ruangan',
           url: '/dashboard/room-stocks',
-          icon: Package,
+          icon: Boxes,
         },
         {
-          title: 'Semua Aset Tetap',
+          title: 'Aset Tetap',
           url: '/dashboard/fixed-assets',
           icon: Layers,
         },
       ],
     },
     {
-      title: 'Organisasi & Lokasi',
+      title: 'Organisasi & Fasilitas',
       items: [
         {
           title: 'Unit Kerja',
@@ -264,7 +287,12 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Users,
         },
         {
-          title: 'Gedung & Fasilitas',
+          title: 'Gudang',
+          url: '/dashboard/warehouses',
+          icon: Warehouse,
+        },
+        {
+          title: 'Gedung',
           url: '/dashboard/buildings',
           icon: Landmark,
         },
@@ -273,16 +301,17 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           url: '/dashboard/rooms',
           icon: MapPin,
         },
-        {
-          title: 'Gudang',
-          url: '/dashboard/warehouses',
-          icon: Warehouse,
-        },
       ],
     },
     {
       title: 'Akun',
-      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+      items: [
+        {
+          title: 'Log Aktivitas',
+          url: '/dashboard/activity-logs',
+          icon: FileClock,
+        },
+      ],
     },
   ],
 }
