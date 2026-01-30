@@ -4,15 +4,16 @@ import {
   Building,
   Building2,
   ClipboardList,
+  Component,
   FileClock,
   FilePenLine,
   FileText,
   FlaskConical,
   Landmark,
-  Layers,
   LayoutDashboard,
   type LucideIcon,
   MapPin,
+  Monitor,
   MonitorSmartphone,
   PackageCheck,
   ShoppingCart,
@@ -63,7 +64,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       items: [
         { title: 'Kategori Barang', url: '/dashboard/categories', icon: Tags },
         { title: 'Barang Habis Pakai', url: '/dashboard/consumables', icon: FlaskConical },
-        { title: 'Model Aset', url: '/dashboard/asset-models', icon: Layers },
+        { title: 'Model Aset', url: '/dashboard/asset-models', icon: Component },
       ],
     },
     {
@@ -154,7 +155,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
         {
           title: 'Aset Tetap',
           url: '/dashboard/room-assets',
-          icon: Layers,
+          icon: Monitor,
         },
         {
           title: 'Laporan Pemakaian',
@@ -207,7 +208,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
         {
           title: 'Aset Tetap',
           url: '/dashboard/unit-assets',
-          icon: Layers,
+          icon: Monitor,
         },
         {
           title: 'Laporan Pemakaian',
@@ -280,7 +281,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
         {
           title: 'Aset Tetap',
           url: '/dashboard/fixed-assets',
-          icon: Layers,
+          icon: Monitor,
         },
       ],
     },
