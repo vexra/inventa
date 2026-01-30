@@ -40,32 +40,38 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
   super_admin: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
-    },
-    {
-      title: 'Organisasi & Lokasi',
       items: [
-        { title: 'Fakultas', url: '/dashboard/faculties', icon: Building },
-        { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
-        { title: 'Gedung', url: '/dashboard/buildings', icon: Landmark },
-        { title: 'Ruangan', url: '/dashboard/rooms', icon: MapPin },
-        { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
       ],
     },
     {
-      title: 'Katalog Barang',
+      title: 'Master Organisasi',
       items: [
-        { title: 'Kategori', url: '/dashboard/categories', icon: Tags },
+        { title: 'Fakultas', url: '/dashboard/faculties', icon: Building },
+        { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
+        { title: 'Gedung & Fasilitas', url: '/dashboard/buildings', icon: Landmark },
+        { title: 'Daftar Ruangan', url: '/dashboard/rooms', icon: MapPin },
+        { title: 'Daftar Gudang', url: '/dashboard/warehouses', icon: Warehouse },
+      ],
+    },
+    {
+      title: 'Master Katalog',
+      items: [
+        { title: 'Kategori Barang', url: '/dashboard/categories', icon: Tags },
         { title: 'Barang Habis Pakai', url: '/dashboard/consumables', icon: FlaskConical },
         { title: 'Model Aset', url: '/dashboard/asset-models', icon: Layers },
       ],
     },
     {
-      title: 'Sistem & Audit',
+      title: 'Sistem & Keamanan',
       items: [
-        { title: 'Pengguna', url: '/dashboard/users', icon: Users },
+        { title: 'Manajemen User', url: '/dashboard/users', icon: Users },
         { title: 'Sesi Login', url: '/dashboard/sessions', icon: MonitorSmartphone },
-        { title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock },
+        { title: 'Log Sistem', url: '/dashboard/activity-logs', icon: FileClock },
       ],
     },
   ],
