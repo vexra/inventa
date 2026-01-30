@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { consumables, requests, roomConsumables, rooms, units, user } from '@/db/schema'
+import { consumables, requests, roomConsumables, rooms, user } from '@/db/schema'
 import { db } from '@/lib/db'
 
 const formatDate = (date: Date | null) => {
@@ -63,61 +63,58 @@ export async function UnitAdminDashboard({
     )
   }
 
-  const [unitDataRes, pendingCountRes, roomCountRes, recentRequests, lowStockItems] =
-    await Promise.all([
-      db.select({ name: units.name }).from(units).where(eq(units.id, currentUser.unitId)).limit(1),
+  const [pendingCountRes, roomCountRes, recentRequests, lowStockItems] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(requests)
+      .innerJoin(rooms, eq(requests.roomId, rooms.id))
+      .where(and(eq(rooms.unitId, currentUser.unitId), eq(requests.status, 'PENDING_UNIT'))),
 
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(requests)
-        .innerJoin(rooms, eq(requests.roomId, rooms.id))
-        .where(and(eq(rooms.unitId, currentUser.unitId), eq(requests.status, 'PENDING_UNIT'))),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(rooms)
+      .where(eq(rooms.unitId, currentUser.unitId)),
 
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(rooms)
-        .where(eq(rooms.unitId, currentUser.unitId)),
+    db
+      .select({
+        id: requests.id,
+        code: requests.requestCode,
+        status: requests.status,
+        createdAt: requests.createdAt,
+        requesterName: user.name,
+      })
+      .from(requests)
+      .innerJoin(rooms, eq(requests.roomId, rooms.id))
+      .innerJoin(user, eq(requests.requesterId, user.id))
+      .where(eq(rooms.unitId, currentUser.unitId))
+      .orderBy(desc(requests.createdAt))
+      .limit(5),
 
-      db
-        .select({
-          id: requests.id,
-          code: requests.requestCode,
-          status: requests.status,
-          createdAt: requests.createdAt,
-          requesterName: user.name,
-        })
-        .from(requests)
-        .innerJoin(rooms, eq(requests.roomId, rooms.id))
-        .innerJoin(user, eq(requests.requesterId, user.id))
-        .where(eq(rooms.unitId, currentUser.unitId))
-        .orderBy(desc(requests.createdAt))
-        .limit(5),
-
-      db
-        .select({
-          uniqueKey: sql<string>`${roomConsumables.consumableId} || '-' || ${roomConsumables.roomId}`,
-          consumableName: consumables.name,
-          roomName: rooms.name,
-          qty: sql<number>`sum(${roomConsumables.quantity})`,
-          minStock: consumables.minimumStock,
-          unit: consumables.baseUnit,
-        })
-        .from(roomConsumables)
-        .innerJoin(rooms, eq(roomConsumables.roomId, rooms.id))
-        .innerJoin(consumables, eq(roomConsumables.consumableId, consumables.id))
-        .where(eq(rooms.unitId, currentUser.unitId))
-        .groupBy(
-          roomConsumables.consumableId,
-          roomConsumables.roomId,
-          rooms.name,
-          consumables.name,
-          consumables.minimumStock,
-          consumables.baseUnit,
-        )
-        .having(sql`sum(${roomConsumables.quantity}) <= ${consumables.minimumStock}`)
-        .orderBy(asc(rooms.name), asc(consumables.name))
-        .limit(6),
-    ])
+    db
+      .select({
+        uniqueKey: sql<string>`${roomConsumables.consumableId} || '-' || ${roomConsumables.roomId}`,
+        consumableName: consumables.name,
+        roomName: rooms.name,
+        qty: sql<number>`sum(${roomConsumables.quantity})`,
+        minStock: consumables.minimumStock,
+        unit: consumables.baseUnit,
+      })
+      .from(roomConsumables)
+      .innerJoin(rooms, eq(roomConsumables.roomId, rooms.id))
+      .innerJoin(consumables, eq(roomConsumables.consumableId, consumables.id))
+      .where(eq(rooms.unitId, currentUser.unitId))
+      .groupBy(
+        roomConsumables.consumableId,
+        roomConsumables.roomId,
+        rooms.name,
+        consumables.name,
+        consumables.minimumStock,
+        consumables.baseUnit,
+      )
+      .having(sql`sum(${roomConsumables.quantity}) <= ${consumables.minimumStock}`)
+      .orderBy(asc(rooms.name), asc(consumables.name))
+      .limit(6),
+  ])
 
   const pendingCount = Number(pendingCountRes[0]?.count || 0)
   const totalRooms = Number(roomCountRes[0]?.count || 0)
