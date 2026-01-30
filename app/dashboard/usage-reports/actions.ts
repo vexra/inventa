@@ -244,6 +244,16 @@ export async function updateUsageReport(
           .set({ quantity: sql`${roomConsumables.quantity} - ${item.quantity}` })
           .where(eq(roomConsumables.id, item.roomConsumableId))
       }
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'UPDATE_USAGE_REPORT',
+        tableName: 'usage_reports',
+        recordId: reportId,
+        oldValues: existingReport,
+        newValues: parsed.data,
+      })
     })
 
     revalidatePath('/dashboard/usage-reports')
@@ -313,6 +323,15 @@ export async function deleteUsageReport(reportId: string) {
 
       await tx.delete(usageDetails).where(eq(usageDetails.reportId, reportId))
       await tx.delete(usageReports).where(eq(usageReports.id, reportId))
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'DELETE_USAGE_REPORT',
+        tableName: 'usage_reports',
+        recordId: reportId,
+        oldValues: report,
+      })
     })
 
     revalidatePath('/dashboard/usage-reports')
