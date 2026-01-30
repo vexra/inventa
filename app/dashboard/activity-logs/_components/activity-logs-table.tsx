@@ -91,6 +91,37 @@ function SortableHeader({
   )
 }
 
+function getActionColor(action: string) {
+  const a = action.toUpperCase()
+  if (
+    a.includes('CREATE') ||
+    a.includes('APPROVE') ||
+    a.includes('COMPLETE') ||
+    a.includes('RECEIPT') ||
+    a.includes('RESTOCK')
+  ) {
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+  }
+  if (
+    a.includes('UPDATE') ||
+    a.includes('OPNAME') ||
+    a.includes('PROCESSING') ||
+    a.includes('TRANSFER')
+  ) {
+    return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400'
+  }
+  if (
+    a.includes('DELETE') ||
+    a.includes('REJECT') ||
+    a.includes('CANCEL') ||
+    a.includes('DAMAGE') ||
+    a.includes('LOSS')
+  ) {
+    return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+  }
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
+}
+
 export function LogsTable({ data, metadata, currentSort }: LogsTableProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -202,7 +233,10 @@ export function LogsTable({ data, metadata, currentSort }: LogsTableProps) {
             <TableBody>
               {data.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground h-24 text-center text-sm">
+                  <TableCell
+                    colSpan={Object.values(visibleColumns).filter(Boolean).length + 1}
+                    className="text-muted-foreground h-24 text-center text-sm"
+                  >
                     Tidak ada riwayat aktivitas ditemukan.
                   </TableCell>
                 </TableRow>
@@ -230,15 +264,10 @@ export function LogsTable({ data, metadata, currentSort }: LogsTableProps) {
                           variant="secondary"
                           className={cn(
                             'font-mono text-[10px] font-bold shadow-none',
-                            log.action === 'CREATE' &&
-                              'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
-                            log.action === 'UPDATE' &&
-                              'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-                            log.action === 'DELETE' &&
-                              'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+                            getActionColor(log.action),
                           )}
                         >
-                          {log.action}
+                          {log.action.replace(/_/g, ' ')}
                         </Badge>
                       </TableCell>
                     )}
@@ -246,7 +275,7 @@ export function LogsTable({ data, metadata, currentSort }: LogsTableProps) {
                       <TableCell className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="text-sm capitalize">
-                            {log.tableName.replace('_', ' ')}
+                            {log.tableName.replace(/_/g, ' ')}
                           </span>
                           <span className="text-muted-foreground font-mono text-[10px]">
                             ID: {log.recordId.substring(0, 8)}...

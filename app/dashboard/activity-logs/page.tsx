@@ -39,7 +39,7 @@ export default async function LogsPage({ searchParams }: PageProps) {
   const currentPage = Number(params.page) || 1
   const itemsPerPage = Number(params.limit) || 10
   const sortCol = params.sort || 'createdAt'
-  const sortOrder = params.order || 'asc'
+  const sortOrder = params.order || 'desc'
   const offset = (currentPage - 1) * itemsPerPage
 
   const isSuperAdmin = session.user.role === 'super_admin'
