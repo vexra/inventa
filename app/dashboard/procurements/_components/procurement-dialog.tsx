@@ -126,6 +126,7 @@ export function ProcurementDialog({
   })
 
   const isLoading = form.formState.isSubmitting
+  const isAllItemsSelected = currentItems.length >= consumables.length
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
     try {
@@ -225,12 +226,14 @@ export function ProcurementDialog({
                 <h3 className="text-muted-foreground text-sm font-medium">Daftar Barang</h3>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
+                  disabled={isAllItemsSelected}
                   onClick={() => append({ consumableId: '', quantity: 1 })}
-                  className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950"
+                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:opacity-50 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
                 >
-                  <Plus className="mr-2 h-3.5 w-3.5" /> Tambah Baris
+                  <Plus className="mr-2 h-3.5 w-3.5" />
+                  {isAllItemsSelected ? 'Semua Barang Dipilih' : 'Tambah Barang'}
                 </Button>
               </div>
             </div>

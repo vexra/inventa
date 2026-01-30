@@ -68,13 +68,11 @@ export async function WarehouseStaffDashboard({
     ])
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 pt-4">
-      <div className="space-y-1">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
-
+    <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-3xl font-bold tracking-tight">Halo, {currentUser.name} 👋</h2>
         <p className="text-muted-foreground">
-          Halo, <span className="text-foreground font-medium">{currentUser.name}</span>. Berikut
-          ringkasan operasional <span className="text-foreground font-semibold">Gudang Anda</span>.
+          Selamat datang di Panel Staff Gudang. Kelola stok gudang dan pengadaan barang di sini.
         </p>
       </div>
 

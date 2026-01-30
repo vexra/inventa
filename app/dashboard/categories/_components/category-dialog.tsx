@@ -103,7 +103,7 @@ export function CategoryDialog({
                 <FormItem>
                   <FormLabel>Nama Kategori</FormLabel>
                   <FormControl>
-                    <Input placeholder="Contoh: Elektronik, Alat Tulis, Mebel" {...field} />
+                    <Input placeholder="Contoh: Elektronik, Alat Tulis" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

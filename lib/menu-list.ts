@@ -1,16 +1,19 @@
 import {
+  Archive,
   Boxes,
   Building,
   Building2,
   ClipboardList,
+  Component,
   FileClock,
   FilePenLine,
   FileText,
   FlaskConical,
-  Layers,
+  Landmark,
   LayoutDashboard,
   type LucideIcon,
   MapPin,
+  Monitor,
   MonitorSmartphone,
   PackageCheck,
   ShoppingCart,
@@ -38,31 +41,38 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
   super_admin: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
+      ],
     },
     {
-      title: 'Organisasi & Lokasi',
+      title: 'Master Organisasi',
       items: [
         { title: 'Fakultas', url: '/dashboard/faculties', icon: Building },
         { title: 'Unit Kerja', url: '/dashboard/units', icon: Building2 },
-        { title: 'Gudang', url: '/dashboard/warehouses', icon: Warehouse },
-        { title: 'Ruangan', url: '/dashboard/rooms', icon: MapPin },
+        { title: 'Gedung & Fasilitas', url: '/dashboard/buildings', icon: Landmark },
+        { title: 'Daftar Ruangan', url: '/dashboard/rooms', icon: MapPin },
+        { title: 'Daftar Gudang', url: '/dashboard/warehouses', icon: Warehouse },
       ],
     },
     {
-      title: 'Katalog Barang',
+      title: 'Master Katalog',
       items: [
-        { title: 'Kategori', url: '/dashboard/categories', icon: Tags },
+        { title: 'Kategori Barang', url: '/dashboard/categories', icon: Tags },
         { title: 'Barang Habis Pakai', url: '/dashboard/consumables', icon: FlaskConical },
-        { title: 'Model Aset', url: '/dashboard/asset-models', icon: Layers },
+        { title: 'Model Aset', url: '/dashboard/asset-models', icon: Component },
       ],
     },
     {
-      title: 'Sistem & Audit',
+      title: 'Sistem & Keamanan',
       items: [
-        { title: 'Pengguna', url: '/dashboard/users', icon: Users },
+        { title: 'Manajemen User', url: '/dashboard/users', icon: Users },
         { title: 'Sesi Login', url: '/dashboard/sessions', icon: MonitorSmartphone },
-        { title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock },
+        { title: 'Log Sistem', url: '/dashboard/activity-logs', icon: FileClock },
       ],
     },
   ],
@@ -96,7 +106,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Data Inventaris',
       items: [
         {
-          title: 'Stok Gudang',
+          title: 'Stok BHP Gudang',
           url: '/dashboard/warehouse-stocks',
           icon: Boxes,
         },
@@ -116,10 +126,16 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
   unit_staff: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
+      ],
     },
     {
-      title: 'Layanan Barang',
+      title: 'Pengajuan',
       items: [
         {
           title: 'Permintaan Barang',
@@ -132,12 +148,17 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Inventaris Ruangan',
       items: [
         {
-          title: 'Stok Ruangan',
+          title: 'Stok BHP',
           url: '/dashboard/room-stocks',
           icon: Boxes,
         },
         {
-          title: 'Lapor Pemakaian',
+          title: 'Aset Tetap',
+          url: '/dashboard/room-assets',
+          icon: Monitor,
+        },
+        {
+          title: 'Laporan Pemakaian',
           url: '/dashboard/usage-reports',
           icon: FilePenLine,
         },
@@ -145,17 +166,29 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
     {
       title: 'Akun',
-      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+      items: [
+        {
+          title: 'Log Aktivitas',
+          url: '/dashboard/activity-logs',
+          icon: FileClock,
+        },
+      ],
     },
   ],
 
   unit_admin: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
+      ],
     },
     {
-      title: 'Manajemen Permintaan',
+      title: 'Pengajuan',
       items: [
         {
           title: 'Permintaan Barang',
@@ -165,15 +198,30 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Monitoring Inventaris',
+      title: 'Inventaris & Aset',
       items: [
         {
-          title: 'Stok per Ruangan',
-          url: '/dashboard/unit-stocks',
+          title: 'Stok BHP',
+          url: '/dashboard/room-stocks',
           icon: Boxes,
         },
         {
-          title: 'Ruangan',
+          title: 'Aset Tetap',
+          url: '/dashboard/unit-assets',
+          icon: Monitor,
+        },
+        {
+          title: 'Laporan Pemakaian',
+          url: '/dashboard/usage-reports',
+          icon: FilePenLine,
+        },
+      ],
+    },
+    {
+      title: 'Manajemen Fasilitas',
+      items: [
+        {
+          title: 'Daftar Ruangan',
           url: '/dashboard/rooms',
           icon: MapPin,
         },
@@ -181,17 +229,29 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
     {
       title: 'Akun',
-      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+      items: [
+        {
+          title: 'Log Aktivitas',
+          url: '/dashboard/activity-logs',
+          icon: FileClock,
+        },
+      ],
     },
   ],
 
   faculty_admin: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
+      ],
     },
     {
-      title: 'Otorisasi & Pengadaan',
+      title: 'Logistik & Pengadaan',
       items: [
         {
           title: 'Permintaan Barang',
@@ -206,32 +266,42 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Aset & Inventaris',
+      title: 'Monitoring Inventaris',
       items: [
-        {
-          title: 'Aset Tetap',
-          url: '/dashboard/fixed-assets',
-          icon: Layers,
-        },
         {
           title: 'Stok Gudang',
           url: '/dashboard/warehouse-stocks',
-          icon: Warehouse,
+          icon: Archive,
         },
         {
-          title: 'Monitoring Unit',
-          url: '/dashboard/unit-stocks',
-          icon: Building2,
+          title: 'Stok Ruangan',
+          url: '/dashboard/room-stocks',
+          icon: Boxes,
+        },
+        {
+          title: 'Aset Tetap',
+          url: '/dashboard/fixed-assets',
+          icon: Monitor,
         },
       ],
     },
     {
-      title: 'Organisasi & Lokasi',
+      title: 'Organisasi & Fasilitas',
       items: [
         {
           title: 'Unit Kerja',
           url: '/dashboard/units',
           icon: Users,
+        },
+        {
+          title: 'Gudang',
+          url: '/dashboard/warehouses',
+          icon: Warehouse,
+        },
+        {
+          title: 'Gedung',
+          url: '/dashboard/buildings',
+          icon: Landmark,
         },
         {
           title: 'Ruangan',
@@ -242,7 +312,13 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
     {
       title: 'Akun',
-      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+      items: [
+        {
+          title: 'Log Aktivitas',
+          url: '/dashboard/activity-logs',
+          icon: FileClock,
+        },
+      ],
     },
   ],
 }

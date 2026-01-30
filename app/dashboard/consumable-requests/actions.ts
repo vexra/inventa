@@ -3,11 +3,13 @@
 import { revalidatePath } from 'next/cache'
 
 import { randomUUID } from 'crypto'
-import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
+import { SQL, and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { PgColumn } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 
 import {
   auditLogs,
+  consumables,
   requestItemAllocations,
   requestItems,
   requestTimelines,
@@ -121,7 +123,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         action: 'CREATE',
         tableName: 'requests',
         recordId: requestId,
-        newValues: { code, items },
+        newValues: { code, items, status: initialStatus },
       })
     })
 
@@ -190,6 +192,16 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         actorId: session.user.id,
         notes: 'Detail permintaan diperbarui.',
       })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'UPDATE',
+        tableName: 'requests',
+        recordId: requestId,
+        oldValues: existingRequest,
+        newValues: { roomId, targetWarehouseId, description, items, status: 'PENDING_UNIT' },
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -215,6 +227,15 @@ export async function cancelRequest(requestId: string) {
 
     await db.transaction(async (tx) => {
       await tx.delete(requests).where(eq(requests.id, requestId))
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'DELETE',
+        tableName: 'requests',
+        recordId: requestId,
+        oldValues: existing,
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -255,6 +276,15 @@ export async function verifyRequest(
           actorId: session.user.id,
           notes: `Ditolak: ${reason}`,
         })
+
+        await tx.insert(auditLogs).values({
+          id: randomUUID(),
+          userId: session.user.id,
+          action: 'REJECT',
+          tableName: 'requests',
+          recordId: requestId,
+          newValues: { status: 'REJECTED', rejectionReason: reason },
+        })
         return
       }
 
@@ -281,8 +311,16 @@ export async function verifyRequest(
         newStatus = 'APPROVED'
 
         const itemsRequested = await tx
-          .select()
+          .select({
+            id: requestItems.id,
+            requestId: requestItems.requestId,
+            consumableId: requestItems.consumableId,
+            qtyRequested: requestItems.qtyRequested,
+            qtyApproved: requestItems.qtyApproved,
+            itemName: consumables.name,
+          })
           .from(requestItems)
+          .innerJoin(consumables, eq(requestItems.consumableId, consumables.id))
           .where(eq(requestItems.requestId, requestId))
 
         for (const item of itemsRequested) {
@@ -304,7 +342,7 @@ export async function verifyRequest(
 
           if (totalAvailable < qtyNeeded) {
             throw new Error(
-              `Stok GAGAL: Item ID ${item.consumableId} kurang. Butuh: ${qtyNeeded}, Ada: ${totalAvailable}.`,
+              `Stok tidak mencukupi untuk barang "${item.itemName}". Dibutuhkan: ${qtyNeeded}, Tersedia di gudang: ${totalAvailable}.`,
             )
           }
 
@@ -357,6 +395,15 @@ export async function verifyRequest(
             ? 'Disetujui Fakultas. Stok telah dialokasikan.'
             : 'Disetujui Unit. Menunggu Fakultas.',
       })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'APPROVE',
+        tableName: 'requests',
+        recordId: requestId,
+        newValues: { status: newStatus, approvedBy: session.user.id },
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -407,6 +454,16 @@ export async function updateRequestStatusByWarehouse(
         actorId: session.user.id,
         notes: newStatus === 'PROCESSING' ? 'Sedang disiapkan.' : 'Siap diambil user.',
       })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'UPDATE_STATUS',
+        tableName: 'requests',
+        recordId: requestId,
+        oldValues: { status: req.status },
+        newValues: { status: newStatus },
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -416,125 +473,71 @@ export async function updateRequestStatusByWarehouse(
   }
 }
 
-export async function completeRequestByQr(qrData: { requestId: string }) {
-  const session = await requireAuth({ roles: ['warehouse_staff'] })
-
-  try {
-    await db.transaction(async (tx) => {
-      const { requestId } = qrData
-
-      const [req] = await tx
-        .select()
-        .from(requests)
-        .where(
-          and(
-            eq(requests.id, requestId),
-            eq(requests.targetWarehouseId, session.user.warehouseId!),
-            eq(requests.status, 'READY_TO_PICKUP'),
-          ),
-        )
-        .limit(1)
-
-      if (!req) throw new Error('Request tidak valid atau belum siap diambil.')
-
-      const allocations = await tx
-        .select({
-          consumableId: requestItemAllocations.consumableId,
-          batchNumber: requestItemAllocations.batchNumber,
-          expiryDate: requestItemAllocations.expiryDate,
-          quantity: requestItemAllocations.quantity,
-        })
-        .from(requestItemAllocations)
-        .innerJoin(requestItems, eq(requestItemAllocations.requestItemId, requestItems.id))
-        .where(eq(requestItems.requestId, requestId))
-
-      if (allocations.length === 0) throw new Error('Data alokasi stok hilang/korup.')
-
-      for (const alloc of allocations) {
-        const [existingRoomStock] = await tx
-          .select()
-          .from(roomConsumables)
-          .where(
-            and(
-              eq(roomConsumables.roomId, req.roomId),
-              eq(roomConsumables.consumableId, alloc.consumableId),
-              alloc.batchNumber
-                ? eq(roomConsumables.batchNumber, alloc.batchNumber)
-                : sql`${roomConsumables.batchNumber} IS NULL`,
-              alloc.expiryDate
-                ? eq(roomConsumables.expiryDate, alloc.expiryDate)
-                : sql`${roomConsumables.expiryDate} IS NULL`,
-            ),
-          )
-
-        if (existingRoomStock) {
-          await tx
-            .update(roomConsumables)
-            .set({
-              quantity: sql`${roomConsumables.quantity} + ${alloc.quantity}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(roomConsumables.id, existingRoomStock.id))
-        } else {
-          await tx.insert(roomConsumables).values({
-            id: randomUUID(),
-            roomId: req.roomId,
-            consumableId: alloc.consumableId,
-            batchNumber: alloc.batchNumber,
-            expiryDate: alloc.expiryDate,
-            quantity: alloc.quantity,
-          })
-        }
-      }
-
-      await tx
-        .update(requests)
-        .set({ status: 'COMPLETED', updatedAt: new Date() })
-        .where(eq(requests.id, requestId))
-
-      await tx.insert(requestTimelines).values({
-        id: randomUUID(),
-        requestId: requestId,
-        status: 'COMPLETED',
-        actorId: session.user.id,
-        notes: 'Barang telah diterima oleh user (Scan QR).',
-      })
-    })
-
-    revalidatePath('/dashboard/consumable-requests')
-    return { success: true, message: 'Serah terima berhasil. Stok ruangan bertambah.' }
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Gagal scan QR.' }
-  }
-}
-
-export async function getConsumableRequests(page: number = 1, limit: number = 10, query?: string) {
+export async function getConsumableRequests(
+  page: number = 1,
+  limit: number = 10,
+  query: string = '',
+  statusFilter: string = 'all',
+  sortCol: string = 'createdAt',
+  sortOrder: 'asc' | 'desc' = 'desc',
+) {
   const session = await requireAuth({
     roles: ['unit_staff', 'unit_admin', 'faculty_admin', 'warehouse_staff'],
   })
+
   const { role, id: userId, unitId, facultyId, warehouseId } = session.user
   const offset = (page - 1) * limit
 
-  let searchCondition = query ? ilike(requests.requestCode, `%${query}%`) : undefined
-
-  if (role !== 'unit_staff' && query) {
+  let searchCondition = undefined
+  if (query) {
     searchCondition = or(ilike(requests.requestCode, `%${query}%`), ilike(user.name, `%${query}%`))
   }
 
-  let whereCondition
+  let uiStatusCondition = undefined
+  if (statusFilter && statusFilter !== 'all') {
+    uiStatusCondition = eq(
+      requests.status,
+      statusFilter as NonNullable<(typeof requests.$inferSelect)['status']>,
+    )
+  }
+
+  let roleCondition
+
   if (role === 'faculty_admin') {
-    whereCondition = and(eq(units.facultyId, facultyId!), searchCondition)
-  } else if (role === 'unit_admin') {
-    whereCondition = and(eq(user.unitId, unitId!), searchCondition)
+    roleCondition = and(
+      eq(units.facultyId, facultyId!),
+      inArray(requests.status, [
+        'PENDING_FACULTY',
+        'APPROVED',
+        'PROCESSING',
+        'READY_TO_PICKUP',
+        'COMPLETED',
+        'REJECTED',
+      ]),
+    )
   } else if (role === 'warehouse_staff') {
-    whereCondition = and(
+    roleCondition = and(
       eq(requests.targetWarehouseId, warehouseId!),
       inArray(requests.status, ['APPROVED', 'PROCESSING', 'READY_TO_PICKUP', 'COMPLETED']),
-      searchCondition,
     )
+  } else if (role === 'unit_admin') {
+    roleCondition = eq(user.unitId, unitId!)
   } else {
-    whereCondition = and(eq(requests.requesterId, userId), searchCondition)
+    roleCondition = eq(requests.requesterId, userId)
   }
+
+  const whereCondition = and(roleCondition, searchCondition, uiStatusCondition)
+
+  const sortMap: Record<string, PgColumn | SQL> = {
+    code: requests.requestCode,
+    status: requests.status,
+    createdAt: requests.createdAt,
+    requester: user.name,
+    room: rooms.name,
+  }
+
+  const orderColumn = sortMap[sortCol] || requests.createdAt
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const requestsData = await db
     .select({
@@ -554,7 +557,7 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
     .innerJoin(rooms, eq(requests.roomId, rooms.id))
     .leftJoin(units, eq(user.unitId, units.id))
     .where(whereCondition)
-    .orderBy(desc(requests.createdAt))
+    .orderBy(orderBy)
     .limit(limit)
     .offset(offset)
 
@@ -573,8 +576,10 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
       .where(inArray(requestItems.requestId, requestIds))
 
     itemsData.forEach((item) => {
-      if (!itemsMap[item.requestId!]) itemsMap[item.requestId!] = []
-      itemsMap[item.requestId!].push({
+      if (!item.requestId) return
+      if (!itemsMap[item.requestId]) itemsMap[item.requestId] = []
+
+      itemsMap[item.requestId].push({
         consumableId: item.consumableId,
         quantity: Number(item.qtyApproved ?? item.qtyRequested),
       })
@@ -603,7 +608,7 @@ export async function getConsumableRequests(page: number = 1, limit: number = 10
 
 export async function completeRequestByQR(requestId: string) {
   const session = await requireAuth({
-    roles: ['warehouse_staff', 'unit_admin', 'faculty_admin'],
+    roles: ['warehouse_staff'],
   })
 
   try {
@@ -618,7 +623,7 @@ export async function completeRequestByQR(requestId: string) {
         if (request.status === 'COMPLETED') {
           throw new Error('Permintaan ini sudah selesai diambil sebelumnya.')
         }
-        throw new Error(`Status permintaan tidak valid untuk diambil (${request.status}).`)
+        throw new Error(`Status permintaan belum siap diambil (Status: ${request.status}).`)
       }
 
       const allocations = await tx
@@ -633,25 +638,31 @@ export async function completeRequestByQR(requestId: string) {
         .where(eq(requestItems.requestId, requestId))
 
       if (allocations.length === 0) {
-        console.warn('Data alokasi tidak ditemukan untuk request ini.')
+        throw new Error('Data alokasi stok korup atau hilang. Hubungi admin.')
       }
 
       for (const alloc of allocations) {
+        const whereConditions = [
+          eq(roomConsumables.roomId, request.roomId),
+          eq(roomConsumables.consumableId, alloc.consumableId),
+        ]
+
+        if (alloc.batchNumber) {
+          whereConditions.push(eq(roomConsumables.batchNumber, alloc.batchNumber))
+        } else {
+          whereConditions.push(isNull(roomConsumables.batchNumber))
+        }
+
+        if (alloc.expiryDate) {
+          whereConditions.push(eq(roomConsumables.expiryDate, alloc.expiryDate))
+        } else {
+          whereConditions.push(isNull(roomConsumables.expiryDate))
+        }
+
         const [existingRoomStock] = await tx
           .select()
           .from(roomConsumables)
-          .where(
-            and(
-              eq(roomConsumables.roomId, request.roomId),
-              eq(roomConsumables.consumableId, alloc.consumableId),
-              alloc.batchNumber
-                ? eq(roomConsumables.batchNumber, alloc.batchNumber)
-                : sql`${roomConsumables.batchNumber} IS NULL`,
-              alloc.expiryDate
-                ? eq(roomConsumables.expiryDate, alloc.expiryDate)
-                : sql`${roomConsumables.expiryDate} IS NULL`,
-            ),
-          )
+          .where(and(...whereConditions))
           .limit(1)
 
         if (existingRoomStock) {
@@ -689,12 +700,22 @@ export async function completeRequestByQR(requestId: string) {
         actorId: session.user.id,
         notes: `Barang diterima via Scan QR oleh ${session.user.name}`,
       })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'COMPLETE',
+        tableName: 'requests',
+        recordId: requestId,
+        newValues: { status: 'COMPLETED' },
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
+
     return {
       success: true,
-      message: 'Verifikasi berhasil! Barang telah diserahkan dan stok ruangan bertambah.',
+      message: 'Verifikasi berhasil! Stok masuk ke ruangan sesuai Batch & Expired date.',
     }
   } catch (error) {
     console.error('QR Scan Error:', error)

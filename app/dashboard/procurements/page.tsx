@@ -1,7 +1,5 @@
 import { asc } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { consumables } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
@@ -16,6 +14,9 @@ interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    sort?: string
+    order?: 'asc' | 'desc'
+    status?: string
   }>
 }
 
@@ -38,8 +39,18 @@ export default async function ProcurementPage({ searchParams }: PageProps) {
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
+  const sortCol = params.sort || 'createdAt'
+  const sortOrder = params.order || 'desc'
+  const statusFilter = params.status || 'all'
 
-  const { data, totalItems } = await getProcurements(currentPage, ITEMS_PER_PAGE, query)
+  const { data, totalItems } = await getProcurements(
+    currentPage,
+    ITEMS_PER_PAGE,
+    query,
+    sortCol,
+    sortOrder,
+    statusFilter,
+  )
 
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
 
@@ -80,24 +91,24 @@ export default async function ProcurementPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <SearchInput
-          placeholder="Cari No. PO atau Nama Pemohon..."
-          className="w-full sm:max-w-xs"
-        />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <ProcurementTable data={formattedData} consumables={consumablesList} userRole={userRole} />
-
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-
-        {data.length === 0 && query && (
-          <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan pengajuan dengan kata kunci <strong>&quot;{query}&quot;</strong>.
-          </div>
-        )}
-      </div>
+      <ProcurementTable
+        data={formattedData}
+        consumables={consumablesList}
+        userRole={userRole}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage,
+          itemsPerPage: ITEMS_PER_PAGE,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+        }}
+        currentSort={{
+          column: sortCol,
+          direction: sortOrder,
+        }}
+        currentStatusFilter={statusFilter}
+      />
     </div>
   )
 }

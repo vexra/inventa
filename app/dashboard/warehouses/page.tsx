@@ -1,36 +1,61 @@
-import { asc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { faculties, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
 import { WarehouseDialog } from './_components/warehouse-dialog'
-import { WarehouseList } from './_components/warehouse-list'
-
-const ITEMS_PER_PAGE = 10
+import { WarehouseTable } from './_components/warehouse-table'
 
 interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    limit?: string
+    sort?: string
+    order?: 'asc' | 'desc'
+    facultyId?: string
   }>
 }
 
 export default async function WarehousesPage({ searchParams }: PageProps) {
-  await requireAuth({
-    roles: ['super_admin'],
-  })
+  const session = await requireAuth({ roles: ['super_admin', 'faculty_admin'] })
+
+  const isFacultyAdmin = session.user.role === 'faculty_admin'
+  const userFacultyId = session.user.facultyId
 
   const params = await searchParams
   const query = params.q || ''
   const currentPage = Number(params.page) || 1
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE
+  const itemsPerPage = Number(params.limit) || 10
+  const sortCol = params.sort || 'name'
+  const sortOrder = params.order || 'asc'
 
-  const searchCondition = query
+  const filterFacultyId = isFacultyAdmin ? userFacultyId : params.facultyId || 'all'
+
+  const offset = (currentPage - 1) * itemsPerPage
+
+  const textSearch = query
     ? or(ilike(warehouses.name, `%${query}%`), ilike(warehouses.description, `%${query}%`))
     : undefined
+
+  const facultyFilter =
+    filterFacultyId && filterFacultyId !== 'all'
+      ? eq(warehouses.facultyId, filterFacultyId)
+      : undefined
+
+  const searchCondition = and(textSearch, facultyFilter)
+
+  const orderColumn =
+    sortCol === 'faculty'
+      ? faculties.name
+      : sortCol === 'type'
+        ? warehouses.type
+        : sortCol === 'description'
+          ? warehouses.description
+          : warehouses.name
+
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const dataPromise = db
     .select({
@@ -44,9 +69,9 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
     .from(warehouses)
     .leftJoin(faculties, eq(warehouses.facultyId, faculties.id))
     .where(searchCondition)
-    .limit(ITEMS_PER_PAGE)
+    .limit(itemsPerPage)
     .offset(offset)
-    .orderBy(asc(warehouses.name))
+    .orderBy(orderBy)
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
@@ -65,7 +90,7 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
   ])
 
   const totalItems = Number(countResult[0]?.count || 0)
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -74,24 +99,28 @@ export default async function WarehousesPage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">Data Gudang</h1>
           <p className="text-muted-foreground">Kelola gudang penyimpanan Bahan Kimia & ATK</p>
         </div>
-        <WarehouseDialog mode="create" faculties={facultiesList} />
+        <WarehouseDialog
+          mode="create"
+          faculties={facultiesList}
+          fixedFacultyId={isFacultyAdmin ? userFacultyId : undefined}
+        />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <SearchInput placeholder="Cari nama gudang..." className="w-full sm:max-w-xs" />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <WarehouseList data={data} faculties={facultiesList} />
-
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-
-        {data.length === 0 && query && (
-          <div className="text-muted-foreground py-10 text-center">
-            Tidak ditemukan gudang dengan kata kunci <strong>&quot;{query}&quot;</strong>.
-          </div>
-        )}
-      </div>
+      <WarehouseTable
+        data={data}
+        faculties={facultiesList}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage,
+          itemsPerPage,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+        }}
+        currentSort={{ column: sortCol, direction: sortOrder }}
+        currentFacultyFilter={filterFacultyId || 'all'}
+        fixedFacultyId={isFacultyAdmin ? userFacultyId : undefined}
+      />
     </div>
   )
 }

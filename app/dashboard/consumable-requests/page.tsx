@@ -1,7 +1,5 @@
 import { asc, eq, sql } from 'drizzle-orm'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { consumables, rooms, warehouseStocks, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
@@ -14,6 +12,9 @@ interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    sort?: string
+    order?: 'asc' | 'desc'
+    status?: string
   }>
 }
 
@@ -46,9 +47,12 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
   const query = params.q || ''
   const page = Number(params.page) || 1
   const limit = 10
+  const sortCol = params.sort || 'createdAt'
+  const sortOrder = params.order || 'desc'
+  const statusFilter = params.status || 'all'
 
   const [requestsData, warehousesList, aggregatedStocks, unitRooms] = await Promise.all([
-    getConsumableRequests(page, limit, query),
+    getConsumableRequests(page, limit, query, statusFilter, sortCol, sortOrder),
 
     db
       .select({
@@ -113,9 +117,6 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
 
   const canCreateRequest = userRole === 'unit_staff'
 
-  const canExtendedSearch =
-    userRole === 'unit_admin' || userRole === 'faculty_admin' || userRole === 'warehouse_staff'
-
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -129,24 +130,26 @@ export default async function RequestConsumablesPage({ searchParams }: PageProps
         )}
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <SearchInput
-          placeholder={canExtendedSearch ? 'Cari Kode / Nama Pemohon...' : 'Cari Kode Request...'}
-          className="w-full sm:max-w-xs"
-        />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <RequestTable
-          data={data}
-          userRole={userRole}
-          warehouses={warehousesList}
-          rooms={unitRooms}
-          stocks={availableStocks}
-        />
-
-        {totalPages > 1 && <PaginationControls totalPages={totalPages} />}
-      </div>
+      <RequestTable
+        data={data}
+        userRole={userRole}
+        warehouses={warehousesList}
+        rooms={unitRooms}
+        stocks={availableStocks}
+        metadata={{
+          totalItems,
+          totalPages,
+          currentPage: page,
+          itemsPerPage: limit,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        }}
+        currentSort={{
+          column: sortCol,
+          direction: sortOrder,
+        }}
+        currentStatusFilter={statusFilter}
+      />
     </div>
   )
 }

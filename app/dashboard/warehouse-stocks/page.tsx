@@ -1,7 +1,5 @@
 import { Building2 } from 'lucide-react'
 
-import { PaginationControls } from '@/components/shared/pagination-controls'
-import { SearchInput } from '@/components/shared/search-input'
 import { requireAuth } from '@/lib/auth-guard'
 
 import { StockFilter } from './_components/stock-filter'
@@ -13,8 +11,11 @@ interface PageProps {
   searchParams: Promise<{
     q?: string
     page?: string
+    limit?: string
     status?: string
     warehouseId?: string
+    sort?: string
+    order?: 'asc' | 'desc'
   }>
 }
 
@@ -25,41 +26,57 @@ export default async function WarehouseStocksPage({ searchParams }: PageProps) {
   const params = await searchParams
   const query = params.q || ''
   const page = Number(params.page) || 1
+  const limit = Number(params.limit) || 10
+  const sortCol = params.sort || 'name'
+  const sortOrder = params.order || 'asc'
 
-  let targetWarehouseId = session.user.warehouseId
+  // LOGIKA UTAMA: Menentukan Target Gudang
+  let targetWarehouseId = session.user.warehouseId // Default null untuk faculty admin
   let availableWarehouses: { id: string; name: string }[] = []
 
   if (isFacultyAdmin) {
+    // 1. Ambil semua opsi gudang
     availableWarehouses = await getAllWarehouses()
+
+    // 2. Jika ada di URL, pakai itu. Jika tidak, pakai gudang pertama dari list.
     targetWarehouseId = params.warehouseId || availableWarehouses[0]?.id
   }
 
-  if (!isFacultyAdmin && !targetWarehouseId) {
+  // Jika setelah logic di atas ID gudang masih kosong (misal data gudang 0), tampilkan empty state
+  if (!targetWarehouseId) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center p-6 text-center">
         <div className="mb-4 rounded-full bg-red-50 p-4">
           <Building2 className="h-8 w-8 text-red-500" />
         </div>
-        <h3 className="text-xl font-bold text-gray-900">Akses Gudang Belum Diatur</h3>
+        <h3 className="text-xl font-bold text-gray-900">
+          {isFacultyAdmin ? 'Belum Ada Data Gudang' : 'Akses Gudang Belum Diatur'}
+        </h3>
         <p className="text-muted-foreground mt-2 max-w-md">
-          Akun Anda ({session.user.role}) belum terhubung dengan gudang manapun.
+          {isFacultyAdmin
+            ? 'Belum ada gudang yang terdaftar di sistem.'
+            : 'Akun Anda belum terhubung dengan gudang manapun.'}
         </p>
       </div>
     )
   }
 
+  // Filter Status
   const rawStatus = params.status
   const statusFilter = (['all', 'low', 'out'].includes(rawStatus || '') ? rawStatus : 'all') as
     | 'all'
     | 'low'
     | 'out'
 
+  // Fetch Data
   const result = await getWarehouseStocks(
     page,
-    10,
+    limit,
     query,
     statusFilter,
-    targetWarehouseId ?? undefined,
+    targetWarehouseId, // Kirim ID yang sudah dipastikan ada
+    sortCol,
+    sortOrder,
   )
 
   return (
@@ -75,43 +92,28 @@ export default async function WarehouseStocksPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <SearchInput placeholder="Cari barang atau SKU..." className="w-full sm:max-w-xs" />
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          {isFacultyAdmin && (
-            <div className="w-full sm:w-auto">
+      {'error' in result ? (
+        <div className="flex flex-col items-center justify-center rounded-md border border-dashed p-12 text-center text-red-600">
+          <Building2 className="mb-3 h-10 w-10 opacity-20" />
+          <p className="font-medium">{result.error}</p>
+        </div>
+      ) : (
+        <StockTable
+          data={result.data}
+          metadata={result.metadata}
+          currentSort={{ column: sortCol, direction: sortOrder }}
+        >
+          <div className="flex items-center gap-2">
+            {isFacultyAdmin && (
               <WarehouseSelector
                 warehouses={availableWarehouses}
-                currentWarehouseId={targetWarehouseId ?? undefined}
+                currentWarehouseId={targetWarehouseId}
               />
-            </div>
-          )}
-
-          <div className="overflow-x-auto pb-1 sm:pb-0">
+            )}
             <StockFilter currentFilter={statusFilter} />
           </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        {'error' in result ? (
-          <div className="flex flex-col items-center justify-center rounded-md border border-dashed p-12 text-center text-red-600 dark:border-red-900/50 dark:text-red-400">
-            <Building2 className="mb-3 h-10 w-10 opacity-20" />
-            <p className="font-medium">
-              {result.error === 'Silakan pilih gudang terlebih dahulu.'
-                ? 'Pilih gudang untuk melihat data.'
-                : result.error}
-            </p>
-          </div>
-        ) : (
-          <StockTable data={result.data} />
-        )}
-
-        {!('error' in result) && result.metadata.totalPages > 1 && (
-          <PaginationControls totalPages={result.metadata.totalPages} />
-        )}
-      </div>
+        </StockTable>
+      )}
     </div>
   )
 }

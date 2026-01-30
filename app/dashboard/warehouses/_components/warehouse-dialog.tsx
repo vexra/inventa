@@ -54,6 +54,7 @@ interface WarehouseDialogProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   faculties: FacultyOption[]
+  fixedFacultyId?: string | null
 }
 
 export function WarehouseDialog({
@@ -62,6 +63,7 @@ export function WarehouseDialog({
   open,
   onOpenChange,
   faculties = [],
+  fixedFacultyId,
 }: WarehouseDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const isControlled = open !== undefined
@@ -73,7 +75,7 @@ export function WarehouseDialog({
     defaultValues: {
       name: initialData?.name || '',
       type: initialData?.type || 'GENERAL_ATK',
-      facultyId: initialData?.facultyId || undefined,
+      facultyId: fixedFacultyId || initialData?.facultyId || undefined,
       description: initialData?.description || '',
     },
   })
@@ -161,7 +163,11 @@ export function WarehouseDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Milik Fakultas</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value || undefined}
+                    disabled={!!fixedFacultyId}
+                  >
                     <FormControl>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pilih Fakultas" />
@@ -175,6 +181,11 @@ export function WarehouseDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  {fixedFacultyId && (
+                    <p className="text-muted-foreground text-[0.8rem]">
+                      *Terkunci otomatis ke fakultas Anda.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

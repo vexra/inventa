@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-guard'
 
+import { FacultyAdminDashboard } from './_components/faculty-admin-dashboard'
 import { SuperAdminDashboard } from './_components/super-admin-dashboard'
 import { UnitAdminDashboard } from './_components/unit-admin-dashboard'
 import { UnitStaffDashboard } from './_components/unit-staff-dashboard'
@@ -20,6 +21,10 @@ export default async function DashboardPage() {
 
   if (session.user.role === 'unit_staff') {
     return <UnitStaffDashboard user={session.user} />
+  }
+
+  if (session.user.role === 'faculty_admin') {
+    return <FacultyAdminDashboard user={session.user} />
   }
 
   return <SuperAdminDashboard user={session.user} />

@@ -1,16 +1,28 @@
 'use server'
 
-import { and, asc, eq, ilike, lte, or, sql } from 'drizzle-orm'
+import { SQL, and, asc, desc, eq, ilike, lte, or, sql } from 'drizzle-orm'
+import { PgColumn } from 'drizzle-orm/pg-core'
 
 import { categories, consumables, warehouseStocks, warehouses } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 
-type BatchItem = {
+type BatchQueryResult = {
   id: string
-  batch: string
+  batch: string | null
   qty: number
   exp: string | null
+}
+
+function getDaysDifference(dateString: string) {
+  const targetDate = new Date(dateString)
+  const today = new Date()
+
+  targetDate.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+
+  const diffTime = targetDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
 export async function getAllWarehouses() {
@@ -37,6 +49,8 @@ export async function getWarehouseStocks(
   query: string = '',
   statusFilter: 'all' | 'low' | 'out' = 'all',
   targetWarehouseId?: string,
+  sortCol: string = 'name',
+  sortOrder: 'asc' | 'desc' = 'asc',
 ) {
   const session = await requireAuth({ roles: ['warehouse_staff', 'faculty_admin'] })
 
@@ -63,6 +77,17 @@ export async function getWarehouseStocks(
     )
   }
 
+  const sortMap: Record<string, PgColumn | SQL> = {
+    name: consumables.name,
+    sku: consumables.sku,
+    category: categories.name,
+    totalQuantity: sql`sq.total_qty`,
+    minimumStock: consumables.minimumStock,
+  }
+
+  const orderColumn = sortMap[sortCol] || consumables.name
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
+
   try {
     const sq = db
       .select({
@@ -84,7 +109,7 @@ export async function getWarehouseStocks(
         unit: consumables.baseUnit,
         minimumStock: consumables.minimumStock,
         totalQty: sq.totalQty,
-        batches: sql<BatchItem[]>`json_agg(
+        batches: sql<BatchQueryResult[]>`json_agg(
             json_build_object(
               'id', ${warehouseStocks.id},
               'batch', ${warehouseStocks.batchNumber},
@@ -126,7 +151,7 @@ export async function getWarehouseStocks(
       )
     }
 
-    const rows = await mainQuery.limit(limit).offset(offset).orderBy(asc(consumables.name))
+    const rows = await mainQuery.limit(limit).offset(offset).orderBy(orderBy)
 
     const countQuery = db
       .select({
@@ -154,9 +179,7 @@ export async function getWarehouseStocks(
     const totalPages = Math.ceil(totalItems / limit)
 
     const formattedData = rows.map((row) => {
-      const now = new Date()
       const batches = row.batches || []
-
       let hasExpired = false
       let hasNearExpiry = false
 
@@ -164,12 +187,9 @@ export async function getWarehouseStocks(
 
       activeBatches.forEach((b) => {
         if (b.exp) {
-          const expDate = new Date(b.exp)
-          const diffTime = expDate.getTime() - now.getTime()
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-          if (diffDays <= 0) hasExpired = true
-          else if (diffDays <= 30) hasNearExpiry = true
+          const diffDays = getDaysDifference(b.exp)
+          if (diffDays < 0) hasExpired = true
+          else if (diffDays <= 90) hasNearExpiry = true
         }
       })
 
@@ -198,6 +218,9 @@ export async function getWarehouseStocks(
         totalItems,
         totalPages,
         currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
       },
     }
   } catch (error) {

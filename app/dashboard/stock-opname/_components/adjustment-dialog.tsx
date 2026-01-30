@@ -5,11 +5,24 @@ import { useForm, useWatch } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
-import { AlertTriangle, Loader2, Package, Save } from 'lucide-react'
+import {
+  AlertCircle,
+  Calculator,
+  Calendar,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Package,
+  PackageOpen,
+  Save,
+  Scale,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { z } from 'zod'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -33,14 +46,15 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { StockOpnameFormValues, stockOpnameSchema } from '@/lib/validations/stock-opname'
+import { stockOpnameSchema } from '@/lib/validations/stock-opname'
 
 import { submitStockOpname } from '../actions'
+
+type StockOpnameFormValues = z.infer<typeof stockOpnameSchema>
 
 interface BatchData {
   id: string
@@ -58,11 +72,12 @@ interface AdjustmentDialogProps {
   batches: BatchData[]
 }
 
+// PERBAIKAN: Menghapus properti warna agar tampilan standar
 const ADJUSTMENT_TYPES = [
   { value: 'STOCK_OPNAME', label: 'Stock Opname (Rutin)' },
-  { value: 'DAMAGE', label: 'Barang Rusak / Kadaluarsa' },
-  { value: 'LOSS', label: 'Barang Hilang' },
-  { value: 'CORRECTION', label: 'Koreksi Admin (Salah Input)' },
+  { value: 'CORRECTION', label: 'Koreksi Data (Admin)' },
+  { value: 'DAMAGE', label: 'Barang Rusak (Damage)' },
+  { value: 'LOSS', label: 'Barang Hilang (Loss)' },
 ]
 
 export function AdjustmentDialog({
@@ -75,260 +90,165 @@ export function AdjustmentDialog({
 }: AdjustmentDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
 
-  const { activeBatches, zeroBatches } = useMemo(() => {
-    const sorted = [...batches].sort((a, b) => {
-      if (!a.expiryDate) return 1
-      if (!b.expiryDate) return -1
-      return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime()
-    })
-
-    const active = sorted.filter((b) => Number(b.quantity) > 0)
-    const zero = sorted.filter((b) => Number(b.quantity) <= 0)
-
-    return { activeBatches: active, zeroBatches: zero }
-  }, [batches])
-
-  const allSortedBatches = useMemo(
-    () => [...activeBatches, ...zeroBatches],
-    [activeBatches, zeroBatches],
-  )
-
   const form = useForm({
     resolver: zodResolver(stockOpnameSchema),
     defaultValues: {
       consumableId,
       warehouseStockId: '',
       physicalQty: 0,
-      type: 'STOCK_OPNAME',
       reason: '',
+      type: 'STOCK_OPNAME',
     },
   })
 
   const selectedBatchId = useWatch({ control: form.control, name: 'warehouseStockId' })
-  const physicalQty = useWatch({ control: form.control, name: 'physicalQty' }) as number
-  const selectedType = useWatch({ control: form.control, name: 'type' })
+  const physicalQtyRaw = useWatch({ control: form.control, name: 'physicalQty' })
 
-  const activeBatch = useMemo(() => {
-    return allSortedBatches.find((b) => b.id === selectedBatchId)
-  }, [allSortedBatches, selectedBatchId])
+  const selectedBatch = useMemo(
+    () => batches.find((b) => b.id === selectedBatchId),
+    [batches, selectedBatchId],
+  )
 
-  const systemQty = activeBatch ? activeBatch.quantity : 0
-  const delta = activeBatch ? Number(physicalQty) - systemQty : 0
+  const systemQty = selectedBatch?.quantity || 0
+  const delta = (Number(physicalQtyRaw) || 0) - systemQty
 
+  // Reset form saat dialog dibuka
   useEffect(() => {
     if (open) {
-      const defaultBatch =
-        activeBatches.length === 1 && zeroBatches.length === 0 ? activeBatches[0] : null
-
       form.reset({
         consumableId,
-        warehouseStockId: defaultBatch ? defaultBatch.id : '',
-        physicalQty: defaultBatch ? defaultBatch.quantity : 0,
-        type: 'STOCK_OPNAME',
+        warehouseStockId: batches.length === 1 ? batches[0].id : '',
+        physicalQty: batches.length === 1 ? batches[0].quantity : 0,
         reason: '',
+        type: 'STOCK_OPNAME',
       })
     }
-  }, [open, consumableId, activeBatches, zeroBatches, form])
+  }, [open, consumableId, batches, form])
 
   useEffect(() => {
-    if (activeBatch) {
-      const currentVal = form.getValues('physicalQty')
-      if (currentVal !== activeBatch.quantity) {
-        form.setValue('physicalQty', activeBatch.quantity)
-      }
+    if (selectedBatch) {
+      form.setValue('physicalQty', selectedBatch.quantity)
     }
-  }, [activeBatch, form])
+  }, [selectedBatch, form])
+
+  useEffect(() => {
+    if (delta === 0) {
+      form.setValue('type', 'STOCK_OPNAME')
+    } else if (delta < 0) {
+      // Logic optional
+    } else if (delta > 0) {
+      form.setValue('type', 'STOCK_OPNAME')
+    }
+  }, [delta, form])
 
   async function onSubmit(values: StockOpnameFormValues) {
     setIsLoading(true)
     try {
-      const res = await submitStockOpname(values)
-      if (res.error) {
-        toast.error(res.error)
+      const payload = {
+        ...values,
+        type: values.type as 'STOCK_OPNAME' | 'DAMAGE' | 'LOSS' | 'CORRECTION',
+      }
+
+      const result = await submitStockOpname(payload)
+
+      if (result.error) {
+        toast.error(result.error)
       } else {
-        toast.success(res.message)
+        toast.success(result.message)
         onOpenChange(false)
       }
     } catch {
-      toast.error('Terjadi kesalahan sistem')
+      toast.error('Terjadi kesalahan saat menyimpan data.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const renderBatchItem = (batch: BatchData, isZero: boolean) => {
-    const isExpired = batch.expiryDate && new Date(batch.expiryDate) < new Date()
-    return (
-      <SelectItem key={batch.id} value={batch.id} className="cursor-pointer">
-        <div className={`flex flex-col text-left ${isZero ? 'opacity-70' : ''}`}>
-          <span className="font-medium">Batch: {batch.batchNumber || 'Tanpa Batch'}</span>
-          <div className="text-muted-foreground flex gap-2 text-xs">
-            <span className={isZero ? 'font-medium text-red-500' : ''}>
-              Stok: {batch.quantity} {unit}
-            </span>
-            {batch.expiryDate && (
-              <span className={isExpired ? 'font-bold text-red-500' : ''}>
-                • Exp: {format(new Date(batch.expiryDate), 'dd MMM yyyy')}
-              </span>
-            )}
-          </div>
-        </div>
-      </SelectItem>
-    )
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Penyesuaian Stok</DialogTitle>
-          <DialogDescription>{consumableName}</DialogDescription>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        {/* HEADER */}
+        <DialogHeader className="bg-muted/30 dark:bg-muted/10 shrink-0 border-b px-6 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-xl font-bold tracking-tight">
+                <Scale className="h-6 w-6 text-blue-600 dark:text-blue-500" />
+                Stok Opname
+              </DialogTitle>
+              <DialogDescription className="mt-1">
+                Sesuaikan stok fisik dengan sistem.
+              </DialogDescription>
+            </div>
+
+            <Badge
+              variant="outline"
+              className="mt-1 mr-8 shrink-0 px-3 py-1 text-sm font-bold uppercase"
+            >
+              Satuan: {unit}
+            </Badge>
+          </div>
+
+          <div className="bg-background dark:bg-muted/20 mt-3 flex items-center gap-3 rounded-lg border p-3 shadow-sm">
+            <div className="shrink-0 rounded-full bg-blue-100 p-2 dark:bg-blue-900/30">
+              <PackageOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="overflow-hidden">
+              <span className="text-muted-foreground block text-[10px] font-bold tracking-wider uppercase">
+                Barang
+              </span>
+              <p className="truncate text-sm leading-tight font-semibold text-slate-900 sm:text-base dark:text-slate-100">
+                {consumableName}
+              </p>
+            </div>
+          </div>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            <FormField
-              control={form.control}
-              name="warehouseStockId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Pilih Batch</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="h-auto w-full py-4 text-left">
-                        <SelectValue placeholder="Pilih batch yang akan disesuaikan..." />
-                      </SelectTrigger>
-                    </FormControl>
-
-                    <SelectContent
-                      position="popper"
-                      className="z-200 max-h-50 w-(--radix-select-trigger-width) overflow-y-auto"
-                      sideOffset={5}
-                    >
-                      {activeBatches.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel className="text-primary px-2 py-1.5 text-xs font-bold">
-                            Stok Tersedia ({activeBatches.length})
-                          </SelectLabel>
-                          {activeBatches.map((batch) => renderBatchItem(batch, false))}
-                        </SelectGroup>
-                      )}
-
-                      {activeBatches.length > 0 && zeroBatches.length > 0 && (
-                        <SelectSeparator className="my-2" />
-                      )}
-
-                      {zeroBatches.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel className="text-muted-foreground px-2 py-1.5 text-xs font-semibold">
-                            Riwayat / Stok Habis ({zeroBatches.length})
-                          </SelectLabel>
-                          {zeroBatches.map((batch) => renderBatchItem(batch, true))}
-                        </SelectGroup>
-                      )}
-
-                      {activeBatches.length === 0 && zeroBatches.length === 0 && (
-                        <div className="text-muted-foreground p-4 text-center text-sm">
-                          Tidak ada data batch.
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {activeBatch ? (
-              <div className="animate-in fade-in slide-in-from-top-2 space-y-4 duration-300">
-                <div className="bg-muted/40 rounded-lg border p-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground text-xs">Stok Sistem</span>
-                      <span className="font-mono text-xl font-bold">{systemQty}</span>
-                    </div>
-                    <div className="text-muted-foreground pb-2">→</div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-muted-foreground text-xs">Stok Fisik</span>
-                      <span
-                        className={`font-mono text-xl font-bold ${
-                          delta !== 0 ? 'text-blue-600' : ''
-                        }`}
-                      >
-                        {Number(physicalQty)}
-                      </span>
-                    </div>
-                    <div className="ml-4 flex min-w-20 flex-col items-end border-l pl-4">
-                      <span className="text-muted-foreground text-xs">Selisih</span>
-                      <Badge
-                        variant="outline"
-                        className={`${
-                          delta === 0
-                            ? 'text-muted-foreground'
-                            : delta > 0
-                              ? 'border-blue-200 bg-blue-100 text-blue-700 hover:bg-blue-100 hover:text-blue-700 dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-400'
-                              : 'border-red-200 bg-red-100 text-red-700 hover:bg-red-100 hover:text-red-700 dark:border-red-900 dark:bg-red-900/30 dark:text-red-400'
-                        }`}
-                      >
-                        {delta > 0 ? '+' : ''}
-                        {delta}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+        {/* BODY (Scrollable) */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="p-6">
+            <Form {...form}>
+              <form id="opname-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                {/* 1. Pilih Batch */}
+                <div className="bg-muted/30 dark:bg-muted/10 rounded-lg border p-4">
                   <FormField
                     control={form.control}
-                    name="physicalQty"
+                    name="warehouseStockId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Jumlah Fisik (Aktual)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            className="text-lg font-bold"
-                            {...field}
-                            value={(field.value as number) ?? ''}
-                            onKeyDown={(e) => {
-                              if (e.key === '-' || e.key === 'e') {
-                                e.preventDefault()
-                              }
-                            }}
-                            onChange={(e) => {
-                              const val = e.target.valueAsNumber
-                              if (isNaN(val) || val < 0) {
-                                field.onChange(0)
-                              } else {
-                                field.onChange(val)
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tipe Penyesuaian</FormLabel>
+                        <FormLabel className="flex items-center gap-2 text-base font-semibold">
+                          <Package className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                          Langkah 1: Pilih Batch
+                        </FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue />
+                            <SelectTrigger className="bg-background dark:bg-background/50 h-11 w-full">
+                              <SelectValue placeholder="Pilih No. Batch..." />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent position="popper" className="z-200 max-h-50">
-                            {ADJUSTMENT_TYPES.map((type) => (
-                              <SelectItem key={type.value} value={type.value}>
-                                {type.label}
-                              </SelectItem>
-                            ))}
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Daftar Batch</SelectLabel>
+                              {batches.map((batch) => (
+                                <SelectItem key={batch.id} value={batch.id}>
+                                  <div className="flex w-full items-center justify-between gap-4">
+                                    <span className="max-w-37.5 truncate font-mono font-medium">
+                                      {batch.batchNumber || 'Tanpa Batch'}
+                                    </span>
+                                    <div className="text-muted-foreground flex shrink-0 items-center gap-2 text-xs">
+                                      {batch.expiryDate && (
+                                        <span className="flex items-center gap-1">
+                                          <Calendar className="h-3 w-3" />
+                                          {format(new Date(batch.expiryDate), 'dd/MM/yy')}
+                                        </span>
+                                      )}
+                                      <Badge variant="secondary" className="text-[10px]">
+                                        Qty: {batch.quantity}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -337,86 +257,194 @@ export function AdjustmentDialog({
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="reason"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Keterangan / Alasan</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder={`Jelaskan alasan ${
-                            activeBatch?.batchNumber ? `untuk batch ${activeBatch.batchNumber}` : ''
-                          }...`}
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {selectedBatch ? (
+                  <div className="animate-in fade-in slide-in-from-top-4 space-y-6 duration-300">
+                    {/* 2. Kalkulasi */}
+                    <Card className="bg-accent/5 overflow-hidden border shadow-sm">
+                      <CardContent className="space-y-6 p-5">
+                        <div className="flex items-center gap-2">
+                          <Calculator className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                          <h3 className="text-sm font-semibold tracking-wide uppercase">
+                            Input Perhitungan
+                          </h3>
+                        </div>
 
-                {delta !== 0 && (
-                  <div
-                    className={`flex gap-3 rounded-md border p-3 text-sm ${
-                      delta < 0
-                        ? 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-200'
-                        : 'border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-200'
-                    }`}
-                  >
-                    <AlertTriangle
-                      className={`h-5 w-5 shrink-0 ${
-                        delta < 0
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-blue-600 dark:text-blue-400'
-                      }`}
-                    />
-                    <div>
-                      <p className="font-semibold">Konfirmasi Perubahan</p>
-                      <p className="mt-1 text-xs opacity-90">
-                        Stok akan {delta > 0 ? 'ditambah' : 'dikurangi'} sebanyak{' '}
-                        <b>
-                          {Math.abs(delta)} {unit}
-                        </b>{' '}
-                        dengan tipe{' '}
-                        <b>{ADJUSTMENT_TYPES.find((t) => t.value === selectedType)?.label}</b>.
-                      </p>
+                        <div className="grid gap-6 md:grid-cols-2">
+                          {/* Input Field */}
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Stok Sistem:</span>
+                              <span className="font-mono font-bold">
+                                {systemQty} {unit}
+                              </span>
+                            </div>
+
+                            <FormField
+                              control={form.control}
+                              name="physicalQty"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="font-bold text-blue-600 dark:text-blue-400">
+                                    Stok Fisik (Riil)
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      {...field}
+                                      value={field.value as number}
+                                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                      className="bg-background h-12 border-blue-200 text-xl font-bold focus-visible:ring-blue-500 dark:border-blue-800"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          {/* Result Box */}
+                          <div
+                            className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-colors ${
+                              delta === 0
+                                ? 'border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50'
+                                : delta < 0
+                                  ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                  : 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/30'
+                            }`}
+                          >
+                            <span className="text-muted-foreground text-[10px] font-bold uppercase">
+                              Selisih (Delta)
+                            </span>
+                            <div
+                              className={`my-1 text-4xl font-black ${
+                                delta === 0
+                                  ? 'text-slate-500'
+                                  : delta < 0
+                                    ? 'text-red-600'
+                                    : 'text-green-600'
+                              }`}
+                            >
+                              {delta > 0 && '+'}
+                              {delta}
+                            </div>
+                            <div className="text-center text-xs font-medium">
+                              {delta === 0 ? (
+                                <span className="flex items-center text-slate-600 dark:text-slate-400">
+                                  <CheckCircle2 className="mr-1 h-3 w-3" /> Sesuai
+                                </span>
+                              ) : delta < 0 ? (
+                                <span className="flex items-center text-red-600 dark:text-red-400">
+                                  <AlertCircle className="mr-1 h-3 w-3" /> Kurang / Hilang
+                                </span>
+                              ) : (
+                                <span className="flex items-center text-green-600 dark:text-green-400">
+                                  <CheckCircle2 className="mr-1 h-3 w-3" /> Lebih / Ditemukan
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* 3. Keterangan */}
+                    <div className="bg-muted/30 dark:bg-muted/10 space-y-4 rounded-lg border p-4">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                        <h3 className="text-sm font-semibold tracking-wide uppercase">
+                          Keterangan
+                        </h3>
+                      </div>
+
+                      <div className="grid gap-4">
+                        <FormField
+                          control={form.control}
+                          name="type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Jenis Penyesuaian</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="bg-background w-full">
+                                    <SelectValue placeholder="Pilih jenis..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {ADJUSTMENT_TYPES.map((type) => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      <span className="font-medium">{type.label}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="reason"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Catatan</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Contoh: Rutin, Rusak, dll."
+                                  className="bg-background"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  <div className="bg-muted/20 flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-12 text-center">
+                    <PackageOpen className="text-muted-foreground mb-3 h-10 w-10 opacity-50" />
+                    <p className="text-muted-foreground text-sm font-medium">
+                      Pilih batch di atas untuk memulai.
+                    </p>
+                  </div>
                 )}
-              </div>
+              </form>
+            </Form>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <DialogFooter className="bg-muted/30 dark:bg-muted/10 shrink-0 border-t px-6 py-4">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Batal
+          </Button>
+          <Button
+            type="submit"
+            form="opname-form"
+            disabled={isLoading || !selectedBatch}
+            className="min-w-35 bg-blue-600 text-white hover:bg-blue-700"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Simpan...
+              </>
             ) : (
-              <div className="bg-muted/20 flex h-32 flex-col items-center justify-center rounded-lg border border-dashed text-center">
-                <Package className="text-muted-foreground/50 mb-2 h-8 w-8" />
-                <p className="text-muted-foreground text-sm">Silakan pilih batch terlebih dahulu</p>
-              </div>
-            )}
-
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="border-input hover:bg-accent hover:text-accent-foreground"
-              >
-                Batal
-              </Button>
-
-              <Button
-                type="submit"
-                disabled={isLoading || !selectedBatchId || delta === 0}
-                className={`text-white transition-colors ${
-                  delta < 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <>
                 <Save className="mr-2 h-4 w-4" />
                 Simpan
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              </>
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

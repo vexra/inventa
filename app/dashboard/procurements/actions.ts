@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 
 import { randomUUID } from 'crypto'
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
+import { SQL, and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
+import { PgColumn } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 
 import {
@@ -273,7 +274,14 @@ export async function deleteProcurement(id: string) {
   }
 }
 
-export async function getProcurements(page = 1, limit = 10, query = '') {
+export async function getProcurements(
+  page = 1,
+  limit = 10,
+  query = '',
+  sortCol = 'createdAt',
+  sortOrder: 'asc' | 'desc' = 'desc',
+  statusFilter = 'all',
+) {
   const session = await requireAuth({
     roles: ['warehouse_staff', 'faculty_admin', 'super_admin'],
   })
@@ -291,7 +299,26 @@ export async function getProcurements(page = 1, limit = 10, query = '') {
       )
     : undefined
 
-  const whereCondition = and(roleCondition, searchCondition)
+  let statusCondition = undefined
+  if (statusFilter && statusFilter !== 'all') {
+    statusCondition = eq(
+      procurements.status,
+      statusFilter as NonNullable<(typeof procurements.$inferSelect)['status']>,
+    )
+  }
+
+  const whereCondition = and(roleCondition, searchCondition, statusCondition)
+
+  const sortMap: Record<string, PgColumn | SQL> = {
+    code: procurements.procurementCode,
+    status: procurements.status,
+    createdAt: procurements.createdAt,
+    requester: user.name,
+    description: procurements.description,
+  }
+
+  const orderColumn = sortMap[sortCol] || procurements.createdAt
+  const orderBy = sortOrder === 'desc' ? desc(orderColumn) : asc(orderColumn)
 
   const [countResult] = await db
     .select({ count: sql<number>`count(*)` })
@@ -305,7 +332,6 @@ export async function getProcurements(page = 1, limit = 10, query = '') {
     .select({
       id: procurements.id,
       code: procurements.procurementCode,
-      procurementCode: procurements.procurementCode,
       status: procurements.status,
       createdAt: procurements.createdAt,
       requestDate: procurements.createdAt,
@@ -320,7 +346,7 @@ export async function getProcurements(page = 1, limit = 10, query = '') {
     .where(whereCondition)
     .limit(limit)
     .offset(offset)
-    .orderBy(desc(procurements.createdAt))
+    .orderBy(orderBy)
 
   const procurementIds = headers.map((h) => h.id)
 

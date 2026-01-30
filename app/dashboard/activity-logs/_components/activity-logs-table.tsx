@@ -2,12 +2,24 @@
 
 import { useState } from 'react'
 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { Eye } from 'lucide-react'
+import { ArrowUpDown, Eye, Settings2 } from 'lucide-react'
 
+import { DataTablePagination } from '@/components/shared/data-table-pagination'
+import { DataTableToolbar } from '@/components/shared/data-table-toolbar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -30,87 +42,264 @@ export type LogEntry = {
   createdAt: Date
   actorName: string | null
   actorEmail: string | null
-  actorImage: string | null
 }
 
 interface LogsTableProps {
   data: LogEntry[]
+  metadata: {
+    totalItems: number
+    totalPages: number
+    currentPage: number
+    itemsPerPage: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }
+  currentSort: {
+    column: string
+    direction: 'asc' | 'desc'
+  }
 }
 
-export function LogsTable({ data }: LogsTableProps) {
+function SortableHeader({
+  id: columnId,
+  label,
+  currentSort,
+  onSort,
+  className,
+}: {
+  id: string
+  label: string
+  currentSort: { column: string; direction: 'asc' | 'desc' }
+  onSort: (id: string) => void
+  className?: string
+}) {
+  return (
+    <TableHead className={cn('h-10 px-0', className)}>
+      <Button
+        variant="ghost"
+        onClick={() => onSort(columnId)}
+        className="hover:bg-muted h-full w-full justify-start px-4 text-xs font-medium uppercase"
+      >
+        {label}
+        {currentSort.column === columnId && (
+          <ArrowUpDown
+            className={cn('ml-2 h-3 w-3', currentSort.direction === 'asc' && 'rotate-180')}
+          />
+        )}
+      </Button>
+    </TableHead>
+  )
+}
+
+function getActionColor(action: string) {
+  const a = action.toUpperCase()
+  if (
+    a.includes('CREATE') ||
+    a.includes('APPROVE') ||
+    a.includes('COMPLETE') ||
+    a.includes('RECEIPT') ||
+    a.includes('RESTOCK')
+  ) {
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+  }
+  if (
+    a.includes('UPDATE') ||
+    a.includes('OPNAME') ||
+    a.includes('PROCESSING') ||
+    a.includes('TRANSFER')
+  ) {
+    return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400'
+  }
+  if (
+    a.includes('DELETE') ||
+    a.includes('REJECT') ||
+    a.includes('CANCEL') ||
+    a.includes('DAMAGE') ||
+    a.includes('LOSS')
+  ) {
+    return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+  }
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
+}
+
+export function LogsTable({ data, metadata, currentSort }: LogsTableProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null)
 
+  const [visibleColumns, setVisibleColumns] = useState({
+    timestamp: true,
+    user: true,
+    action: true,
+    entity: true,
+  })
+
+  const handleSort = (column: string) => {
+    const isAsc = currentSort.column === column && currentSort.direction === 'asc'
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', column)
+    params.set('order', isAsc ? 'desc' : 'asc')
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   return (
-    <>
-      <div className="bg-card rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-50">Waktu</TableHead>
-              <TableHead>User (Aktor)</TableHead>
-              <TableHead>Aksi</TableHead>
-              <TableHead>Entitas</TableHead>
-              <TableHead className="text-right">Detail</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((log) => (
-              <TableRow key={log.id}>
-                <TableCell className="text-muted-foreground font-medium whitespace-nowrap">
-                  {format(new Date(log.createdAt), 'dd MMM yyyy, HH:mm', { locale: id })}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="text-foreground font-medium">
-                      {log.actorName || 'Unknown User'}
-                    </span>
-                    <span className="text-muted-foreground text-xs">{log.actorEmail}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      'w-auto min-w-20 justify-center px-2 font-medium shadow-none',
+    <div className="w-full">
+      <div className="bg-card text-card-foreground rounded-md border shadow-sm">
+        <DataTableToolbar placeholder="Cari aktor atau tabel..." limit={metadata.itemsPerPage}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto hidden h-9 px-3 text-xs sm:flex"
+              >
+                <Settings2 className="mr-2 h-3.5 w-3.5" />
+                Tampilan
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-45">
+              <DropdownMenuLabel>Atur Kolom</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.timestamp}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, timestamp: !!v }))}
+              >
+                Waktu
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.user}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, user: !!v }))}
+              >
+                User (Aktor)
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.action}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, action: !!v }))}
+              >
+                Aksi
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.entity}
+                onCheckedChange={(v) => setVisibleColumns((p) => ({ ...p, entity: !!v }))}
+              >
+                Entitas
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </DataTableToolbar>
 
-                      log.action === 'CREATE' &&
-                        'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/15 dark:text-green-400 dark:hover:bg-green-500/25',
-
-                      log.action === 'UPDATE' &&
-                        'bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:hover:bg-blue-500/25',
-
-                      log.action === 'DELETE' &&
-                        'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25',
-
-                      log.action === 'IMPERSONATE' &&
-                        'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:hover:bg-purple-500/25',
-                    )}
-                  >
-                    {log.action}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1">
-                    <span className="font-medium capitalize">{log.tableName}</span>
-                    <span className="text-muted-foreground font-mono text-[10px]">
-                      ID: {log.recordId.substring(0, 8)}...
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedLog(log)}
-                    title="Lihat Detail JSON"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </TableCell>
+        <div className="relative w-full overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                {visibleColumns.timestamp && (
+                  <SortableHeader
+                    id="createdAt"
+                    label="Waktu"
+                    currentSort={currentSort}
+                    onSort={handleSort}
+                  />
+                )}
+                {visibleColumns.user && (
+                  <SortableHeader
+                    id="actorName"
+                    label="User (Aktor)"
+                    currentSort={currentSort}
+                    onSort={handleSort}
+                  />
+                )}
+                {visibleColumns.action && (
+                  <SortableHeader
+                    id="action"
+                    label="Aksi"
+                    currentSort={currentSort}
+                    onSort={handleSort}
+                  />
+                )}
+                {visibleColumns.entity && (
+                  <SortableHeader
+                    id="tableName"
+                    label="Entitas"
+                    currentSort={currentSort}
+                    onSort={handleSort}
+                  />
+                )}
+                <TableHead className="h-10 w-20 px-4 text-right text-xs font-medium uppercase">
+                  Detail
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {data.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={Object.values(visibleColumns).filter(Boolean).length + 1}
+                    className="text-muted-foreground h-24 text-center text-sm"
+                  >
+                    Tidak ada riwayat aktivitas ditemukan.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.map((log) => (
+                  <TableRow key={log.id} className="hover:bg-muted/50 border-b last:border-0">
+                    {visibleColumns.timestamp && (
+                      <TableCell className="text-muted-foreground px-4 py-3 text-xs font-medium whitespace-nowrap">
+                        {format(new Date(log.createdAt), 'dd MMM yyyy, HH:mm', { locale: id })}
+                      </TableCell>
+                    )}
+                    {visibleColumns.user && (
+                      <TableCell className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{log.actorName || 'System'}</span>
+                          <span className="text-muted-foreground text-[11px]">
+                            {log.actorEmail}
+                          </span>
+                        </div>
+                      </TableCell>
+                    )}
+                    {visibleColumns.action && (
+                      <TableCell className="px-4 py-3">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            'font-mono text-[10px] font-bold shadow-none',
+                            getActionColor(log.action),
+                          )}
+                        >
+                          {log.action.replace(/_/g, ' ')}
+                        </Badge>
+                      </TableCell>
+                    )}
+                    {visibleColumns.entity && (
+                      <TableCell className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="text-sm capitalize">
+                            {log.tableName.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-muted-foreground font-mono text-[10px]">
+                            ID: {log.recordId.substring(0, 8)}...
+                          </span>
+                        </div>
+                      </TableCell>
+                    )}
+                    <TableCell className="px-4 py-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setSelectedLog(log)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <DataTablePagination metadata={metadata} />
       </div>
 
       {selectedLog && (
@@ -120,6 +309,6 @@ export function LogsTable({ data }: LogsTableProps) {
           data={selectedLog}
         />
       )}
-    </>
+    </div>
   )
 }

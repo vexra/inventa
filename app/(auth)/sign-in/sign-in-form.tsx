@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Turnstile } from '@marsidev/react-turnstile'
-import { Eye, EyeOff, GalleryVerticalEnd, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Layers, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
@@ -94,8 +94,8 @@ export default function SignInForm() {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <a href="#" className="flex items-center gap-2 font-medium">
-            <div className="flex size-6 items-center justify-center rounded-md bg-blue-600 text-white">
-              <GalleryVerticalEnd className="size-4" />
+            <div className="flex size-6 items-center justify-center">
+              <Layers className="size-6 text-blue-600" />
             </div>
             Inventa
           </a>

@@ -20,6 +20,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -33,19 +34,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { roomTypeEnum } from '@/db/schema'
+import { cn } from '@/lib/utils'
 import { RoomFormValues, roomSchema } from '@/lib/validations/room'
 
 import { createRoom, updateRoom } from '../actions'
 
-interface UnitOption {
+type RoomType = (typeof roomTypeEnum.enumValues)[number]
+
+const roomTypeLabels: Record<string, string> = {
+  LABORATORY: 'Laboratorium',
+  ADMIN_OFFICE: 'Kantor / Admin',
+  LECTURE_HALL: 'Kelas / Umum',
+  WAREHOUSE_UNIT: 'Gudang Unit',
+}
+
+interface Option {
   id: string
   name: string
   facultyId?: string | null
-}
-
-interface FacultyOption {
-  id: string
-  name: string
 }
 
 interface RoomDialogProps {
@@ -53,14 +60,16 @@ interface RoomDialogProps {
   initialData?: {
     id: string
     name: string
-    unitId: string
-    type: 'LABORATORY' | 'ADMIN_OFFICE' | 'LECTURE_HALL' | 'WAREHOUSE_UNIT'
+    unitId: string | null
+    buildingId: string
+    type: RoomType
     description: string | null
   }
   open?: boolean
   onOpenChange?: (open: boolean) => void
-  units: UnitOption[]
-  faculties?: FacultyOption[]
+  units: Option[]
+  buildings: Option[]
+  faculties?: Option[]
   fixedUnitId?: string
 }
 
@@ -70,6 +79,7 @@ export function RoomDialog({
   open,
   onOpenChange,
   units = [],
+  buildings = [],
   faculties = [],
   fixedUnitId,
 }: RoomDialogProps) {
@@ -81,9 +91,9 @@ export function RoomDialog({
   const isSuperAdmin = faculties.length > 0 && !fixedUnitId
 
   const [selectedFacultyId, setSelectedFacultyId] = useState<string>(() => {
-    if (mode === 'edit' && initialData?.unitId && isSuperAdmin) {
-      const currentUnit = units.find((u) => u.id === initialData.unitId)
-      return currentUnit?.facultyId || ''
+    if (mode === 'edit' && initialData?.buildingId && isSuperAdmin) {
+      const bld = buildings.find((b) => b.id === initialData.buildingId)
+      return bld?.facultyId || ''
     }
     return ''
   })
@@ -92,19 +102,26 @@ export function RoomDialog({
     resolver: zodResolver(roomSchema),
     defaultValues: {
       name: initialData?.name || '',
-      unitId: initialData?.unitId || fixedUnitId || '',
+      buildingId: initialData?.buildingId || '',
+      unitId: initialData?.unitId || fixedUnitId || 'null_value',
       type: initialData?.type || 'LECTURE_HALL',
       description: initialData?.description || '',
     },
   })
 
+  const filteredBuildings = useMemo(() => {
+    if (isSuperAdmin && selectedFacultyId) {
+      return buildings.filter((b) => b.facultyId === selectedFacultyId)
+    }
+    if (isSuperAdmin && !selectedFacultyId) return []
+    return buildings
+  }, [buildings, isSuperAdmin, selectedFacultyId])
+
   const filteredUnits = useMemo(() => {
     if (isSuperAdmin && selectedFacultyId) {
       return units.filter((u) => u.facultyId === selectedFacultyId)
     }
-    if (isSuperAdmin && !selectedFacultyId) {
-      return []
-    }
+    if (isSuperAdmin && !selectedFacultyId) return []
     return units
   }, [units, isSuperAdmin, selectedFacultyId])
 
@@ -112,17 +129,15 @@ export function RoomDialog({
 
   async function onSubmit(data: RoomFormValues) {
     try {
-      const payload = {
-        ...data,
-        unitId: fixedUnitId || data.unitId,
-      }
+      let finalUnitId: string | null = data.unitId ?? null
+      if (data.unitId === 'null_value') finalUnitId = null
+      if (fixedUnitId) finalUnitId = fixedUnitId
+
+      const payload = { ...data, unitId: finalUnitId }
 
       let result
-      if (mode === 'create') {
-        result = await createRoom(payload)
-      } else if (initialData?.id) {
-        result = await updateRoom(initialData.id, payload)
-      }
+      if (mode === 'create') result = await createRoom(payload)
+      else if (initialData?.id) result = await updateRoom(initialData.id, payload)
 
       if (result?.error) {
         toast.error(result.error)
@@ -139,8 +154,16 @@ export function RoomDialog({
     }
   }
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open && mode === 'create') {
+      form.reset()
+      setSelectedFacultyId('')
+    }
+    setIsOpen?.(open)
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       {!isControlled && mode === 'create' && (
         <DialogTrigger asChild>
           <Button className="bg-blue-600 text-white hover:bg-blue-700">
@@ -151,12 +174,77 @@ export function RoomDialog({
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Tambah Ruangan Baru' : 'Edit Ruangan'}</DialogTitle>
-          <DialogDescription>Kelola data ruangan untuk lokasi aset dan kegiatan.</DialogDescription>
+          <DialogTitle>{mode === 'create' ? 'Tambah Ruangan' : 'Edit Ruangan'}</DialogTitle>
+          <DialogDescription>Pastikan lokasi gedung dan unit kepemilikan sesuai.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {isSuperAdmin && (
+              <FormItem>
+                <FormLabel>Pilih Fakultas</FormLabel>
+                <Select
+                  disabled={mode === 'edit'}
+                  onValueChange={(val) => {
+                    setSelectedFacultyId(val)
+                    form.setValue('buildingId', '')
+                    form.setValue('unitId', 'null_value')
+                  }}
+                  value={selectedFacultyId}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Pilih Fakultas..." />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {faculties.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+
+            <FormField
+              control={form.control}
+              name="buildingId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lokasi Gedung</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={isSuperAdmin && !selectedFacultyId}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Pilih Gedung..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {filteredBuildings.length === 0 ? (
+                        <div className="text-muted-foreground p-2 text-center text-xs">
+                          {isSuperAdmin && !selectedFacultyId
+                            ? 'Pilih Fakultas dulu'
+                            : 'Tidak ada data gedung'}
+                        </div>
+                      ) : (
+                        filteredBuildings.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="name"
@@ -171,118 +259,91 @@ export function RoomDialog({
               )}
             />
 
-            {fixedUnitId ? (
-              <input type="hidden" {...form.register('unitId')} value={fixedUnitId} />
-            ) : (
-              <>
-                {isSuperAdmin && (
+            {!fixedUnitId && (
+              <FormField
+                control={form.control}
+                name="unitId"
+                render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Pilih Fakultas</FormLabel>
+                    <FormLabel>Kepemilikan Unit (Opsional)</FormLabel>
                     <Select
-                      onValueChange={(val) => {
-                        setSelectedFacultyId(val)
-                        form.setValue('unitId', '')
-                      }}
-                      value={selectedFacultyId}
+                      onValueChange={field.onChange}
+                      value={field.value || 'null_value'}
+                      disabled={isSuperAdmin && !selectedFacultyId}
                     >
                       <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Pilih Fakultas..." />
+                        <SelectTrigger
+                          className={cn(
+                            'w-full',
+                            (!field.value || field.value === 'null_value') &&
+                              'text-muted-foreground',
+                          )}
+                        >
+                          <SelectValue placeholder="Pilih Unit..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {faculties.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.name}
+                        <SelectItem value="null_value" className="text-muted-foreground italic">
+                          -- Milik Bersama (Fasilitas Umum) --
+                        </SelectItem>
+                        {filteredUnits.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormDescription>Kosongkan jika fasilitas umum.</FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
-
-                <FormField
-                  control={form.control}
-                  name="unitId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Milik Unit/Jurusan</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={isSuperAdmin && !selectedFacultyId}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue
-                              placeholder={
-                                isSuperAdmin && !selectedFacultyId
-                                  ? 'Pilih Fakultas Dulu'
-                                  : 'Pilih Unit...'
-                              }
-                            />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {filteredUnits.length === 0 ? (
-                            <div className="text-muted-foreground p-2 text-center text-xs">
-                              Tidak ada unit tersedia
-                            </div>
-                          ) : (
-                            filteredUnits.map((u) => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </>
+              />
             )}
 
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Jenis Ruangan</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Jenis</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {roomTypeEnum.enumValues.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {roomTypeLabels[type] || type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Deskripsi</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Pilih Jenis" />
-                      </SelectTrigger>
+                      <Input {...field} value={field.value || ''} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="LECTURE_HALL">Kelas / Umum</SelectItem>
-                      <SelectItem value="LABORATORY">Laboratorium</SelectItem>
-                      <SelectItem value="ADMIN_OFFICE">Kantor / Admin</SelectItem>
-                      <SelectItem value="WAREHOUSE_UNIT">Gudang Unit</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Deskripsi (Opsional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Keterangan lokasi..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
+            <DialogFooter className="mt-4 pt-2">
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                Batal
+              </Button>
               <Button
                 type="submit"
                 disabled={isLoading}

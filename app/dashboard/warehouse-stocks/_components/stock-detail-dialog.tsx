@@ -35,10 +35,19 @@ interface StockDetailDialogProps {
   itemName: string
   unit: string
   batches: BatchItem[]
-  children: React.ReactNode
+  children?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function StockDetailDialog({ itemName, unit, batches, children }: StockDetailDialogProps) {
+export function StockDetailDialog({
+  itemName,
+  unit,
+  batches,
+  children,
+  open,
+  onOpenChange,
+}: StockDetailDialogProps) {
   const sortedBatches = useMemo(() => {
     return [...batches].sort((a, b) => {
       const isZeroA = a.qty <= 0
@@ -56,8 +65,8 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
   }, [batches])
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -76,7 +85,7 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
                 <TableHead>No. Batch</TableHead>
                 <TableHead className="text-center">Kadaluarsa</TableHead>
                 <TableHead className="text-right">Stok</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Kondisi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -90,19 +99,23 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
                 sortedBatches.map((batch, index) => {
                   const expDate = batch.exp ? new Date(batch.exp) : null
                   const now = new Date()
-                  const isZero = batch.qty <= 0 // Cek apakah stok habis
+                  const isZero = batch.qty <= 0
+
                   let status: 'expired' | 'warning' | 'ok' | 'empty' | 'no-exp' = 'no-exp'
 
                   if (isZero) {
                     status = 'empty'
                   } else if (expDate) {
-                    const cleanExp = new Date(expDate.setHours(0, 0, 0, 0))
-                    const cleanNow = new Date(now.setHours(0, 0, 0, 0))
+                    const cleanExp = new Date(expDate)
+                    cleanExp.setHours(0, 0, 0, 0)
+
+                    const cleanNow = new Date(now)
+                    cleanNow.setHours(0, 0, 0, 0)
 
                     const diffTime = cleanExp.getTime() - cleanNow.getTime()
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-                    if (diffTime < 0) status = 'expired'
+                    if (diffDays < 0) status = 'expired'
                     else if (diffDays <= 90) status = 'warning'
                     else status = 'ok'
                   }
@@ -137,8 +150,8 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
                         )}
                         {status === 'warning' && (
                           <Badge
-                            variant="outline"
-                            className="h-5 border-yellow-500 bg-yellow-50 px-1.5 text-[10px] text-yellow-700 dark:border-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
+                            variant="secondary"
+                            className="h-5 border border-orange-200 bg-orange-100 px-1.5 text-[10px] text-orange-800 hover:bg-orange-200 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
                           >
                             Exp. Dekat
                           </Badge>
@@ -148,7 +161,7 @@ export function StockDetailDialog({ itemName, unit, batches, children }: StockDe
                             variant="outline"
                             className="h-5 border-green-500 bg-green-50 px-1.5 text-[10px] text-green-700 dark:border-green-600 dark:bg-green-900/30 dark:text-green-400"
                           >
-                            Oke
+                            Baik
                           </Badge>
                         )}
                         {status === 'no-exp' && !isZero && (
