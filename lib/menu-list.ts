@@ -119,10 +119,16 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
   unit_staff: [
     {
       title: 'Utama',
-      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        {
+          title: 'Dashboard',
+          url: '/dashboard',
+          icon: LayoutDashboard,
+        },
+      ],
     },
     {
-      title: 'Layanan Barang',
+      title: 'Pengajuan',
       items: [
         {
           title: 'Permintaan Barang',
@@ -135,12 +141,12 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Inventaris Ruangan',
       items: [
         {
-          title: 'Stok BHP Ruangan',
+          title: 'Stok BHP',
           url: '/dashboard/room-stocks',
           icon: Boxes,
         },
         {
-          title: 'Aset Ruangan',
+          title: 'Aset Tetap',
           url: '/dashboard/room-assets',
           icon: Layers,
         },
@@ -153,7 +159,13 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     },
     {
       title: 'Akun',
-      items: [{ title: 'Log Aktivitas', url: '/dashboard/activity-logs', icon: FileClock }],
+      items: [
+        {
+          title: 'Log Aktivitas',
+          url: '/dashboard/activity-logs',
+          icon: FileClock,
+        },
+      ],
     },
   ],
 
