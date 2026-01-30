@@ -123,7 +123,7 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         action: 'CREATE',
         tableName: 'requests',
         recordId: requestId,
-        newValues: { code, items },
+        newValues: { code, items, status: initialStatus },
       })
     })
 
@@ -192,6 +192,16 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         actorId: session.user.id,
         notes: 'Detail permintaan diperbarui.',
       })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'UPDATE',
+        tableName: 'requests',
+        recordId: requestId,
+        oldValues: existingRequest,
+        newValues: { roomId, targetWarehouseId, description, items, status: 'PENDING_UNIT' },
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -217,6 +227,15 @@ export async function cancelRequest(requestId: string) {
 
     await db.transaction(async (tx) => {
       await tx.delete(requests).where(eq(requests.id, requestId))
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'DELETE',
+        tableName: 'requests',
+        recordId: requestId,
+        oldValues: existing,
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -256,6 +275,15 @@ export async function verifyRequest(
           status: 'REJECTED',
           actorId: session.user.id,
           notes: `Ditolak: ${reason}`,
+        })
+
+        await tx.insert(auditLogs).values({
+          id: randomUUID(),
+          userId: session.user.id,
+          action: 'REJECT',
+          tableName: 'requests',
+          recordId: requestId,
+          newValues: { status: 'REJECTED', rejectionReason: reason },
         })
         return
       }
@@ -367,6 +395,15 @@ export async function verifyRequest(
             ? 'Disetujui Fakultas. Stok telah dialokasikan.'
             : 'Disetujui Unit. Menunggu Fakultas.',
       })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'APPROVE',
+        tableName: 'requests',
+        recordId: requestId,
+        newValues: { status: newStatus, approvedBy: session.user.id },
+      })
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -416,6 +453,16 @@ export async function updateRequestStatusByWarehouse(
         status: newStatus,
         actorId: session.user.id,
         notes: newStatus === 'PROCESSING' ? 'Sedang disiapkan.' : 'Siap diambil user.',
+      })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'UPDATE_STATUS',
+        tableName: 'requests',
+        recordId: requestId,
+        oldValues: { status: req.status },
+        newValues: { status: newStatus },
       })
     })
 
@@ -652,6 +699,15 @@ export async function completeRequestByQR(requestId: string) {
         status: 'COMPLETED',
         actorId: session.user.id,
         notes: `Barang diterima via Scan QR oleh ${session.user.name}`,
+      })
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        action: 'COMPLETE',
+        tableName: 'requests',
+        recordId: requestId,
+        newValues: { status: 'COMPLETED' },
       })
     })
 
