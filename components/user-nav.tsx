@@ -136,10 +136,7 @@ export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavPro
               <span>Notifikasi</span>
 
               {unreadCount > 0 && (
-                <Badge
-                  variant="destructive"
-                  className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px]"
-                >
+                <Badge className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-green-600 px-1 text-[10px] text-white hover:bg-green-700 dark:bg-green-600">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </Badge>
               )}
