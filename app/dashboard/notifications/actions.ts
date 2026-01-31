@@ -2,11 +2,26 @@
 
 import { revalidatePath } from 'next/cache'
 
-import { and, eq } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 
 import { notifications } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
+
+export async function getUnreadCount() {
+  const session = await requireAuth()
+
+  try {
+    const [result] = await db
+      .select({ value: count() })
+      .from(notifications)
+      .where(and(eq(notifications.userId, session.user.id), eq(notifications.isRead, false)))
+
+    return result?.value || 0
+  } catch (error) {
+    return 0
+  }
+}
 
 export async function markAsRead(id: string) {
   const session = await requireAuth()

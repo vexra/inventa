@@ -1,10 +1,15 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { BadgeCheck, Bell, CircleHelp, Keyboard, LogOut } from 'lucide-react'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { getUnreadCount } from '@/app/dashboard/notifications/actions'
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,6 +33,13 @@ interface UserNavProps {
 export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavProps) {
   const { data: session, isPending } = authClient.useSession()
   const router = useRouter()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    if (session?.user) {
+      getUnreadCount().then((count) => setUnreadCount(count))
+    }
+  }, [session])
 
   const getInitials = (name: string) => {
     return name
@@ -49,19 +61,7 @@ export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavPro
   }
 
   if (isPending) {
-    if (children) {
-      return (
-        <div className="ring-sidebar-ring has-data-[state=open]:bg-sidebar-accent has-data-[state=open]:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm transition-[width,height,padding] outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50">
-          <Skeleton className="h-8 w-8 rounded-lg" />
-          <div className="grid flex-1 gap-1 text-left text-sm leading-tight">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-16" />
-          </div>
-          <Skeleton className="ml-auto h-4 w-4" />
-        </div>
-      )
-    }
-
+    if (children) return null
     return <Skeleton className="h-8 w-8 rounded-full" />
   }
 
@@ -75,10 +75,18 @@ export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavPro
         {children ? (
           children
         ) : (
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={session.user.image || ''} alt={session.user.name} />
-              <AvatarFallback>{getInitials(session.user.name)}</AvatarFallback>
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <Avatar className="h-8 w-8 overflow-visible">
+              <AvatarImage
+                src={session.user.image || ''}
+                alt={session.user.name}
+                className="rounded-full object-cover"
+              />
+              <AvatarFallback className="rounded-full">
+                {getInitials(session.user.name)}
+              </AvatarFallback>
+
+              {unreadCount > 0 && <AvatarBadge className="bg-green-600 dark:bg-green-800" />}
             </Avatar>
           </Button>
         )}
@@ -93,7 +101,11 @@ export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavPro
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
             <Avatar className="h-8 w-8 rounded-lg">
-              <AvatarImage src={session.user.image || ''} alt={session.user.name} />
+              <AvatarImage
+                src={session.user.image || ''}
+                alt={session.user.name}
+                className="rounded-lg"
+              />
               <AvatarFallback className="rounded-lg">
                 {getInitials(session.user.name)}
               </AvatarFallback>
@@ -108,26 +120,48 @@ export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavPro
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <BadgeCheck className="mr-2 size-4" />
-            Akun
+          <DropdownMenuItem asChild>
+            <Link href="#" className="flex w-full cursor-pointer items-center">
+              <BadgeCheck className="mr-2 size-4" />
+              <span>Akun</span>
+            </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Bell className="mr-2 size-4" />
-            Notifikasi
+
+          <DropdownMenuItem asChild>
+            <Link
+              href="/dashboard/notifications"
+              className="flex w-full cursor-pointer items-center"
+            >
+              <Bell className="mr-2 size-4" />
+              <span>Notifikasi</span>
+
+              {unreadCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px]"
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Badge>
+              )}
+            </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <Keyboard className="mr-2 size-4" />
-            Pintasan Keyboard
+          <DropdownMenuItem asChild>
+            <Link href="#" className="flex w-full cursor-pointer items-center">
+              <Keyboard className="mr-2 size-4" />
+              <span>Pintasan Keyboard</span>
+            </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem>
-            <CircleHelp className="mr-2 size-4" />
-            Pusat Bantuan
+
+          <DropdownMenuItem asChild>
+            <Link href="#" className="flex w-full cursor-pointer items-center">
+              <CircleHelp className="mr-2 size-4" />
+              <span>Pusat Bantuan</span>
+            </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
@@ -135,10 +169,10 @@ export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavPro
 
         <DropdownMenuItem
           onClick={handleSignOut}
-          className="text-red-600 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-950/50"
+          className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-950/50"
         >
           <LogOut className="mr-2 size-4 text-red-600 focus:text-red-600" />
-          Keluar
+          <span>Keluar</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
