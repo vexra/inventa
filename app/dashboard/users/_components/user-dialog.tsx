@@ -239,7 +239,7 @@ export function UserDialog({
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="email@universitas.ac.id" {...field} />
+                    <Input type="email" placeholder="email@universitas.ac.id" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
