@@ -22,8 +22,10 @@ import { db } from '@/lib/db'
 import { sendEmail } from '@/lib/email'
 import { goodsReceiptSchema } from '@/lib/validations/inbound'
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 async function sendNotificationHelper(
-  tx: any,
+  tx: Transaction,
   userIds: string[],
   title: string,
   message: string,
@@ -54,7 +56,7 @@ async function sendNotificationHelper(
       .where(inArray(user.id, userIds))
 
     await Promise.all(
-      usersToEmail.map((u: any) => {
+      usersToEmail.map((u: { email: string; name: string | null }) => {
         if (!u.email) return Promise.resolve()
 
         const htmlContent = `
@@ -66,30 +68,21 @@ async function sendNotificationHelper(
           </head>
           <body style="background-color: #f3f4f6; padding: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333;">
             <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
-              
               <div style="background-color: #2563EB; padding: 20px; text-align: center;">
                 <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Inventa FMIPA Unila</h1>
               </div>
-              
               <div style="padding: 30px 20px;">
                 <h2 style="margin-top: 0; font-size: 18px; color: #1f2937;">${title}</h2>
-                <p style="line-height: 1.6; color: #4b5563;">Halo <strong>${u.name}</strong>,</p>
+                <p style="line-height: 1.6; color: #4b5563;">Halo <strong>${u.name || 'User'}</strong>,</p>
                 <p style="line-height: 1.6; color: #4b5563;">${message}</p>
-                
                 <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: center;">
                   <span style="display: block; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Kode Pengadaan</span>
                   <span style="display: block; font-size: 18px; font-weight: bold; color: #2563EB; margin-top: 5px; font-family: monospace;">${procurementCode}</span>
                 </div>
-
-                <p style="line-height: 1.6; color: #4b5563;">
-                  Silakan klik tombol di bawah ini untuk melihat detail pengadaan.
-                </p>
-                
                 <div style="text-align: center; margin: 30px 0;">
                   <a href="${fullUrl}" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Lihat Detail Pengadaan</a>
                 </div>
               </div>
-
               <div style="background-color: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">
                 <p style="margin: 0; font-size: 12px; color: #9ca3af;">
                   Notifikasi otomatis sistem Inventa.<br>
@@ -105,7 +98,7 @@ async function sendNotificationHelper(
           to: u.email,
           subject: `[Inventa] ${title} - ${procurementCode}`,
           html: htmlContent,
-        }).catch((err: any) => console.error(`Gagal kirim email ke ${u.email}:`, err))
+        }).catch((err: unknown) => console.error(`Gagal kirim email ke ${u.email}:`, err))
       }),
     )
   } catch (error) {
@@ -186,7 +179,7 @@ export async function createProcurement(data: ProcurementFormData) {
 
       await sendNotificationHelper(
         tx,
-        facultyAdmins.map((u: any) => u.id),
+        facultyAdmins.map((u: { id: string }) => u.id),
         'Pengajuan Pengadaan Baru',
         `Staf gudang ${session.user.name} membuat pengajuan pengadaan baru. Menunggu persetujuan.`,
         procurementId,
@@ -281,7 +274,7 @@ export async function updateProcurement(id: string, data: ProcurementFormData) {
 
       await sendNotificationHelper(
         tx,
-        facultyAdmins.map((u: any) => u.id),
+        facultyAdmins.map((u: { id: string }) => u.id),
         'Revisi Pengadaan Masuk',
         `Pengajuan pengadaan (${existingProcurement.procurementCode}) telah direvisi/diajukan ulang oleh staf gudang.`,
         id,
@@ -644,7 +637,7 @@ export async function processGoodsReceipt(data: unknown) {
 
       await sendNotificationHelper(
         tx,
-        facultyAdmins.map((u: any) => u.id),
+        facultyAdmins.map((u: { id: string }) => u.id),
         'Penerimaan Barang Selesai',
         `Pengadaan ${po.procurementCode} telah selesai. Barang sudah diterima di gudang & stok bertambah.`,
         procurementId,

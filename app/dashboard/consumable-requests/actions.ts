@@ -25,8 +25,10 @@ import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { sendEmail } from '@/lib/email'
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 async function sendNotificationHelper(
-  tx: any,
+  tx: Transaction,
   userIds: string[],
   title: string,
   message: string,
@@ -57,7 +59,7 @@ async function sendNotificationHelper(
       .where(inArray(user.id, userIds))
 
     await Promise.all(
-      usersToEmail.map((u: any) => {
+      usersToEmail.map((u: { email: string; name: string | null }) => {
         if (!u.email) return Promise.resolve()
 
         const htmlContent = `
@@ -76,7 +78,7 @@ async function sendNotificationHelper(
               
               <div style="padding: 30px 20px;">
                 <h2 style="margin-top: 0; font-size: 18px; color: #1f2937;">${title}</h2>
-                <p style="line-height: 1.6; color: #4b5563;">Halo <strong>${u.name}</strong>,</p>
+                <p style="line-height: 1.6; color: #4b5563;">Halo <strong>${u.name || 'User'}</strong>,</p>
                 <p style="line-height: 1.6; color: #4b5563;">${message}</p>
                 
                 <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: center;">
@@ -108,7 +110,7 @@ async function sendNotificationHelper(
           to: u.email,
           subject: `[Inventa] ${title} - ${requestCode}`,
           html: htmlContent,
-        }).catch((err: any) => console.error(`Gagal kirim email ke ${u.email}:`, err))
+        }).catch((err: unknown) => console.error(`Gagal kirim email ke ${u.email}:`, err))
       }),
     )
   } catch (error) {
