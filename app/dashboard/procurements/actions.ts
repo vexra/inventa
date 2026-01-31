@@ -10,6 +10,7 @@ import { z } from 'zod'
 import {
   auditLogs,
   consumables,
+  notifications,
   procurementConsumables,
   procurementTimelines,
   procurements,
@@ -18,7 +19,92 @@ import {
 } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
+import { sendEmail } from '@/lib/email'
 import { goodsReceiptSchema } from '@/lib/validations/inbound'
+
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function sendNotificationHelper(
+  tx: Transaction,
+  userIds: string[],
+  title: string,
+  message: string,
+  procurementId: string,
+  procurementCode: string,
+) {
+  if (!userIds || userIds.length === 0) return
+
+  const detailLink = `/dashboard/procurements/${procurementId}`
+  const fullUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}${detailLink}`
+
+  for (const uid of userIds) {
+    await tx.insert(notifications).values({
+      id: randomUUID(),
+      userId: uid,
+      title,
+      message,
+      link: detailLink,
+      isRead: false,
+      createdAt: new Date(),
+    })
+  }
+
+  try {
+    const usersToEmail = await tx
+      .select({ email: user.email, name: user.name })
+      .from(user)
+      .where(inArray(user.id, userIds))
+
+    await Promise.all(
+      usersToEmail.map((u: { email: string; name: string | null }) => {
+        if (!u.email) return Promise.resolve()
+
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="background-color: #f3f4f6; padding: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+              <div style="background-color: #2563EB; padding: 20px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Inventa FMIPA Unila</h1>
+              </div>
+              <div style="padding: 30px 20px;">
+                <h2 style="margin-top: 0; font-size: 18px; color: #1f2937;">${title}</h2>
+                <p style="line-height: 1.6; color: #4b5563;">Halo <strong>${u.name || 'User'}</strong>,</p>
+                <p style="line-height: 1.6; color: #4b5563;">${message}</p>
+                <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: center;">
+                  <span style="display: block; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Kode Pengadaan</span>
+                  <span style="display: block; font-size: 18px; font-weight: bold; color: #2563EB; margin-top: 5px; font-family: monospace;">${procurementCode}</span>
+                </div>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${fullUrl}" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Lihat Detail Pengadaan</a>
+                </div>
+              </div>
+              <div style="background-color: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">
+                <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                  Notifikasi otomatis sistem Inventa.<br>
+                  &copy; ${new Date().getFullYear()} Inventa FMIPA Unila.
+                </p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+
+        return sendEmail({
+          to: u.email,
+          subject: `[Inventa] ${title} - ${procurementCode}`,
+          html: htmlContent,
+        }).catch((err: unknown) => console.error(`Gagal kirim email ke ${u.email}:`, err))
+      }),
+    )
+  } catch (error) {
+    console.error('Error in sendNotificationHelper:', error)
+  }
+}
 
 const itemSchema = z.object({
   consumableId: z.string().min(1, 'Pilih barang'),
@@ -85,6 +171,20 @@ export async function createProcurement(data: ProcurementFormData) {
         recordId: procurementId,
         newValues: { ...parsed.data, procurementCode: code },
       })
+
+      const facultyAdmins = await tx
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.role, 'faculty_admin'))
+
+      await sendNotificationHelper(
+        tx,
+        facultyAdmins.map((u: { id: string }) => u.id),
+        'Pengajuan Pengadaan Baru',
+        `Staf gudang ${session.user.name} membuat pengajuan pengadaan baru. Menunggu persetujuan.`,
+        procurementId,
+        code,
+      )
     })
 
     revalidatePath('/dashboard/procurements')
@@ -166,6 +266,20 @@ export async function updateProcurement(id: string, data: ProcurementFormData) {
         oldValues: oldData,
         newValues: { ...parsed.data, status: 'PENDING' },
       })
+
+      const facultyAdmins = await tx
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.role, 'faculty_admin'))
+
+      await sendNotificationHelper(
+        tx,
+        facultyAdmins.map((u: { id: string }) => u.id),
+        'Revisi Pengadaan Masuk',
+        `Pengajuan pengadaan (${existingProcurement.procurementCode}) telah direvisi/diajukan ulang oleh staf gudang.`,
+        id,
+        existingProcurement.procurementCode!,
+      )
     })
 
     revalidatePath('/dashboard/procurements')
@@ -189,6 +303,14 @@ export async function verifyProcurement(
 
   try {
     await db.transaction(async (tx) => {
+      const [existingProcurement] = await tx
+        .select()
+        .from(procurements)
+        .where(eq(procurements.id, id))
+        .limit(1)
+
+      if (!existingProcurement) throw new Error('Pengajuan tidak ditemukan.')
+
       await tx
         .update(procurements)
         .set({
@@ -214,6 +336,21 @@ export async function verifyProcurement(
         recordId: id,
         newValues: { status: decision, reason },
       })
+
+      const title = decision === 'APPROVED' ? 'Pengadaan Disetujui' : 'Pengadaan Ditolak'
+      const message =
+        decision === 'APPROVED'
+          ? `Pengajuan pengadaan Anda telah disetujui. Silakan lakukan proses penerimaan barang jika sudah tiba.`
+          : `Pengajuan pengadaan Anda ditolak. Alasan: ${reason}`
+
+      await sendNotificationHelper(
+        tx,
+        [existingProcurement.userId],
+        title,
+        message,
+        id,
+        existingProcurement.procurementCode!,
+      )
     })
 
     revalidatePath('/dashboard/procurements')
@@ -492,6 +629,20 @@ export async function processGoodsReceipt(data: unknown) {
         recordId: procurementId,
         newValues: { items: logDetails, warehouseId: session.user.warehouseId },
       })
+
+      const facultyAdmins = await tx
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.role, 'faculty_admin'))
+
+      await sendNotificationHelper(
+        tx,
+        facultyAdmins.map((u: { id: string }) => u.id),
+        'Penerimaan Barang Selesai',
+        `Pengadaan ${po.procurementCode} telah selesai. Barang sudah diterima di gudang & stok bertambah.`,
+        procurementId,
+        po.procurementCode!,
+      )
     })
 
     revalidatePath('/dashboard/procurements')

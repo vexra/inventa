@@ -96,6 +96,13 @@ export const receiptConditionEnum = pgEnum('receipt_condition', [
   'INCOMPLETE', // Jumlah/Part kurang
 ])
 
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'INFO', // Informasi umum
+  'SUCCESS', // Tindakan berhasil (misal: Request disetujui)
+  'WARNING', // Peringatan (misal: Stok menipis)
+  'ERROR', // Kesalahan (misal: Request ditolak)
+])
+
 /**
  * =========================================
  * 2. AUTHENTICATION & USER MANAGEMENT
@@ -727,6 +734,26 @@ export const systemActivityLogs = pgTable('system_activity_logs', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    title: text('title').notNull(),
+    message: text('message').notNull(),
+
+    type: notificationTypeEnum('type').default('INFO').notNull(),
+    link: text('link'),
+    isRead: boolean('is_read').default(false).notNull(),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [index('notif_user_idx').on(table.userId), index('notif_read_idx').on(table.isRead)],
+)
+
 /**
  * =========================================
  * 10. RELATIONS (DRIZZLE ORM)
@@ -959,6 +986,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),
   requests: many(requests, { relationName: 'requester' }),
   procurements: many(procurements),
+  notifications: many(notifications),
 }))
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -967,4 +995,11 @@ export const sessionRelations = relations(session, ({ one }) => ({
 
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, { fields: [account.userId], references: [user.id] }),
+}))
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(user, {
+    fields: [notifications.userId],
+    references: [user.id],
+  }),
 }))
