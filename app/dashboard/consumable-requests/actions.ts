@@ -10,6 +10,7 @@ import { z } from 'zod'
 import {
   auditLogs,
   consumables,
+  notifications,
   requestItemAllocations,
   requestItems,
   requestTimelines,
@@ -22,6 +23,98 @@ import {
 } from '@/db/schema'
 import { requireAuth } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
+import { sendEmail } from '@/lib/email'
+
+async function sendNotificationHelper(
+  tx: any,
+  userIds: string[],
+  title: string,
+  message: string,
+  requestId: string,
+  requestCode: string,
+) {
+  if (!userIds || userIds.length === 0) return
+
+  const detailLink = `/dashboard/consumable-requests/${requestId}`
+  const fullUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}${detailLink}`
+
+  for (const uid of userIds) {
+    await tx.insert(notifications).values({
+      id: randomUUID(),
+      userId: uid,
+      title,
+      message,
+      link: detailLink,
+      isRead: false,
+      createdAt: new Date(),
+    })
+  }
+
+  try {
+    const usersToEmail = await tx
+      .select({ email: user.email, name: user.name })
+      .from(user)
+      .where(inArray(user.id, userIds))
+
+    await Promise.all(
+      usersToEmail.map((u: any) => {
+        if (!u.email) return Promise.resolve()
+
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="background-color: #f3f4f6; padding: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+              
+              <div style="background-color: #2563EB; padding: 20px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Inventa FMIPA Unila</h1>
+              </div>
+              
+              <div style="padding: 30px 20px;">
+                <h2 style="margin-top: 0; font-size: 18px; color: #1f2937;">${title}</h2>
+                <p style="line-height: 1.6; color: #4b5563;">Halo <strong>${u.name}</strong>,</p>
+                <p style="line-height: 1.6; color: #4b5563;">${message}</p>
+                
+                <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: center;">
+                  <span style="display: block; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Kode Permintaan</span>
+                  <span style="display: block; font-size: 18px; font-weight: bold; color: #2563EB; margin-top: 5px; font-family: monospace;">${requestCode}</span>
+                </div>
+
+                <p style="line-height: 1.6; color: #4b5563;">
+                  Silakan klik tombol di bawah ini untuk melihat detail permintaan.
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${fullUrl}" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Lihat Detail Permintaan</a>
+                </div>
+              </div>
+
+              <div style="background-color: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">
+                <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                  Notifikasi otomatis sistem Inventa.<br>
+                  &copy; ${new Date().getFullYear()} Inventa FMIPA Unila.
+                </p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+
+        return sendEmail({
+          to: u.email,
+          subject: `[Inventa] ${title} - ${requestCode}`,
+          html: htmlContent,
+        }).catch((err: any) => console.error(`Gagal kirim email ke ${u.email}:`, err))
+      }),
+    )
+  } catch (error) {
+    console.error('Error in sendNotificationHelper:', error)
+  }
+}
 
 const itemSchema = z.object({
   consumableId: z.string().min(1, 'Pilih barang'),
@@ -125,6 +218,44 @@ export async function createRequest(data: z.infer<typeof requestSchema>) {
         recordId: requestId,
         newValues: { code, items, status: initialStatus },
       })
+
+      if (initialStatus === 'PENDING_UNIT') {
+        const unitAdmins = await tx
+          .select({ id: user.id })
+          .from(user)
+          .where(and(eq(user.unitId, session.user.unitId!), eq(user.role, 'unit_admin')))
+
+        await sendNotificationHelper(
+          tx,
+          unitAdmins.map((u) => u.id),
+          'Permintaan Baru Masuk',
+          `Staff ${session.user.name} membuat permintaan baru. Menunggu persetujuan Unit.`,
+          requestId,
+          code,
+        )
+      } else {
+        const [unitData] = await tx
+          .select({ facultyId: units.facultyId })
+          .from(units)
+          .where(eq(units.id, session.user.unitId!))
+          .limit(1)
+
+        if (unitData?.facultyId) {
+          const facultyAdmins = await tx
+            .select({ id: user.id })
+            .from(user)
+            .where(and(eq(user.facultyId, unitData.facultyId), eq(user.role, 'faculty_admin')))
+
+          await sendNotificationHelper(
+            tx,
+            facultyAdmins.map((u) => u.id),
+            'Permintaan Baru Fakultas',
+            `Unit Admin ${session.user.name} membuat permintaan. Menunggu persetujuan Fakultas.`,
+            requestId,
+            code,
+          )
+        }
+      }
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -202,6 +333,22 @@ export async function updateRequest(requestId: string, data: z.infer<typeof requ
         oldValues: existingRequest,
         newValues: { roomId, targetWarehouseId, description, items, status: 'PENDING_UNIT' },
       })
+
+      if (session.user.role === 'unit_staff') {
+        const unitAdmins = await tx
+          .select({ id: user.id })
+          .from(user)
+          .where(and(eq(user.unitId, session.user.unitId!), eq(user.role, 'unit_admin')))
+
+        await sendNotificationHelper(
+          tx,
+          unitAdmins.map((u) => u.id),
+          'Revisi Permintaan Masuk',
+          `Permintaan telah diperbarui/direvisi oleh staff. Mohon dicek kembali.`,
+          requestId,
+          existingRequest.requestCode!,
+        )
+      }
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -285,6 +432,18 @@ export async function verifyRequest(
           recordId: requestId,
           newValues: { status: 'REJECTED', rejectionReason: reason },
         })
+
+        await sendNotificationHelper(
+          tx,
+          [existingRequest.requesterId!],
+          'Permintaan Ditolak',
+          `Maaf, permintaan Anda ditolak oleh ${
+            userRole === 'unit_admin' ? 'Unit' : 'Fakultas'
+          }. Alasan: ${reason}`,
+          requestId,
+          existingRequest.requestCode!,
+        )
+
         return
       }
 
@@ -304,6 +463,38 @@ export async function verifyRequest(
             updatedAt: new Date(),
           })
           .where(eq(requests.id, requestId))
+
+        await sendNotificationHelper(
+          tx,
+          [existingRequest.requesterId!],
+          'Disetujui Unit',
+          `Permintaan disetujui Unit. Sekarang menunggu persetujuan Fakultas.`,
+          requestId,
+          existingRequest.requestCode!,
+        )
+
+        const [userData] = await tx
+          .select({ facultyId: units.facultyId })
+          .from(user)
+          .leftJoin(units, eq(user.unitId, units.id))
+          .where(eq(user.id, existingRequest.requesterId!))
+          .limit(1)
+
+        if (userData?.facultyId) {
+          const facultyAdmins = await tx
+            .select({ id: user.id })
+            .from(user)
+            .where(and(eq(user.facultyId, userData.facultyId), eq(user.role, 'faculty_admin')))
+
+          await sendNotificationHelper(
+            tx,
+            facultyAdmins.map((u) => u.id),
+            'Approval Diperlukan',
+            `Permintaan dari Unit telah disetujui dan menunggu verifikasi Fakultas.`,
+            requestId,
+            existingRequest.requestCode!,
+          )
+        }
       } else if (userRole === 'faculty_admin') {
         if (existingRequest.status !== 'PENDING_FACULTY') {
           throw new Error('Status harus PENDING_FACULTY.')
@@ -383,6 +574,34 @@ export async function verifyRequest(
             updatedAt: new Date(),
           })
           .where(eq(requests.id, requestId))
+
+        await sendNotificationHelper(
+          tx,
+          [existingRequest.requesterId!],
+          'Permintaan Disetujui',
+          `Permintaan telah disetujui Fakultas. Stok dialokasikan & diteruskan ke Gudang.`,
+          requestId,
+          existingRequest.requestCode!,
+        )
+
+        const warehouseStaffs = await tx
+          .select({ id: user.id })
+          .from(user)
+          .where(
+            and(
+              eq(user.warehouseId, existingRequest.targetWarehouseId!),
+              eq(user.role, 'warehouse_staff'),
+            ),
+          )
+
+        await sendNotificationHelper(
+          tx,
+          warehouseStaffs.map((u) => u.id),
+          'Permintaan Masuk Gudang',
+          `Permintaan disetujui Fakultas. Harap siapkan barang.`,
+          requestId,
+          existingRequest.requestCode!,
+        )
       }
 
       await tx.insert(requestTimelines).values({
@@ -464,6 +683,22 @@ export async function updateRequestStatusByWarehouse(
         oldValues: { status: req.status },
         newValues: { status: newStatus },
       })
+
+      const notifTitle =
+        newStatus === 'PROCESSING' ? 'Barang Sedang Disiapkan' : 'Barang Siap Diambil'
+      const notifMsg =
+        newStatus === 'PROCESSING'
+          ? `Gudang sedang menyiapkan barang.`
+          : `Barang SUDAH SIAP. Silakan datang ke gudang dengan QR Code.`
+
+      await sendNotificationHelper(
+        tx,
+        [req.requesterId!],
+        notifTitle,
+        notifMsg,
+        requestId,
+        req.requestCode!,
+      )
     })
 
     revalidatePath('/dashboard/consumable-requests')
@@ -709,6 +944,15 @@ export async function completeRequestByQR(requestId: string) {
         recordId: requestId,
         newValues: { status: 'COMPLETED' },
       })
+
+      await sendNotificationHelper(
+        tx,
+        [request.requesterId!],
+        'Transaksi Selesai',
+        `Permintaan telah selesai. Barang sudah ditambahkan ke stok ruangan.`,
+        requestId,
+        request.requestCode!,
+      )
     })
 
     revalidatePath('/dashboard/consumable-requests')
