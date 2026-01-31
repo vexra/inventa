@@ -18,7 +18,7 @@ export async function getUnreadCount() {
       .where(and(eq(notifications.userId, session.user.id), eq(notifications.isRead, false)))
 
     return result?.value || 0
-  } catch (error) {
+  } catch {
     return 0
   }
 }
@@ -34,7 +34,7 @@ export async function markAsRead(id: string) {
 
     revalidatePath('/dashboard/notifications')
     return { success: true, message: 'Ditandai sudah dibaca' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal update status' }
   }
 }
@@ -50,7 +50,7 @@ export async function markAllAsRead() {
 
     revalidatePath('/dashboard/notifications')
     return { success: true, message: 'Semua notifikasi ditandai sudah dibaca' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal memperbarui notifikasi' }
   }
 }
@@ -65,7 +65,7 @@ export async function deleteNotification(id: string) {
 
     revalidatePath('/dashboard/notifications')
     return { success: true, message: 'Notifikasi dihapus' }
-  } catch (error) {
+  } catch {
     return { error: 'Gagal menghapus notifikasi' }
   }
 }
