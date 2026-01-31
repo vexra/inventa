@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { authClient } from '@/lib/auth-client'
 
 const formSchema = z.object({
-  email: z.string().email({ message: 'Format email tidak valid.' }),
+  email: z.email({ message: 'Format email tidak valid.' }),
 })
 
 export default function ForgotPasswordPage() {

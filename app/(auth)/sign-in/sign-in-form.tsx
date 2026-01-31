@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input'
 import { authClient } from '@/lib/auth-client'
 
 const formSchema = z.object({
-  email: z.string().email({
+  email: z.email({
     message: 'Email tidak valid.',
   }),
   password: z.string().min(1, {
@@ -118,7 +118,7 @@ export default function SignInForm() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="admin@kantor.com" {...field} />
+                        <Input type="email" placeholder="admin@kantor.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
