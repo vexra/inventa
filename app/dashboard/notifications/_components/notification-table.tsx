@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 
-import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { formatDistanceToNow } from 'date-fns'
@@ -14,7 +13,6 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
-  ExternalLink,
   Info,
   MoreHorizontal,
   Settings2,
@@ -34,7 +32,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -152,10 +149,18 @@ export function NotificationTable({ data, metadata, currentSort }: NotificationT
     }
   }
 
-  const handleLinkClick = async (id: string, isRead: boolean) => {
-    if (isRead) return
-    await markAsRead(id)
-    router.refresh()
+  const handleRowClick = async (e: React.MouseEvent, item: NotificationData) => {
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('a')) {
+      return
+    }
+
+    if (item.link) {
+      if (!item.isRead) {
+        markAsRead(item.id)
+      }
+      router.push(item.link)
+    }
   }
 
   const getTypeIcon = (type: string) => {
@@ -168,6 +173,19 @@ export function NotificationTable({ data, metadata, currentSort }: NotificationT
         return <AlertCircle className="h-4 w-4 text-red-600" />
       default:
         return <Info className="h-4 w-4 text-blue-600" />
+    }
+  }
+
+  const getStatusLabel = (type: string) => {
+    switch (type) {
+      case 'SUCCESS':
+        return 'Berhasil'
+      case 'WARNING':
+        return 'Peringatan'
+      case 'ERROR':
+        return 'Error'
+      default:
+        return 'Info'
     }
   }
 
@@ -228,7 +246,7 @@ export function NotificationTable({ data, metadata, currentSort }: NotificationT
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                {visibleColumns.status && <TableHead className="w-25">Status</TableHead>}
+                {visibleColumns.status && <TableHead className="w-32">Status</TableHead>}
                 {visibleColumns.content && (
                   <TableHead className="w-[50%]">
                     <Button
@@ -275,17 +293,21 @@ export function NotificationTable({ data, metadata, currentSort }: NotificationT
                 data.map((item) => (
                   <TableRow
                     key={item.id}
-                    className={`hover:bg-muted/50 border-b last:border-0 ${!item.isRead ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                    onClick={(e) => handleRowClick(e, item)}
+                    className={`hover:bg-muted/50 border-b transition-colors last:border-0 ${
+                      !item.isRead ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                    } ${item.link ? 'cursor-pointer' : ''}`}
                   >
                     {visibleColumns.status && (
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div
+                          className="bg-background/50 flex w-fit items-center gap-2 rounded-md border px-2 py-1 shadow-sm"
+                          title={getStatusLabel(item.type)}
+                        >
                           {getTypeIcon(item.type)}
-                          {!item.isRead && (
-                            <Badge variant="secondary" className="h-5 text-[10px]">
-                              Baru
-                            </Badge>
-                          )}
+                          <span className="text-muted-foreground text-[10px] font-medium uppercase">
+                            {getStatusLabel(item.type)}
+                          </span>
                         </div>
                       </TableCell>
                     )}
@@ -293,22 +315,17 @@ export function NotificationTable({ data, metadata, currentSort }: NotificationT
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <span
-                            className={`text-sm ${!item.isRead ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'}`}
+                            className={`text-sm ${
+                              !item.isRead
+                                ? 'text-foreground font-bold'
+                                : 'text-muted-foreground font-medium'
+                            }`}
                           >
                             {item.title}
                           </span>
                           <span className="text-muted-foreground line-clamp-2 text-xs">
                             {item.message}
                           </span>
-                          {item.link && (
-                            <Link
-                              href={item.link}
-                              onClick={() => handleLinkClick(item.id, item.isRead)}
-                              className="mt-1 flex w-fit items-center gap-1 text-xs text-blue-600 hover:underline"
-                            >
-                              Lihat Detail <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          )}
                         </div>
                       </TableCell>
                     )}
@@ -332,12 +349,20 @@ export function NotificationTable({ data, metadata, currentSort }: NotificationT
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           {!item.isRead && (
-                            <DropdownMenuItem onClick={() => handleMarkAsRead(item.id)}>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleMarkAsRead(item.id)
+                              }}
+                            >
                               <Check className="mr-2 h-4 w-4" /> Tandai Dibaca
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
-                            onClick={() => setDeletingId(item.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeletingId(item.id)
+                            }}
                             className="text-red-600 focus:text-red-600"
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Hapus
