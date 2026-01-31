@@ -19,10 +19,62 @@ export const auth = betterAuth({
     provider: 'pg',
     schema: schema,
   }),
+
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        subject: 'Verifikasi Email - Inventa FMIPA Unila',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="background-color: #f3f4f6; padding: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+              
+              <div style="background-color: #2563EB; padding: 20px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Inventa FMIPA Unila</h1>
+              </div>
+              
+              <div style="padding: 30px 20px;">
+                <h2 style="margin-top: 0; font-size: 18px; color: #1f2937;">Verifikasi Alamat Email</h2>
+                <p style="line-height: 1.6; color: #4b5563;">Halo <strong>${user.name || 'Pengguna'}</strong>,</p>
+                <p style="line-height: 1.6; color: #4b5563;">
+                  Terima kasih telah mendaftar di Inventa. Untuk mengamankan akun Anda dan memulai, silakan verifikasi alamat email Anda dengan mengklik tombol di bawah ini.
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${url}" style="background-color: #2563EB; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Verifikasi Email Saya</a>
+                </div>
+
+                <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
+                  Atau salin tautan ini ke browser Anda:
+                </p>
+                <p style="font-size: 12px; color: #2563EB; word-break: break-all;">${url}</p>
+              </div>
+
+              <div style="background-color: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">
+                <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                  &copy; ${new Date().getFullYear()} Inventa FMIPA Unila.
+                </p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+      })
+    },
+  },
+
   emailAndPassword: {
     enabled: true,
     autoSignIn: false,
-    requireEmailVerification: false,
+    requireEmailVerification: true,
     resetPasswordTokenExpiresIn: 3600,
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
@@ -92,6 +144,9 @@ export const auth = betterAuth({
     }),
   ],
   user: {
+    changeEmail: {
+      enabled: true,
+    },
     additionalFields: {
       role: {
         type: 'string',

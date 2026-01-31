@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { BadgeCheck, Bell, CircleHelp, Keyboard, LogOut } from 'lucide-react'
+import { Bell, CircleHelp, Keyboard, LogOut, User } from 'lucide-react'
 
 import { getUnreadCount } from '@/app/dashboard/notifications/actions'
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -121,9 +121,9 @@ export function UserNav({ children, side = 'bottom', align = 'end' }: UserNavPro
 
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="#" className="flex w-full cursor-pointer items-center">
-              <BadgeCheck className="mr-2 size-4" />
-              <span>Akun</span>
+            <Link href="/dashboard/profile" className="flex w-full cursor-pointer items-center">
+              <User className="mr-2 size-4" />
+              <span>Profile</span>
             </Link>
           </DropdownMenuItem>
 
