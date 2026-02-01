@@ -9,6 +9,7 @@ type UserSeedData = {
   role: (typeof userRoleEnum.enumValues)[number]
   email: string
   userName: string
+  facultyId?: string // Opsional: Jika dia orang Fakultas
   unitId?: string // Opsional: Jika dia orang Jurusan
   warehouseId?: string // Opsional: Jika dia petugas Gudang
 }
@@ -118,7 +119,7 @@ async function seedOrganization() {
 }
 
 async function main() {
-  const password = process.env.DEFAULT_PASSWORD || 'password123'
+  const password = process.env.DEFAULT_PASSWORD || 'InventaUnila2026!$'
 
   // Pastikan struktur organisasi ada dulu sebelum buat user
   await seedOrganization()
@@ -133,6 +134,7 @@ async function main() {
       role: 'faculty_admin', // Dekanat / WD2
       email: 'wd2@inventa.fmipa.unila.ac.id',
       userName: 'Wakil Dekan 2',
+      facultyId: 'fac-fmipa',
     },
     {
       role: 'unit_admin', // Kajur Biologi
