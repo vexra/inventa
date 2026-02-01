@@ -204,7 +204,3 @@ Kontribusi sangat kami hargai. Jika Anda ingin melakukan perubahan besar atau me
 ## 📄 Lisensi
 
 [MIT](https://choosealicense.com/licenses/mit/)
-
-```
-
-```
