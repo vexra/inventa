@@ -103,7 +103,6 @@ async function seedOrganization() {
         type: 'ADMIN_OFFICE',
         qrToken: 'QR-BIO-TU',
       },
-
       {
         id: 'room-aula-mipa',
         buildingId: 'bld-mipa-terpadu',
@@ -162,19 +161,19 @@ async function main() {
     const existingUsers = await db.select().from(user).where(eq(user.email, data.email)).limit(1)
     const existingUser = existingUsers[0]
 
-    // Update data tambahan (Unit/Gudang) jika user sudah ada
     const updatePayload = {
       role: data.role,
       unitId: data.unitId || null,
       warehouseId: data.warehouseId || null,
+      facultyId: data.facultyId || null,
     }
 
     if (existingUser) {
-      // Cek apakah ada data yang perlu diupdate
       if (
         existingUser.role !== data.role ||
         existingUser.unitId !== data.unitId ||
-        existingUser.warehouseId !== data.warehouseId
+        existingUser.warehouseId !== data.warehouseId ||
+        existingUser.facultyId !== data.facultyId
       ) {
         await db.update(user).set(updatePayload).where(eq(user.id, existingUser.id))
         console.log(`🔄 Updated info for: ${data.email}`)
@@ -196,7 +195,7 @@ async function main() {
       })
 
       if (response.user) {
-        // Update Role & Unit/Warehouse segera setelah user dibuat
+        // Update Role & Unit/Warehouse/Faculty segera setelah user dibuat
         await db
           .update(user)
           .set({

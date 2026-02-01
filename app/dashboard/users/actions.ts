@@ -106,11 +106,13 @@ export async function updateUserAction(id: string, data: z.infer<typeof userForm
       body: {
         userId: id,
         data: {
+          email: parsed.data.email,
           name: parsed.data.name,
           unitId: finalUnitId,
           warehouseId: finalWarehouseId,
           facultyId: finalFacultyId,
           role: role,
+          emailVerified: true,
         },
       },
       headers: requestHeaders,
