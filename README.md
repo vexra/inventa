@@ -49,7 +49,7 @@ pnpm install
 Salin file `.env.example` menjadi `.env` (atau buat file `.env` baru) dan sesuaikan isinya.
 
 ```bash
-cp .env.example .env
+cp env.example .env
 
 ```
 
@@ -82,7 +82,7 @@ SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_USER=
 SMTP_PASS=
-SMTP_FROM=noreply@inventa.unila.ac.id
+SMTP_FROM=noreply@inventa.fmipa.unila.ac.id
 
 ```
 
