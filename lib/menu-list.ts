@@ -23,6 +23,8 @@ import {
   Users,
   Warehouse,
   Wrench,
+  Truck, 
+  Inbox, 
 } from 'lucide-react'
 
 import { userRoleEnum } from '@/db/schema'
@@ -73,6 +75,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     {
       title: 'Fasilitas & Pemeliharaan', 
       items: [
+        { title: 'Distribusi Aset', url: '/dashboard/distributions', icon: Truck }, // [BARU]
         { title: 'Pemeliharaan Aset', url: '/dashboard/maintenances', icon: Wrench },
       ],
     },
@@ -95,9 +98,14 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Operasional Gudang',
       items: [
         {
-          title: 'Permintaan Barang',
-          url: '/dashboard/consumable-requests',
+          title: 'Pengajuan (BHP & Aset)', // [UPDATE] Ganti nama untuk Portal Satu Pintu
+          url: '/dashboard/consumable-requests', 
           icon: ClipboardList,
+        },
+        {
+          title: 'Distribusi Aset', // [BARU] Menu untuk melakukan dropping
+          url: '/dashboard/distributions',
+          icon: Truck,
         },
         {
           title: 'Stock Opname',
@@ -152,12 +160,17 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Pengajuan',
+      title: 'Pengajuan & Penerimaan',
       items: [
         {
-          title: 'Permintaan Barang',
+          title: 'Pengajuan (BHP & Aset)', // [UPDATE]
           url: '/dashboard/consumable-requests',
           icon: ShoppingCart,
+        },
+        {
+          title: 'Barang Masuk', // [BARU] Menu Handshake untuk menerima dropping
+          url: '/dashboard/incoming-distributions',
+          icon: Inbox,
         },
         { title: 'Lapor Kerusakan', 
           url: '/dashboard/maintenances', 
@@ -174,7 +187,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Boxes,
         },
         {
-          title: 'Aset Tetap',
+          title: 'Aset Ruangan',
           url: '/dashboard/room-assets',
           icon: Monitor,
         },
@@ -209,12 +222,17 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      title: 'Pengajuan',
+      title: 'Pengajuan & Penerimaan',
       items: [
         {
-          title: 'Permintaan Barang',
+          title: 'Persetujuan Pengajuan', // [UPDATE]
           url: '/dashboard/consumable-requests',
           icon: ClipboardList,
+        },
+        {
+          title: 'Barang Masuk', // [BARU]
+          url: '/dashboard/incoming-distributions',
+          icon: Inbox,
         },
       ],
     },
@@ -227,7 +245,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           icon: Boxes,
         },
         {
-          title: 'Aset Tetap',
+          title: 'Aset Unit',
           url: '/dashboard/unit-assets',
           icon: Monitor,
         },
@@ -279,7 +297,7 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       title: 'Logistik & Pengadaan',
       items: [
         {
-          title: 'Permintaan Barang',
+          title: 'Persetujuan Pengajuan', // [UPDATE]
           url: '/dashboard/consumable-requests',
           icon: ClipboardList,
         },
@@ -293,11 +311,6 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     {
       title: 'Monitoring Inventaris',
       items: [
-        {
-          title: 'Aset Tetap',
-          url: '/dashboard/fixed-assets',
-          icon: Layers,
-        },
         { title: 'Pemeliharaan Aset', 
           url: '/dashboard/maintenances', 
           icon: Wrench 
@@ -311,11 +324,6 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           title: 'Stok Ruangan',
           url: '/dashboard/room-stocks',
           icon: Boxes,
-        },
-        {
-          title: 'Aset Tetap',
-          url: '/dashboard/fixed-assets',
-          icon: Monitor,
         },
       ],
     },

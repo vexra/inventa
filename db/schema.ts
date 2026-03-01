@@ -39,6 +39,11 @@ export const warehouseTypeEnum = pgEnum('warehouse_type', [
   'GENERAL_ATK',
 ])
 
+export const requestTypeEnum = pgEnum('request_type', [
+  'CONSUMABLE', 
+  'ASSET',      
+])
+
 export const requestStatusEnum = pgEnum('request_status', [
   'PENDING_UNIT',
   'PENDING_FACULTY',
@@ -55,6 +60,12 @@ export const procurementStatusEnum = pgEnum('procurement_status', [
   'APPROVED',
   'REJECTED',
   'COMPLETED',
+])
+
+export const distributionStatusEnum = pgEnum('distribution_status', [
+  'DRAFT',      // Sedang disusun alokasinya
+  'SHIPPED',    // Barang sedang dikirim ke ruangan (OTW)
+  'COMPLETED',  // Semua ruangan sudah menerima barang
 ])
 
 export const adjustmentTypeEnum = pgEnum('adjustment_type', [
@@ -336,7 +347,10 @@ export const assetModels = pgTable('asset_models', {
 
   name: text('name').notNull(),
   modelNumber: text('model_number'),
-  
+
+  // [BARU] Jenis Aset: Bergerak (true) atau Tidak Bergerak (false)
+  isMovable: boolean('is_movable').default(false),
+
   // [BARU] JSON Specifications agar fleksibel per kategori
   // cth: {"ram": "16GB", "processor": "i7"} atau {"lensa": "100x"}
   specifications: json('specifications'),
@@ -475,6 +489,7 @@ export const fixedAssets = pgTable(
 export const requests = pgTable('requests', {
   id: text('id').primaryKey(),
   requestCode: text('request_code').notNull().unique(),
+  type: requestTypeEnum('type').default('CONSUMABLE').notNull(),
 
   requesterId: text('requester_id')
     .notNull()
@@ -522,6 +537,25 @@ export const requestItems = pgTable('request_items', {
 
   qtyRequested: decimal('qty_requested', { precision: 10, scale: 2 }).notNull(),
   qtyApproved: decimal('qty_approved', { precision: 10, scale: 2 }),
+})
+
+// (Tabel requestItems untuk Consumable biarkan seperti semula)
+
+// [BARU] Detail Item untuk Pengajuan Aset Tetap
+export const requestAssetItems = pgTable('request_asset_items', {
+  id: text('id').primaryKey(),
+  
+  requestId: text('request_id')
+    .notNull()
+    .references(() => requests.id, { onDelete: 'cascade' }),
+    
+  // Mengarah ke Master Katalog Aset (assetModels)
+  modelId: text('model_id')
+    .notNull()
+    .references(() => assetModels.id),
+
+  qtyRequested: integer('qty_requested').notNull(),
+  qtyApproved: integer('qty_approved'),
 })
 
 export const requestItemAllocations = pgTable('request_item_allocations', {
@@ -621,6 +655,43 @@ export const procurementAssets = pgTable('procurement_assets', {
   pricePerUnit: decimal('price_per_unit', { precision: 15, scale: 2 }),
 
   destinationRoomId: text('destination_room_id').references(() => rooms.id),
+})
+
+/**
+ * =========================================
+ * 7B. ASSET DISTRIBUTION (DROPPING & HANDSHAKE)
+ * =========================================
+ */
+export const assetDistributions = pgTable('asset_distributions', {
+  id: text('id').primaryKey(),
+  distributionCode: text('distribution_code').notNull().unique(), 
+  
+  actorId: text('actor_id').notNull().references(() => user.id), 
+  modelId: text('model_id').notNull().references(() => assetModels.id), 
+  
+  totalQuantity: integer('total_quantity').notNull(),
+  status: distributionStatusEnum('status').default('DRAFT').notNull(),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
+export const assetDistributionTargets = pgTable('asset_distribution_targets', {
+  id: text('id').primaryKey(),
+  distributionId: text('distribution_id')
+    .notNull()
+    .references(() => assetDistributions.id, { onDelete: 'cascade' }),
+  
+  targetRoomId: text('target_room_id')
+    .notNull()
+    .references(() => rooms.id), 
+    
+  allocatedQuantity: integer('allocated_quantity').notNull(),
+  
+  // Handshake Logic: Berapa fisik yang benar-benar diterima laboran
+  receivedQuantity: integer('received_quantity').default(0).notNull(),
+  receiverId: text('receiver_id').references(() => user.id), 
+  receivedAt: timestamp('received_at'),
 })
 
 
@@ -932,6 +1003,7 @@ export const requestsRelations = relations(requests, ({ one, many }) => ({
     references: [warehouses.id],
   }),
   items: many(requestItems),
+  assetItems: many(requestAssetItems),
   timelines: many(requestTimelines),
   approvedByUnit: one(user, {
     fields: [requests.approvedByUnitId],
@@ -972,6 +1044,23 @@ export const requestItemAllocationsRelations = relations(requestItemAllocations,
     fields: [requestItemAllocations.consumableId],
     references: [consumables.id],
   }),
+}))
+
+export const requestAssetItemsRelations = relations(requestAssetItems, ({ one }) => ({
+  request: one(requests, { fields: [requestAssetItems.requestId], references: [requests.id] }),
+  model: one(assetModels, { fields: [requestAssetItems.modelId], references: [assetModels.id] }),
+}))
+
+export const assetDistributionsRelations = relations(assetDistributions, ({ one, many }) => ({
+  actor: one(user, { fields: [assetDistributions.actorId], references: [user.id] }),
+  model: one(assetModels, { fields: [assetDistributions.modelId], references: [assetModels.id] }),
+  targets: many(assetDistributionTargets),
+}))
+
+export const assetDistributionTargetsRelations = relations(assetDistributionTargets, ({ one }) => ({
+  distribution: one(assetDistributions, { fields: [assetDistributionTargets.distributionId], references: [assetDistributions.id] }),
+  targetRoom: one(rooms, { fields: [assetDistributionTargets.targetRoomId], references: [rooms.id] }),
+  receiver: one(user, { fields: [assetDistributionTargets.receiverId], references: [user.id] }),
 }))
 
 // --- PROCUREMENT ---
