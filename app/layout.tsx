@@ -16,7 +16,7 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: 'Inventa - Sistem Manajemen Aset & Persediaan FMIPA Unila',
   description:
-    'Platform terintegrasi pengelolaan Aset Tetap dan Barang Habis Pakai (BHP) di Fakultas MIPA Universitas Lampung. Monitoring inventaris dan pelacakan lokasi aset.',
+    'Platform terintegrasi pengelolaan Aset dan Barang Habis Pakai (BHP) di Fakultas MIPA Universitas Lampung. Monitoring inventaris dan pelacakan lokasi aset.',
 }
 
 export default function RootLayout({

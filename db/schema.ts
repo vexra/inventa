@@ -17,68 +17,71 @@ import {
  * =========================================
  * 1. ENUMS (DEFINISI TIPE DATA TERBATAS)
  * =========================================
- * Mengunci nilai input agar konsisten di level database.
  */
 
-// Peran user dalam sistem (Authorization Level)
 export const userRoleEnum = pgEnum('roles', [
-  'super_admin', // Akses penuh sistem & konfigurasi
-  'warehouse_staff', // Petugas Gudang (Inbound/Outbound/Stock Opname)
-  'faculty_admin', // Level Dekanat/WD2 (Approval pengadaan besar)
-  'unit_admin', // Level Kajur/Kaprodi (Approval permintaan ruangan)
-  'unit_staff', // Level Dosen/Laboran/TU (Request barang & Scan QR)
+  'super_admin',
+  'warehouse_staff',
+  'faculty_admin',
+  'unit_admin',
+  'unit_staff',
 ])
 
-// Jenis Ruangan (Menentukan barang apa yang boleh ada di sana)
 export const roomTypeEnum = pgEnum('room_type', [
-  'LABORATORY', // Boleh simpan Zat Kimia & Alat Praktikum
-  'ADMIN_OFFICE', // Ruang TU/Dosen (Hanya ATK & Furniture)
-  'LECTURE_HALL', // Ruang Kelas (Furniture & Elektronik Kelas)
-  'WAREHOUSE_UNIT', // Gudang kecil transit milik jurusan
+  'LABORATORY',
+  'ADMIN_OFFICE',
+  'LECTURE_HALL',
+  'WAREHOUSE_UNIT',
 ])
 
-// Jenis Gudang Utama
 export const warehouseTypeEnum = pgEnum('warehouse_type', [
-  'CHEMICAL', // Gudang khusus B3 / Zat Kimia (Perlu penanganan khusus)
-  'GENERAL_ATK', // Gudang Umum (Kertas, Spidol, Alat Kebersihan)
+  'CHEMICAL',
+  'GENERAL_ATK',
 ])
 
-// Status Permintaan Barang (Flow Distribusi)
+export const requestTypeEnum = pgEnum('request_type', [
+  'CONSUMABLE', 
+  'ASSET',      
+])
+
 export const requestStatusEnum = pgEnum('request_status', [
-  'PENDING_UNIT', // Baru dibuat, menunggu ACC Kajur
-  'PENDING_FACULTY', // Lolos Kajur, menunggu ACC Dekanat (jika nominal besar)
-  'APPROVED', // Disetujui semua pihak, masuk antrian gudang
-  'PROCESSING', // Gudang sedang packing barang
-  'READY_TO_PICKUP', // Barang sudah dipacking, siap diambil user
-  'COMPLETED', // Barang diterima user & stok pindah ke ruangan
-  'REJECTED', // Ditolak atasan
-  'CANCELED', // Dibatalkan user sendiri
+  'PENDING_UNIT',
+  'PENDING_FACULTY',
+  'APPROVED',
+  'PROCESSING',
+  'READY_TO_PICKUP',
+  'COMPLETED',
+  'REJECTED',
+  'CANCELED',
 ])
 
-// Status Pengadaan Barang (Flow Pembelian)
 export const procurementStatusEnum = pgEnum('procurement_status', [
-  'PENDING', // Draft pengajuan
-  'APPROVED', // Disetujui anggaran
-  'REJECTED', // Ditolak
-  'COMPLETED', // Barang dari vendor sudah diterima Gudang
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'COMPLETED',
 ])
 
-// Jenis Penyesuaian Stok (Audit Trail)
+export const distributionStatusEnum = pgEnum('distribution_status', [
+  'DRAFT',      // Sedang disusun alokasinya
+  'SHIPPED',    // Barang sedang dikirim ke ruangan (OTW)
+  'COMPLETED',  // Semua ruangan sudah menerima barang
+])
+
 export const adjustmentTypeEnum = pgEnum('adjustment_type', [
-  'STOCK_OPNAME', // Rutin: Cek fisik vs sistem
-  'DAMAGE', // Insidental: Barang rusak/pecah
-  'LOSS', // Insidental: Barang hilang
-  'CORRECTION', // Admin: Salah input data sebelumnya
+  'STOCK_OPNAME',
+  'DAMAGE',
+  'LOSS',
+  'CORRECTION',
 ])
 
-// Kondisi Fisik Aset Tetap
 export const assetConditionEnum = pgEnum('asset_condition', [
-  'GOOD', // Baik
-  'MINOR_DAMAGE', // Rusak Ringan (masih bisa pakai)
-  'MAJOR_DAMAGE', // Rusak Berat (perlu servis)
-  'BROKEN', // Hancur (perlu penghapusan)
-  'LOST', // Hilang
-  'MAINTENANCE', // Sedang diservis
+  'GOOD',
+  'MINOR_DAMAGE',
+  'MAJOR_DAMAGE',
+  'BROKEN',
+  'LOST',
+  'MAINTENANCE',
 ])
 
 // Status Pergerakan Aset (Untuk Aset Bergerak)
@@ -91,9 +94,9 @@ export const assetMovementStatusEnum = pgEnum('asset_movement_status', [
 
 // Kondisi Penerimaan Barang (Quality Control Inbound)
 export const receiptConditionEnum = pgEnum('receipt_condition', [
-  'GOOD', // Diterima baik
-  'DAMAGED', // Rusak saat pengiriman
-  'INCOMPLETE', // Jumlah/Part kurang
+  'GOOD',
+  'DAMAGED',
+  'INCOMPLETE',
 ])
 
 export const notificationTypeEnum = pgEnum('notification_type', [
@@ -103,13 +106,34 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'ERROR', // Kesalahan (misal: Request ditolak)
 ])
 
+// --- [BARU] ENUMS UNTUK DSS MAINTENANCE & RESERVASI ---
+export const maintenanceSeverityEnum = pgEnum('maintenance_severity', [
+  'MINOR',     // Rusak Ringan (Bisa dipakai sebagian)
+  'MODERATE',  // Rusak Sedang (Mengganggu fungsi utama)
+  'MAJOR',     // Rusak Berat (Mati total)
+])
+
+export const maintenanceStatusEnum = pgEnum('maintenance_status', [
+  'REPORTED',     // Baru dilaporkan
+  'IN_PROGRESS',  // Sedang diperbaiki teknisi
+  'COMPLETED',    // Selesai diperbaiki
+  'IRREPARABLE',  // Tidak bisa diperbaiki (Direkomendasikan hapus/pemutihan)
+])
+
+export const reservationStatusEnum = pgEnum('reservation_status', [
+  'PENDING',    // Menunggu approval Unit Admin
+  'APPROVED',   // Disetujui
+  'REJECTED',   // Ditolak
+  'COMPLETED',  // Selesai digunakan
+  'CANCELED',   // Dibatalkan oleh peminjam
+])
+
+
 /**
  * =========================================
  * 2. AUTHENTICATION & USER MANAGEMENT
  * =========================================
- * Menggunakan struktur standar (kompatibel dengan NextAuth/Better-Auth).
  */
-
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -126,9 +150,9 @@ export const user = pgTable('user', {
   banReason: text('ban_reason'),
   banExpires: timestamp('ban_expires'),
 
-  facultyId: text('faculty_id').references(() => faculties.id), // Diisi HANYA jika role = faculty_admin
-  unitId: text('unit_id').references(() => units.id), // Diisi jika role = unit_admin / unit_staff
-  warehouseId: text('warehouse_id').references(() => warehouses.id), // Diisi jika role = warehouse_staff
+  facultyId: text('faculty_id').references(() => faculties.id),
+  unitId: text('unit_id').references(() => units.id),
+  warehouseId: text('warehouse_id').references(() => warehouses.id),
 })
 
 export const session = pgTable(
@@ -192,6 +216,7 @@ export const verification = pgTable(
   (table) => [index('verification_identifier_idx').on(table.identifier)],
 )
 
+
 /**
  * =========================================
  * 3. ORGANIZATIONAL STRUCTURE
@@ -199,10 +224,9 @@ export const verification = pgTable(
  * Hierarki: Faculty -> Buildings (Fisik) -> Rooms (Fisik).
  * Unit (Logis) menempel pada Room.
  */
-
 export const faculties = pgTable('faculties', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(), // Contoh: "Fakultas MIPA"
+  name: text('name').notNull(),
   description: text('description'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
@@ -212,7 +236,7 @@ export const units = pgTable(
   {
     id: text('id').primaryKey(),
     facultyId: text('faculty_id').references(() => faculties.id),
-    name: text('name').notNull(), // Contoh: "Jurusan Biologi"
+    name: text('name').notNull(),
     description: text('description'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
@@ -258,7 +282,7 @@ export const rooms = pgTable(
     name: text('name').notNull(), // Contoh: "Lab Mikrobiologi 1"
     floorLevel: integer('floor_level').default(1),
     type: roomTypeEnum('type').default('LECTURE_HALL').notNull(),
-    qrToken: text('qr_token').unique(), // QR yang ditempel di ruangan
+    qrToken: text('qr_token').unique(),
 
     description: text('description'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -272,71 +296,77 @@ export const rooms = pgTable(
 
 export const warehouses = pgTable('warehouses', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(), // Contoh: "Gudang Bahan Kimia A"
-  type: warehouseTypeEnum('type').notNull(), // Membedakan SOP penyimpanan
+  name: text('name').notNull(),
+  type: warehouseTypeEnum('type').notNull(),
   facultyId: text('faculty_id').references(() => faculties.id),
   description: text('description'),
 })
+
 
 /**
  * =========================================
  * 4. CATALOG (DEFINISI PRODUK - MASTER DATA)
  * =========================================
- * Ini adalah "Katalog", bukan stok fisik.
- * Mendefinisikan barang apa saja yang BISA ada di sistem.
  */
-
 export const categories = pgTable('categories', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(), // e.g. "Alat Gelas", "Bahan Kimia Padat", "Elektronik"
+  name: text('name').notNull(),
 })
 
-// A. BARANG HABIS PAKAI (Consumables)
-// Barang yang stoknya berkurang saat dipakai (Kertas, Alkohol, H2SO4)
+// [BARU] Tabel Master Merek untuk Standarisasi Data Aset
+export const brands = pgTable('brands', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(), // Contoh: "Epson", "Olympus", "Asus"
+  country: text('country'), // Negara Asal (Opsional untuk laporan TKDN)
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
 export const consumables = pgTable('consumables', {
   id: text('id').primaryKey(),
   categoryId: text('category_id').references(() => categories.id),
 
   name: text('name').notNull(),
-  sku: text('sku').unique(), // Stock Keeping Unit (Kode Barang)
+  sku: text('sku').unique(),
 
-  baseUnit: text('base_unit').notNull(), // Satuan terkecil (Liter, Pcs, Rim)
-  minimumStock: integer('minimum_stock').default(10), // Trigger notifikasi jika stok tipis
+  baseUnit: text('base_unit').notNull(),
+  minimumStock: integer('minimum_stock').default(10),
 
-  hasExpiry: boolean('has_expiry').default(false).notNull(), // Apakah butuh tracking kadaluarsa?
+  hasExpiry: boolean('has_expiry').default(false).notNull(),
   image: text('image'),
   description: text('description'),
 
-  isActive: boolean('is_active').default(true), // Soft delete
+  isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
 })
 
-// B. KATALOG MODEL ASET (Asset Models)
-// Definisi spesifikasi alat (Bukan unit fisiknya).
-// Contoh: "Mikroskop Olympus CX-23" (Definisi) vs "Mikroskop #001 di Lab A" (Fisik)
+// [UPDATE] Definisi Spesifikasi Aset
 export const assetModels = pgTable('asset_models', {
   id: text('id').primaryKey(),
   categoryId: text('category_id').references(() => categories.id),
+  brandId: text('brand_id').references(() => brands.id), // Diambil dari master Merek
 
   name: text('name').notNull(),
-  manufacturer: text('manufacturer'),
   modelNumber: text('model_number'),
+
+  // [BARU] Jenis Aset: Bergerak (true) atau Tidak Bergerak (false)
+  isMovable: boolean('is_movable').default(false),
+
+  // [BARU] JSON Specifications agar fleksibel per kategori
+  // cth: {"ram": "16GB", "processor": "i7"} atau {"lensa": "100x"}
+  specifications: json('specifications'),
 
   image: text('image'),
   description: text('description'),
 
   createdAt: timestamp('created_at').defaultNow(),
 })
+
 
 /**
  * =========================================
  * 5. INVENTORY & STOCKS (DATA FISIK)
  * =========================================
- * Menghubungkan Katalog dengan Lokasi (Gudang/Ruangan).
  */
-
-// A. STOK GUDANG (Source of Truth)
-// Menyimpan jumlah consumable yang siap didistribusikan.
 export const warehouseStocks = pgTable(
   'warehouse_stocks',
   {
@@ -368,8 +398,6 @@ export const warehouseStocks = pgTable(
   ],
 )
 
-// B. STOK RUANGAN (Distributed Items)
-// Menyimpan jumlah consumable yang sudah ada di Lab/TU dan sedang dipakai.
 export const roomConsumables = pgTable(
   'room_consumables',
   {
@@ -394,8 +422,7 @@ export const roomConsumables = pgTable(
   (table) => [index('rc_room_item_idx').on(table.roomId, table.consumableId)],
 )
 
-// C. INVENTARIS ASET TETAP (Unique Items)
-// Setiap baris adalah 1 unit fisik dengan QR Code unik.
+// [UPDATE] Aset Tetap Fisik dengan Kode Rektorat & Mobilitas
 export const fixedAssets = pgTable(
   'fixed_assets',
   {
@@ -418,6 +445,12 @@ export const fixedAssets = pgTable(
      */
     custodianId: text('custodian_id').references(() => user.id),
 
+        // [BARU] Nomor Inventaris Baku dari Rektorat
+    inventoryNumber: text('inventory_number').unique(),
+
+        // [BARU] Status mobilitas barang (Boleh dipindah / Terkunci di ruangan)
+    isMovable: boolean('is_movable').default(true).notNull(),
+
     /**
      * STATUS PERGERAKAN
      * Membedakan aset yang "Parkir" vs "Jalan".
@@ -429,7 +462,6 @@ export const fixedAssets = pgTable(
 
     condition: assetConditionEnum('condition').default('GOOD').notNull(),
 
-    // Data Akuntansi / Depresiasi
     procurementYear: integer('procurement_year'),
     price: decimal('price', { precision: 15, scale: 2 }),
     purchaseDate: date('purchase_date'),
@@ -448,34 +480,32 @@ export const fixedAssets = pgTable(
   ],
 )
 
+
 /**
  * =========================================
- * 6. REQUEST & TIMELINE (DISTRIBUSI)
+ * 6. REQUEST & TIMELINE (DISTRIBUSI BHP)
  * =========================================
- * Flow User meminta barang dari Gudang ke Ruangan.
  */
-
 export const requests = pgTable('requests', {
   id: text('id').primaryKey(),
-  requestCode: text('request_code').notNull().unique(), // e.g. "REQ/2024/001"
+  requestCode: text('request_code').notNull().unique(),
+  type: requestTypeEnum('type').default('CONSUMABLE').notNull(),
 
   requesterId: text('requester_id')
     .notNull()
     .references(() => user.id),
   roomId: text('room_id')
     .notNull()
-    .references(() => rooms.id), // Barang ini untuk ruangan mana?
+    .references(() => rooms.id),
 
-  // Gudang mana yang harus memproses? (Kimia vs ATK)
   targetWarehouseId: text('target_warehouse_id').references(() => warehouses.id),
 
   status: requestStatusEnum('status').default('PENDING_UNIT'),
   description: text('description'),
   rejectionReason: text('rejection_reason'),
 
-  // Tracking Approval
-  approvedByUnitId: text('approved_by_unit_id').references(() => user.id), // ACC Kajur
-  approvedByFacultyId: text('approved_by_faculty_id').references(() => user.id), // ACC Dekanat
+  approvedByUnitId: text('approved_by_unit_id').references(() => user.id),
+  approvedByFacultyId: text('approved_by_faculty_id').references(() => user.id),
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at')
@@ -483,7 +513,6 @@ export const requests = pgTable('requests', {
     .$onUpdate(() => new Date()),
 })
 
-// History status (Audit Trail Distribusi)
 export const requestTimelines = pgTable('request_timelines', {
   id: text('id').primaryKey(),
   requestId: text('request_id')
@@ -491,13 +520,12 @@ export const requestTimelines = pgTable('request_timelines', {
     .references(() => requests.id, { onDelete: 'cascade' }),
 
   status: requestStatusEnum('status').notNull(),
-  actorId: text('actor_id').references(() => user.id), // Siapa yang mengubah status?
+  actorId: text('actor_id').references(() => user.id),
   notes: text('notes'),
 
   createdAt: timestamp('created_at').defaultNow(),
 })
 
-// Detail barang apa saja yang diminta dalam 1 tiket request
 export const requestItems = pgTable('request_items', {
   id: text('id').primaryKey(),
   requestId: text('request_id')
@@ -508,10 +536,28 @@ export const requestItems = pgTable('request_items', {
     .references(() => consumables.id),
 
   qtyRequested: decimal('qty_requested', { precision: 10, scale: 2 }).notNull(),
-  qtyApproved: decimal('qty_approved', { precision: 10, scale: 2 }), // Admin bisa menyetujui sebagian (partial)
+  qtyApproved: decimal('qty_approved', { precision: 10, scale: 2 }),
 })
 
-// Alokasi Stok (FEFO Result)
+// (Tabel requestItems untuk Consumable biarkan seperti semula)
+
+// [BARU] Detail Item untuk Pengajuan Aset Tetap
+export const requestAssetItems = pgTable('request_asset_items', {
+  id: text('id').primaryKey(),
+  
+  requestId: text('request_id')
+    .notNull()
+    .references(() => requests.id, { onDelete: 'cascade' }),
+    
+  // Mengarah ke Master Katalog Aset (assetModels)
+  modelId: text('model_id')
+    .notNull()
+    .references(() => assetModels.id),
+
+  qtyRequested: integer('qty_requested').notNull(),
+  qtyApproved: integer('qty_approved'),
+})
+
 export const requestItemAllocations = pgTable('request_item_allocations', {
   id: text('id').primaryKey(),
 
@@ -519,7 +565,6 @@ export const requestItemAllocations = pgTable('request_item_allocations', {
     .notNull()
     .references(() => requestItems.id, { onDelete: 'cascade' }),
 
-  // Snapshot Data (Agar warehouse staff tau ambil barang di mana & batch apa)
   warehouseId: text('warehouse_id')
     .notNull()
     .references(() => warehouses.id),
@@ -528,35 +573,35 @@ export const requestItemAllocations = pgTable('request_item_allocations', {
     .notNull()
     .references(() => consumables.id),
 
-  batchNumber: text('batch_number'), // Batch spesifik yang harus diambil
-  expiryDate: timestamp('expiry_date'), // Informasi expired date batch tersebut
+  batchNumber: text('batch_number'),
+  expiryDate: timestamp('expiry_date'),
 
-  quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(), // Jumlah yang diambil dari batch ini
+  quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
 
   createdAt: timestamp('created_at').defaultNow(),
 })
 
+
 /**
  * =========================================
- * 7. PROCUREMENT & TIMELINE (PENGADAAN)
+ * 7. PROCUREMENT (PENGADAAN)
  * =========================================
  * Flow warehouse staff mengambil barang dari vendor (Masuk ke Gudang/Ruangan).
  */
-
 export const procurements = pgTable('procurements', {
   id: text('id').primaryKey(),
-  procurementCode: text('procurement_code').notNull().unique(), // e.g. "PO/2024/10"
+  procurementCode: text('procurement_code').notNull().unique(),
 
   userId: text('user_id')
     .notNull()
-    .references(() => user.id), // Admin pembuat PO
+    .references(() => user.id),
 
   warehouseId: text('warehouse_id').references(() => warehouses.id),
   status: procurementStatusEnum('status').default('PENDING'),
-  description: text('description'), // Diisi User: "Pengadaan Semester Ganjil"
-  supplier: text('supplier'), // Nama Vendor
-  proofDocument: text('proof_document'), // URL Faktur/Surat Jalan
-  notes: text('notes'), // Diisi Admin: Alasan Penolakan
+  description: text('description'),
+  supplier: text('supplier'),
+  proofDocument: text('proof_document'),
+  notes: text('notes'),
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at')
@@ -564,7 +609,6 @@ export const procurements = pgTable('procurements', {
     .$onUpdate(() => new Date()),
 })
 
-// History status pengadaan
 export const procurementTimelines = pgTable('procurement_timelines', {
   id: text('id').primaryKey(),
   procurementId: text('procurement_id')
@@ -587,7 +631,7 @@ export const procurementConsumables = pgTable('procurement_consumables', {
   consumableId: text('consumable_id')
     .notNull()
     .references(() => consumables.id),
-  warehouseId: text('warehouse_id').references(() => warehouses.id), // Target Gudang
+  warehouseId: text('warehouse_id').references(() => warehouses.id),
 
   quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
   pricePerUnit: decimal('price_per_unit', { precision: 15, scale: 2 }),
@@ -607,17 +651,54 @@ export const procurementAssets = pgTable('procurement_assets', {
     .notNull()
     .references(() => assetModels.id),
 
-  quantity: integer('quantity').notNull(), // Berapa unit dibeli?
+  quantity: integer('quantity').notNull(),
   pricePerUnit: decimal('price_per_unit', { precision: 15, scale: 2 }),
 
-  destinationRoomId: text('destination_room_id').references(() => rooms.id), // Langsung taruh ruangan?
+  destinationRoomId: text('destination_room_id').references(() => rooms.id),
 })
 
 /**
  * =========================================
- * 8. USAGE & ADJUSTMENTS (OPERASIONAL HARIAN)
+ * 7B. ASSET DISTRIBUTION (DROPPING & HANDSHAKE)
  * =========================================
- * Pencatatan pemakaian barang, kerusakan, dan audit stok.
+ */
+export const assetDistributions = pgTable('asset_distributions', {
+  id: text('id').primaryKey(),
+  distributionCode: text('distribution_code').notNull().unique(), 
+  
+  actorId: text('actor_id').notNull().references(() => user.id), 
+  modelId: text('model_id').notNull().references(() => assetModels.id), 
+  
+  totalQuantity: integer('total_quantity').notNull(),
+  status: distributionStatusEnum('status').default('DRAFT').notNull(),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
+export const assetDistributionTargets = pgTable('asset_distribution_targets', {
+  id: text('id').primaryKey(),
+  distributionId: text('distribution_id')
+    .notNull()
+    .references(() => assetDistributions.id, { onDelete: 'cascade' }),
+  
+  targetRoomId: text('target_room_id')
+    .notNull()
+    .references(() => rooms.id), 
+    
+  allocatedQuantity: integer('allocated_quantity').notNull(),
+  
+  // Handshake Logic: Berapa fisik yang benar-benar diterima laboran
+  receivedQuantity: integer('received_quantity').default(0).notNull(),
+  receiverId: text('receiver_id').references(() => user.id), 
+  receivedAt: timestamp('received_at'),
+})
+
+
+/**
+ * =========================================
+ * 8. USAGE, ADJUSTMENTS, & DSS LOGS
+ * =========================================
  */
 
 // Laporan Pemakaian BHP di Ruangan (e.g. Praktikum Kimia Dasar)
@@ -652,35 +733,31 @@ export const usageDetails = pgTable('usage_details', {
     .notNull()
     .references(() => consumables.id),
 
-  qtyUsed: decimal('qty_used', { precision: 10, scale: 2 }).notNull(), // Mengurangi RoomConsumables
+  qtyUsed: decimal('qty_used', { precision: 10, scale: 2 }).notNull(),
   batchNumber: text('batch_number'),
 })
 
-// 1. Adjustment / Stock Opname (BHP)
-// Digunakan saat jumlah fisik != jumlah di sistem
 export const consumableAdjustments = pgTable('consumable_adjustments', {
   id: text('id').primaryKey(),
   userId: text('user_id')
     .notNull()
-    .references(() => user.id), // Siapa yang menghitung?
+    .references(() => user.id),
 
   consumableId: text('consumable_id')
     .notNull()
     .references(() => consumables.id),
 
-  // Lokasi Adjustment (Gudang ATAU Ruangan)
   warehouseId: text('warehouse_id').references(() => warehouses.id),
   roomId: text('room_id').references(() => rooms.id),
 
   batchNumber: text('batch_number'),
-  deltaQuantity: decimal('delta_quantity', { precision: 10, scale: 2 }).notNull(), // (+5 atau -2)
+  deltaQuantity: decimal('delta_quantity', { precision: 10, scale: 2 }).notNull(),
 
   type: adjustmentTypeEnum('type').default('STOCK_OPNAME'),
   reason: text('reason').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 })
 
-// 2. Audit Aset Tetap (Cek Kondisi & Posisi)
 export const assetAudits = pgTable('asset_audits', {
   id: text('id').primaryKey(),
   userId: text('user_id')
@@ -694,8 +771,6 @@ export const assetAudits = pgTable('asset_audits', {
   previousCondition: assetConditionEnum('previous_condition').notNull(),
   newCondition: assetConditionEnum('new_condition').notNull(),
 
-  // [LOCATION TRACKING]
-  // Mencatat jika aset ditemukan di lokasi yang berbeda saat diaudit
   currentRoomId: text('current_room_id').references(() => rooms.id),
   currentWarehouseId: text('current_warehouse_id').references(() => warehouses.id),
   notes: text('notes'),
@@ -703,12 +778,72 @@ export const assetAudits = pgTable('asset_audits', {
   createdAt: timestamp('created_at').defaultNow(),
 })
 
+// --- [BARU] 8A. RESERVASI RUANGAN (ROOM BOOKING) ---
+// Pengganti peminjaman Aset yang menempel di kelas (seperti Proyektor/AC)
+export const roomReservations = pgTable('room_reservations', {
+  id: text('id').primaryKey(),
+  roomId: text('room_id')
+    .notNull()
+    .references(() => rooms.id, { onDelete: 'cascade' }),
+  
+  bookerId: text('booker_id')
+    .notNull()
+    .references(() => user.id),
+  
+  // Siapa yang memberikan izin (Kajur / TU)
+  approverId: text('approver_id').references(() => user.id),
+
+  startTime: timestamp('start_time').notNull(),
+  endTime: timestamp('end_time').notNull(),
+  
+  activityName: text('activity_name').notNull(),
+  
+  status: reservationStatusEnum('status').default('PENDING').notNull(),
+  rejectionReason: text('rejection_reason'),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+})
+
+// --- [BARU] 8B. MAINTENANCE LOGS (LOG KERUSAKAN) ---
+// Jantung dari Decision Support System untuk Aset
+export const assetMaintenances = pgTable('asset_maintenances', {
+  id: text('id').primaryKey(),
+  
+  assetId: text('asset_id')
+    .notNull()
+    .references(() => fixedAssets.id, { onDelete: 'cascade' }),
+  
+  reporterId: text('reporter_id')
+    .notNull()
+    .references(() => user.id), // Siapa yang melaporkan kerusakan
+    
+  severity: maintenanceSeverityEnum('severity').notNull(),
+  status: maintenanceStatusEnum('status').default('REPORTED').notNull(),
+  
+  description: text('description').notNull(),
+  
+  // Sangat penting untuk kalkulasi DSS "Apakah aset ini layak diservis?"
+  repairCost: decimal('repair_cost', { precision: 15, scale: 2 }),
+  
+  // Mencatat downtime / alat tidak bisa dipakai
+  downtimeStart: timestamp('downtime_start').defaultNow().notNull(),
+  downtimeEnd: timestamp('downtime_end'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+})
+
+
 /**
  * =========================================
  * 9. LOGGING (SYSTEM LOGS)
  * =========================================
  */
-
 export const auditLogs = pgTable('audit_logs', {
   id: text('id').primaryKey(),
   userId: text('user_id').references(() => user.id),
@@ -791,6 +926,7 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
   fixedAssets: many(fixedAssets),
   requests: many(requests),
   usageReports: many(usageReports),
+  reservations: many(roomReservations), // [BARU] Relasi Ruangan ke Peminjaman
 }))
 
 export const warehousesRelations = relations(warehouses, ({ one, many }) => ({
@@ -800,6 +936,16 @@ export const warehousesRelations = relations(warehouses, ({ one, many }) => ({
 }))
 
 // --- CATALOG ---
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  consumables: many(consumables),
+  assetModels: many(assetModels),
+}))
+
+// [BARU] Relasi Master Merek
+export const brandsRelations = relations(brands, ({ many }) => ({
+  assetModels: many(assetModels),
+}))
+
 export const consumablesRelations = relations(consumables, ({ one, many }) => ({
   category: one(categories, {
     fields: [consumables.categoryId],
@@ -811,6 +957,7 @@ export const consumablesRelations = relations(consumables, ({ one, many }) => ({
 
 export const assetModelsRelations = relations(assetModels, ({ one, many }) => ({
   category: one(categories, { fields: [assetModels.categoryId], references: [categories.id] }),
+  brand: one(brands, { fields: [assetModels.brandId], references: [brands.id] }), // [BARU] Relasi Model ke Merek
   fixedAssets: many(fixedAssets),
 }))
 
@@ -836,12 +983,11 @@ export const roomConsumablesRelations = relations(roomConsumables, ({ one }) => 
 
 export const fixedAssetsRelations = relations(fixedAssets, ({ one, many }) => ({
   model: one(assetModels, { fields: [fixedAssets.modelId], references: [assetModels.id] }),
-
-  // Relasi opsional: Aset bisa punya 'room' ATAU 'warehouse'
   room: one(rooms, { fields: [fixedAssets.roomId], references: [rooms.id] }),
   warehouse: one(warehouses, { fields: [fixedAssets.warehouseId], references: [warehouses.id] }),
   custodian: one(user, { fields: [fixedAssets.custodianId], references: [user.id] }),
   audits: many(assetAudits),
+  maintenances: many(assetMaintenances), // [BARU] Relasi ke Log Kerusakan
 }))
 
 // --- REQUESTS ---
@@ -857,6 +1003,7 @@ export const requestsRelations = relations(requests, ({ one, many }) => ({
     references: [warehouses.id],
   }),
   items: many(requestItems),
+  assetItems: many(requestAssetItems),
   timelines: many(requestTimelines),
   approvedByUnit: one(user, {
     fields: [requests.approvedByUnitId],
@@ -897,6 +1044,23 @@ export const requestItemAllocationsRelations = relations(requestItemAllocations,
     fields: [requestItemAllocations.consumableId],
     references: [consumables.id],
   }),
+}))
+
+export const requestAssetItemsRelations = relations(requestAssetItems, ({ one }) => ({
+  request: one(requests, { fields: [requestAssetItems.requestId], references: [requests.id] }),
+  model: one(assetModels, { fields: [requestAssetItems.modelId], references: [assetModels.id] }),
+}))
+
+export const assetDistributionsRelations = relations(assetDistributions, ({ one, many }) => ({
+  actor: one(user, { fields: [assetDistributions.actorId], references: [user.id] }),
+  model: one(assetModels, { fields: [assetDistributions.modelId], references: [assetModels.id] }),
+  targets: many(assetDistributionTargets),
+}))
+
+export const assetDistributionTargetsRelations = relations(assetDistributionTargets, ({ one }) => ({
+  distribution: one(assetDistributions, { fields: [assetDistributionTargets.distributionId], references: [assetDistributions.id] }),
+  targetRoom: one(rooms, { fields: [assetDistributionTargets.targetRoomId], references: [rooms.id] }),
+  receiver: one(user, { fields: [assetDistributionTargets.receiverId], references: [user.id] }),
 }))
 
 // --- PROCUREMENT ---
@@ -962,6 +1126,18 @@ export const assetAuditsRelations = relations(assetAudits, ({ one }) => ({
   }),
 }))
 
+// --- [BARU] RELASI RESERVASI & MAINTENANCE ---
+export const roomReservationsRelations = relations(roomReservations, ({ one }) => ({
+  room: one(rooms, { fields: [roomReservations.roomId], references: [rooms.id] }),
+  booker: one(user, { fields: [roomReservations.bookerId], references: [user.id], relationName: 'reservationBooker' }),
+  approver: one(user, { fields: [roomReservations.approverId], references: [user.id], relationName: 'reservationApprover' }),
+}))
+
+export const assetMaintenancesRelations = relations(assetMaintenances, ({ one }) => ({
+  asset: one(fixedAssets, { fields: [assetMaintenances.assetId], references: [fixedAssets.id] }),
+  reporter: one(user, { fields: [assetMaintenances.reporterId], references: [user.id], relationName: 'maintenanceReporter' }),
+}))
+
 // --- USAGE ---
 export const usageReportsRelations = relations(usageReports, ({ one, many }) => ({
   user: one(user, { fields: [usageReports.userId], references: [user.id] }),
@@ -987,6 +1163,10 @@ export const userRelations = relations(user, ({ one, many }) => ({
   requests: many(requests, { relationName: 'requester' }),
   procurements: many(procurements),
   notifications: many(notifications),
+    // [BARU] Relasi aktivitas user untuk fitur baru
+  reservationsBooked: many(roomReservations, { relationName: 'reservationBooker' }),
+  reservationsApproved: many(roomReservations, { relationName: 'reservationApprover' }),
+  maintenancesReported: many(assetMaintenances, { relationName: 'maintenanceReporter' }),
 }))
 
 export const sessionRelations = relations(session, ({ one }) => ({
