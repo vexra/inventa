@@ -41,6 +41,9 @@ const statement = {
   // D. PELAPORAN
   usage_reports: ['create', 'read'], // Lapor pakai BHP
   audit_logs: ['read'], // History sistem
+
+  // E. Maintentance
+  asset_maintenances: ['create', 'read', 'update', 'delete'],
 } as const
 
 // 2. BUAT INSTANCE ACCESS CONTROL
@@ -73,6 +76,7 @@ export const super_admin = ac.newRole({
   procurements: ['create', 'read', 'update', 'approve', 'receive'],
   usage_reports: ['create', 'read'],
   audit_logs: ['read'],
+  asset_maintenances: ['create', 'read', 'update', 'delete'],
 })
 
 // WAREHOUSE STAFF (Petugas Gudang)
@@ -86,6 +90,7 @@ export const warehouse_staff = ac.newRole({
   requests: ['read', 'fulfill'], // Melihat request & Packing barang
   procurements: ['read', 'receive'], // Cek status PO & Terima barang vendor
   usage_reports: ['read'],
+  asset_maintenances: ['read', 'update'], 
 })
 
 // FACULTY ADMIN (Dekanat / WD2)
@@ -100,6 +105,7 @@ export const faculty_admin = ac.newRole({
   procurements: ['read', 'approve'], // Approve Pengadaan
   usage_reports: ['read'],
   audit_logs: ['read'],
+  asset_maintenances: ['read'], // Analisis kesehatan aset (DSS)
 })
 
 // UNIT ADMIN (Kajur / Kaprodi)
@@ -112,6 +118,7 @@ export const unit_admin = ac.newRole({
   fixed_assets: ['read'],
   requests: ['read', 'create', 'approve_unit'], // Approval Tahap 1 & Bisa request juga
   usage_reports: ['read', 'create'],
+  asset_maintenances: ['read'], // Monitor barang rusak di unitnya
 })
 
 // UNIT STAFF (Dosen / Laboran / TU)
@@ -124,6 +131,7 @@ export const unit_staff = ac.newRole({
   fixed_assets: ['read'],
   requests: ['create', 'read', 'update', 'delete', 'complete'], // Buat request & Konfirmasi terima
   usage_reports: ['create', 'read'], // Lapor praktikum
+  asset_maintenances: ['create', 'read'], // Bisa lapor barang rusak
 })
 
 // Export instance AC

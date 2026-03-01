@@ -2,6 +2,8 @@ import {
   Archive,
   Boxes,
   Building,
+  Layers,
+  CalendarDays,
   Building2,
   ClipboardList,
   Component,
@@ -20,6 +22,7 @@ import {
   Tags,
   Users,
   Warehouse,
+  Wrench,
 } from 'lucide-react'
 
 import { userRoleEnum } from '@/db/schema'
@@ -68,6 +71,12 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
+      title: 'Fasilitas & Pemeliharaan', 
+      items: [
+        { title: 'Pemeliharaan Aset', url: '/dashboard/maintenances', icon: Wrench },
+      ],
+    },
+    {
       title: 'Sistem & Keamanan',
       items: [
         { title: 'Manajemen User', url: '/dashboard/users', icon: Users },
@@ -99,6 +108,14 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           title: 'Pengadaan Barang',
           url: '/dashboard/procurements',
           icon: FileText,
+        },
+        { title: 'Pemeliharaan Aset', 
+          url: '/dashboard/maintenances', 
+          icon: Wrench 
+        },
+        { title: 'Katalog Model Aset', 
+          url: '/dashboard/asset-models', 
+          icon: Layers 
         },
       ],
     },
@@ -141,6 +158,10 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           title: 'Permintaan Barang',
           url: '/dashboard/consumable-requests',
           icon: ShoppingCart,
+        },
+        { title: 'Lapor Kerusakan', 
+          url: '/dashboard/maintenances', 
+          icon: Wrench 
         },
       ],
     },
@@ -225,6 +246,10 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
           url: '/dashboard/rooms',
           icon: MapPin,
         },
+        { title: 'Status Perbaikan', 
+          url: '/dashboard/maintenances', 
+          icon: Wrench 
+        },
       ],
     },
     {
@@ -268,6 +293,15 @@ export const roleNavItems: Record<UserRole, NavGroup[]> = {
     {
       title: 'Monitoring Inventaris',
       items: [
+        {
+          title: 'Aset Tetap',
+          url: '/dashboard/fixed-assets',
+          icon: Layers,
+        },
+        { title: 'Pemeliharaan Aset', 
+          url: '/dashboard/maintenances', 
+          icon: Wrench 
+        },
         {
           title: 'Stok Gudang',
           url: '/dashboard/warehouse-stocks',
